@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo, useCallback, useRef } from 'react'
-import type { Branch, Worktree, BranchFilter, BranchSort, CheckoutResult, PullRequest } from './types/electron'
+import type { Branch, Worktree, BranchFilter, BranchSort, CheckoutResult, PullRequest, Commit, WorkingStatus } from './types/electron'
 import './styles/app.css'
 
 interface StatusMessage {
@@ -30,6 +30,8 @@ export default function App() {
   const [worktrees, setWorktrees] = useState<Worktree[]>([])
   const [pullRequests, setPullRequests] = useState<PullRequest[]>([])
   const [prError, setPrError] = useState<string | null>(null)
+  const [commits, setCommits] = useState<Commit[]>([])
+  const [workingStatus, setWorkingStatus] = useState<WorkingStatus | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
   const [status, setStatus] = useState<StatusMessage | null>(null)
@@ -88,10 +90,12 @@ export default function App() {
     setPrError(null)
 
     try {
-      const [branchResult, worktreeResult, prResult] = await Promise.all([
+      const [branchResult, worktreeResult, prResult, commitResult, statusResult] = await Promise.all([
         window.electronAPI.getBranchesWithMetadata(),
         window.electronAPI.getWorktrees(),
         window.electronAPI.getPullRequests(),
+        window.electronAPI.getCommitHistory(15),
+        window.electronAPI.getWorkingStatus(),
       ])
 
       if ('error' in branchResult) {
@@ -113,6 +117,9 @@ export default function App() {
       } else {
         setPullRequests(prResult.prs)
       }
+
+      setCommits(commitResult)
+      setWorkingStatus(statusResult)
     } catch (err) {
       setError((err as Error).message)
     } finally {
@@ -487,7 +494,7 @@ export default function App() {
 
       {/* Main Content */}
       {repoPath && !error && (
-        <main className="ledger-content four-columns">
+        <main className="ledger-content five-columns">
           {/* Pull Requests Column */}
           <section className="column pr-column">
             <div className="column-header">
@@ -579,6 +586,74 @@ export default function App() {
                   ))}
                 </ul>
               )}
+            </div>
+          </section>
+
+          {/* Commits Timeline Column */}
+          <section className="column commits-column">
+            <div className="column-header">
+              <h2>
+                <span className="column-icon">⦿</span>
+                Commits
+              </h2>
+              <span className="count-badge">{commits.length}</span>
+            </div>
+            <div className="column-content">
+              <div className="timeline">
+                {/* Uncommitted changes as grey dot */}
+                {workingStatus?.hasChanges && (
+                  <div className="timeline-item uncommitted">
+                    <div className="timeline-node">
+                      <div className="timeline-dot uncommitted-dot" title="Uncommitted changes" />
+                      <div className="timeline-line" />
+                    </div>
+                    <div className="timeline-content">
+                      <div className="commit-message uncommitted-label">
+                        Uncommitted changes
+                      </div>
+                      <div className="commit-meta">
+                        <span className="commit-files">
+                          {workingStatus.stagedCount > 0 && (
+                            <span className="staged-count">{workingStatus.stagedCount} staged</span>
+                          )}
+                          {workingStatus.unstagedCount > 0 && (
+                            <span className="unstaged-count">{workingStatus.unstagedCount} modified</span>
+                          )}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                )}
+                {/* Actual commits */}
+                {commits.length === 0 && !workingStatus?.hasChanges ? (
+                  <div className="empty-column">No commits found</div>
+                ) : (
+                  commits.map((commit, index) => (
+                    <div 
+                      key={commit.hash} 
+                      className={`timeline-item ${commit.isMerge ? 'merge' : ''}`}
+                    >
+                      <div className="timeline-node">
+                        <div 
+                          className={`timeline-dot ${commit.isMerge ? 'merge-dot' : ''}`}
+                          title={commit.hash}
+                        />
+                        {index < commits.length - 1 && <div className="timeline-line" />}
+                      </div>
+                      <div className="timeline-content">
+                        <div className="commit-message" title={commit.message}>
+                          {commit.message}
+                        </div>
+                        <div className="commit-meta">
+                          <code className="commit-hash">{commit.shortHash}</code>
+                          <span className="commit-author">{commit.author}</span>
+                          <span className="commit-date">{formatRelativeTime(commit.date)}</span>
+                        </div>
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
             </div>
           </section>
 

@@ -429,6 +429,116 @@ export async function pullBranch(remoteBranch: string): Promise<{ success: boole
   }
 }
 
+// Commit info for timeline
+export interface CommitInfo {
+  hash: string;
+  shortHash: string;
+  message: string;
+  author: string;
+  date: string;
+  isMerge: boolean;
+}
+
+// Get recent commit history for the current branch
+export async function getCommitHistory(limit: number = 20): Promise<CommitInfo[]> {
+  if (!git) throw new Error('No repository selected');
+
+  try {
+    const log = await git.log(['-n', limit.toString(), '--format=%H|%h|%s|%an|%ci|%P']);
+    
+    return log.all.map(commit => {
+      // Check if it's a merge commit by looking at parent count
+      const parentCount = (commit.body || '').split(' ').filter(Boolean).length;
+      return {
+        hash: commit.hash,
+        shortHash: commit.hash.slice(0, 7),
+        message: commit.message,
+        author: commit.author_name,
+        date: commit.date,
+        isMerge: parentCount > 1,
+      };
+    });
+  } catch {
+    return [];
+  }
+}
+
+// Get list of uncommitted files (staged + unstaged + untracked)
+export interface UncommittedFile {
+  path: string;
+  status: 'modified' | 'added' | 'deleted' | 'renamed' | 'untracked';
+  staged: boolean;
+}
+
+export async function getUncommittedFiles(): Promise<UncommittedFile[]> {
+  if (!git) throw new Error('No repository selected');
+
+  try {
+    const status = await git.status();
+    const files: UncommittedFile[] = [];
+
+    // Staged files
+    for (const file of status.staged) {
+      files.push({ path: file, status: 'added', staged: true });
+    }
+    
+    // Modified files
+    for (const file of status.modified) {
+      const isStaged = status.staged.includes(file);
+      files.push({ path: file, status: 'modified', staged: isStaged });
+    }
+
+    // Deleted files
+    for (const file of status.deleted) {
+      files.push({ path: file, status: 'deleted', staged: false });
+    }
+
+    // Renamed files
+    for (const file of status.renamed) {
+      files.push({ path: file.to, status: 'renamed', staged: true });
+    }
+
+    // Untracked (new) files
+    for (const file of status.not_added) {
+      files.push({ path: file, status: 'untracked', staged: false });
+    }
+
+    // Also check created files
+    for (const file of status.created) {
+      if (!files.some(f => f.path === file)) {
+        files.push({ path: file, status: 'added', staged: true });
+      }
+    }
+
+    return files;
+  } catch {
+    return [];
+  }
+}
+
+// Get working directory status summary
+export interface WorkingStatus {
+  hasChanges: boolean;
+  files: UncommittedFile[];
+  stagedCount: number;
+  unstagedCount: number;
+}
+
+export async function getWorkingStatus(): Promise<WorkingStatus> {
+  if (!git) throw new Error('No repository selected');
+
+  const files = await getUncommittedFiles();
+  const stagedCount = files.filter(f => f.staged).length;
+  const unstagedCount = files.filter(f => !f.staged).length;
+
+  return {
+    hasChanges: files.length > 0,
+    files,
+    stagedCount,
+    unstagedCount,
+  };
+}
+
 // Checkout a PR branch (by branch name)
 export async function checkoutPRBranch(branchName: string): Promise<{ success: boolean; message: string; stashed?: string }> {
   if (!git) throw new Error('No repository selected');

@@ -14,6 +14,8 @@ import {
   openBranchInGitHub,
   pullBranch,
   checkoutPRBranch,
+  getCommitHistory,
+  getWorkingStatus,
 } from './git-service'
 import { getLastRepoPath, saveLastRepoPath } from './settings-service'
 
@@ -133,6 +135,22 @@ app.whenReady().then(() => {
 
   ipcMain.handle('checkout-pr-branch', async (_, branchName: string) => {
     return await checkoutPRBranch(branchName);
+  });
+
+  ipcMain.handle('get-commit-history', async (_, limit?: number) => {
+    try {
+      return await getCommitHistory(limit);
+    } catch (error) {
+      return [];
+    }
+  });
+
+  ipcMain.handle('get-working-status', async () => {
+    try {
+      return await getWorkingStatus();
+    } catch (error) {
+      return { hasChanges: false, files: [], stagedCount: 0, unstagedCount: 0 };
+    }
   });
 
   // Set app user model id for windows

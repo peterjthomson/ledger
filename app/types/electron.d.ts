@@ -54,6 +54,28 @@ export interface PullRequestsResult {
   error?: string;
 }
 
+export interface Commit {
+  hash: string;
+  shortHash: string;
+  message: string;
+  author: string;
+  date: string;
+  isMerge: boolean;
+}
+
+export interface UncommittedFile {
+  path: string;
+  status: 'modified' | 'added' | 'deleted' | 'renamed' | 'untracked';
+  staged: boolean;
+}
+
+export interface WorkingStatus {
+  hasChanges: boolean;
+  files: UncommittedFile[];
+  stagedCount: number;
+  unstagedCount: number;
+}
+
 export interface ElectronAPI {
   selectRepo: () => Promise<string | null>;
   getRepoPath: () => Promise<string | null>;
@@ -73,6 +95,9 @@ export interface ElectronAPI {
   // Remote operations
   openBranchInGitHub: (branchName: string) => Promise<{ success: boolean; message: string }>;
   pullBranch: (remoteBranch: string) => Promise<{ success: boolean; message: string }>;
+  // Commit history and working status
+  getCommitHistory: (limit?: number) => Promise<Commit[]>;
+  getWorkingStatus: () => Promise<WorkingStatus>;
 }
 
 declare global {

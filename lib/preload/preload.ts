@@ -21,6 +21,9 @@ const electronAPI = {
   // Remote operations
   openBranchInGitHub: (branchName: string) => ipcRenderer.invoke('open-branch-in-github', branchName),
   pullBranch: (remoteBranch: string) => ipcRenderer.invoke('pull-branch', remoteBranch),
+  // Commit history and working status
+  getCommitHistory: (limit?: number) => ipcRenderer.invoke('get-commit-history', limit),
+  getWorkingStatus: () => ipcRenderer.invoke('get-working-status'),
 }
 
 // Use `contextBridge` APIs to expose APIs to

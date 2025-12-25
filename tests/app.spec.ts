@@ -86,9 +86,9 @@ test.describe('Ledger App - Main View', () => {
     await app.close()
   })
 
-  test('displays four-column layout', async () => {
+  test('displays five-column layout', async () => {
     test.skip(!repoLoaded, 'Repo did not auto-load')
-    await expect(page.locator('.ledger-content.four-columns')).toBeVisible()
+    await expect(page.locator('.ledger-content.five-columns')).toBeVisible()
   })
 
   test('displays Pull Requests column', async () => {
