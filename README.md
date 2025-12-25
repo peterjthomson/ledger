@@ -2,9 +2,14 @@
 
 A modern git interface for macOS - view branches, worktrees, and pull requests at a glance.
 
-![Electron](https://img.shields.io/badge/Electron-37-blue)
-![React](https://img.shields.io/badge/React-19-blue)
-![TypeScript](https://img.shields.io/badge/TypeScript-5-blue)
+[![Download](https://img.shields.io/badge/Download-v0.1.0-blue?style=for-the-badge)](https://github.com/peterjthomson/ledger/releases/download/v0.1.0/Ledger-0.1.0-arm64.dmg)
+[![GitHub Release](https://img.shields.io/github/v/release/peterjthomson/ledger?style=flat-square)](https://github.com/peterjthomson/ledger/releases)
+
+## Download
+
+**[⬇️ Download Ledger for Mac (Apple Silicon)](https://github.com/peterjthomson/ledger/releases/download/v0.1.0/Ledger-0.1.0-arm64.dmg)**
+
+> ⚠️ **First launch:** The app is unsigned. Right-click → Open to bypass Gatekeeper.
 
 ## Features
 
@@ -19,11 +24,12 @@ A modern git interface for macOS - view branches, worktrees, and pull requests a
 
 ## Requirements
 
-- macOS
-- Node.js 18+
-- [GitHub CLI](https://cli.github.com/) (`gh`) - for PR integration
+- macOS (Apple Silicon)
+- [GitHub CLI](https://cli.github.com/) (`gh`) - optional, for PR integration
 
-## Installation
+## Development
+
+### Installation
 
 ```bash
 # Clone the repository
