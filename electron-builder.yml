@@ -1,5 +1,5 @@
-appId: com.guasam.era
-productName: ElectronReactApp
+appId: com.peterjthomson.ledger
+productName: Ledger
 directories:
   buildResources: resources/build
 files:
@@ -12,32 +12,42 @@ files:
 asarUnpack:
   - resources/**
 win:
-  executableName: ElectronReactApp
+  executableName: Ledger
 nsis:
   artifactName: ${name}-${version}-setup.${ext}
   shortcutName: ${productName}
   uninstallDisplayName: ${productName}
   createDesktopShortcut: always
 mac:
+  # Build for Apple Silicon (arm64), Intel (x64), or both (universal)
+  target:
+    - target: dmg
+      arch:
+        - arm64        # Apple Silicon only (smaller, faster)
+        # - x64        # Intel only
+        # - universal  # Both (larger file ~2x size)
+    - target: zip
+      arch:
+        - arm64
+  category: public.app-category.developer-tools
   entitlementsInherit: resources/build/entitlements.mac.plist
   extendInfo:
-    - NSCameraUsageDescription: Application requests access to the device's camera.
-    - NSMicrophoneUsageDescription: Application requests access to the device's microphone.
-    - NSDocumentsFolderUsageDescription: Application requests access to the user's Documents folder.
-    - NSDownloadsFolderUsageDescription: Application requests access to the user's Downloads folder.
+    - NSDocumentsFolderUsageDescription: Ledger needs access to read git repositories.
+    - NSDownloadsFolderUsageDescription: Ledger needs access to read git repositories.
   notarize: false
 dmg:
-  artifactName: ${name}-${version}.${ext}
+  artifactName: ${productName}-${version}-${arch}.${ext}
+  title: ${productName}
 linux:
   target:
     - AppImage
-    - snap
     - deb
-  maintainer: electronjs.org
-  category: Utility
+  maintainer: peterjthomson
+  category: Development
 appImage:
   artifactName: ${name}-${version}.${ext}
 npmRebuild: false
 publish:
-  provider: generic
-  url: https://example.com/auto-updates
+  provider: github
+  owner: peterjthomson
+  repo: ledger

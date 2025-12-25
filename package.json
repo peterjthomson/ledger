@@ -1,12 +1,12 @@
 {
-  "name": "era",
-  "version": "12.0.0",
-  "description": "A modern Electron application template with React, Vite, TypeScript, Shadcn UI and TailwindCSS",
+  "name": "ledger",
+  "version": "0.1.0",
+  "description": "A modern git interface for macOS - view branches, worktrees, and pull requests",
   "main": "./out/main/main.js",
   "license": "MIT",
   "author": {
-    "name": "Guasam",
-    "url": "https://github.com/guasam"
+    "name": "Peter Thomson",
+    "url": "https://github.com/peterjthomson"
   },
   "scripts": {
     "dev": "cross-env ELECTRON_DISABLE_SANDBOX=1 electron-vite dev -w",
@@ -17,16 +17,23 @@
     "vite:build:app": "electron-vite build",
     "electron:build:win": "electron-builder --win",
     "electron:build:mac": "electron-builder --mac",
+    "electron:build:mac:arm64": "electron-builder --mac --arm64",
+    "electron:build:mac:x64": "electron-builder --mac --x64",
+    "electron:build:mac:universal": "electron-builder --mac --universal",
     "electron:build:linux": "electron-builder --linux",
     "electron:build:dir": "electron-builder --dir",
     "build:unpack": "run-s vite:build:app electron:build:dir",
     "build:win": "run-s vite:build:app electron:build:win",
     "build:mac": "run-s vite:build:app electron:build:mac",
-    "build:linux": "run-s vite:build:app electron:build:linux"
+    "build:mac:arm64": "run-s vite:build:app electron:build:mac:arm64",
+    "build:mac:x64": "run-s vite:build:app electron:build:mac:x64",
+    "build:mac:universal": "run-s vite:build:app electron:build:mac:universal",
+    "build:linux": "run-s vite:build:app electron:build:linux",
+    "release": "run-s vite:build:app && electron-builder --mac --publish always"
   },
   "repository": {
     "type": "git",
-    "url": "https://github.com/guasam/electron-react-app"
+    "url": "https://github.com/peterjthomson/ledger"
   },
   "pnpm": {
     "onlyBuiltDependencies": [
