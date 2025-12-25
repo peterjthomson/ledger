@@ -15,6 +15,7 @@ import {
   pullBranch,
   checkoutPRBranch,
 } from './git-service'
+import { getLastRepoPath, saveLastRepoPath } from './settings-service'
 
 // This method will be called when Electron has finished
 // initialization and is ready to create browser windows.
@@ -33,11 +34,25 @@ app.whenReady().then(() => {
     
     const path = result.filePaths[0];
     setRepoPath(path);
+    saveLastRepoPath(path); // Save for next launch
     return path;
   });
 
   ipcMain.handle('get-repo-path', () => {
     return getRepoPath();
+  });
+
+  ipcMain.handle('get-saved-repo-path', () => {
+    return getLastRepoPath();
+  });
+
+  ipcMain.handle('load-saved-repo', () => {
+    const savedPath = getLastRepoPath();
+    if (savedPath) {
+      setRepoPath(savedPath);
+      return savedPath;
+    }
+    return null;
   });
 
   ipcMain.handle('get-branches', async () => {

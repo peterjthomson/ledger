@@ -57,6 +57,8 @@ export interface PullRequestsResult {
 export interface ElectronAPI {
   selectRepo: () => Promise<string | null>;
   getRepoPath: () => Promise<string | null>;
+  getSavedRepoPath: () => Promise<string | null>;
+  loadSavedRepo: () => Promise<string | null>;
   getBranches: () => Promise<BranchesResult>;
   getBranchesWithMetadata: () => Promise<BranchesResult>;
   getWorktrees: () => Promise<Worktree[] | { error: string }>;

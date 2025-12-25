@@ -307,7 +307,8 @@ export default function App() {
 
   useEffect(() => {
     if (!window.electronAPI) return
-    window.electronAPI.getRepoPath().then((path) => {
+    // Try to load the saved repo from last session
+    window.electronAPI.loadSavedRepo().then((path) => {
       if (path) {
         setRepoPath(path)
         refresh()

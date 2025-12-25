@@ -5,6 +5,8 @@ import { conveyor } from '@/lib/conveyor/api'
 const electronAPI = {
   selectRepo: () => ipcRenderer.invoke('select-repo'),
   getRepoPath: () => ipcRenderer.invoke('get-repo-path'),
+  getSavedRepoPath: () => ipcRenderer.invoke('get-saved-repo-path'),
+  loadSavedRepo: () => ipcRenderer.invoke('load-saved-repo'),
   getBranches: () => ipcRenderer.invoke('get-branches'),
   getBranchesWithMetadata: () => ipcRenderer.invoke('get-branches-with-metadata'),
   getWorktrees: () => ipcRenderer.invoke('get-worktrees'),
