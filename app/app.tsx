@@ -477,7 +477,7 @@ export default function App() {
         <div className="empty-state">
           <div className="empty-icon">◈</div>
           <h2>Welcome to Ledger</h2>
-          <p>Select a git repository to view branches and worktrees</p>
+          <p>Select a git repository to view your branches, worktrees and pull requests</p>
           <button onClick={selectRepo} className="btn btn-large btn-primary">
             <span className="btn-icon">📁</span>
             Select Repository
@@ -547,7 +547,7 @@ export default function App() {
           <section className="column worktrees-column">
             <div className="column-header">
               <h2>
-                <span className="column-icon">🌳</span>
+                <span className="column-icon">📁</span>
                 Worktrees
               </h2>
               <span className="count-badge">{worktrees.length}</span>

@@ -17,6 +17,10 @@ import {
 } from './git-service'
 import { getLastRepoPath, saveLastRepoPath } from './settings-service'
 
+// Check for --repo command line argument (for testing)
+const repoArgIndex = process.argv.findIndex(arg => arg.startsWith('--repo='))
+const testRepoPath = repoArgIndex !== -1 ? process.argv[repoArgIndex].split('=')[1] : null
+
 // This method will be called when Electron has finished
 // initialization and is ready to create browser windows.
 // Some APIs can only be used after this event occurs.
@@ -47,6 +51,12 @@ app.whenReady().then(() => {
   });
 
   ipcMain.handle('load-saved-repo', () => {
+    // Check for test repo path first (command line argument)
+    if (testRepoPath) {
+      setRepoPath(testRepoPath);
+      return testRepoPath;
+    }
+    // Otherwise use saved settings
     const savedPath = getLastRepoPath();
     if (savedPath) {
       setRepoPath(savedPath);
