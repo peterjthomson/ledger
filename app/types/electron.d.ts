@@ -18,11 +18,24 @@ export interface BranchesResult {
   error?: string;
 }
 
+export type WorktreeAgent = 'cursor' | 'claude' | 'gemini' | 'junie' | 'unknown';
+
 export interface Worktree {
   path: string;
   head: string;
   branch: string | null;
   bare: boolean;
+  // Agent workspace metadata
+  agent: WorktreeAgent;
+  agentIndex: number;            // 1, 2, 3... per agent type
+  contextHint: string;           // Primary file or branch name
+  displayName: string;           // "Cursor 1: DocsController"
+  // Diff stats
+  changedFileCount: number;
+  additions: number;
+  deletions: number;
+  // For ordering
+  lastModified: string;          // Directory mtime (ISO string)
 }
 
 export type BranchFilter = 'all' | 'local-only' | 'unmerged';
@@ -47,7 +60,12 @@ export interface PullRequest {
   deletions: number;
   reviewDecision: string | null;
   labels: string[];
+  isDraft: boolean;
+  comments: number;
 }
+
+export type PRFilter = 'all' | 'open-not-draft' | 'open-draft';
+export type PRSort = 'updated' | 'comments' | 'first-commit' | 'last-commit';
 
 export interface PullRequestsResult {
   prs: PullRequest[];

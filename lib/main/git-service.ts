@@ -1,8 +1,11 @@
 import { simpleGit, SimpleGit } from 'simple-git';
 import { exec } from 'child_process';
 import { promisify } from 'util';
+import * as fs from 'fs';
+import * as path from 'path';
 
 const execAsync = promisify(exec);
+const statAsync = promisify(fs.stat);
 
 let git: SimpleGit | null = null;
 let repoPath: string | null = null;
@@ -192,6 +195,187 @@ export async function getWorktrees() {
   return worktrees;
 }
 
+// Agent workspace types
+export type WorktreeAgent = 'cursor' | 'claude' | 'gemini' | 'junie' | 'unknown';
+
+export interface EnhancedWorktree {
+  path: string;
+  head: string;
+  branch: string | null;
+  bare: boolean;
+  // Agent workspace metadata
+  agent: WorktreeAgent;
+  agentIndex: number;
+  contextHint: string;
+  displayName: string;
+  // Diff stats
+  changedFileCount: number;
+  additions: number;
+  deletions: number;
+  // For ordering
+  lastModified: string;
+}
+
+// Detect which agent created this worktree based on its path
+function detectAgent(worktreePath: string): WorktreeAgent {
+  // Cursor stores worktrees in ~/.cursor/worktrees/
+  if (worktreePath.includes('/.cursor/worktrees/')) {
+    return 'cursor';
+  }
+  
+  // Claude Code might use ~/.claude/worktrees/ or similar
+  if (worktreePath.includes('/.claude/worktrees/') || worktreePath.includes('/claude-worktrees/')) {
+    return 'claude';
+  }
+  
+  // Add other agent patterns as we discover them
+  // For now, if it's not in a known agent path, mark as unknown
+  return 'unknown';
+}
+
+// Get diff stats for a worktree
+async function getWorktreeDiffStats(worktreePath: string): Promise<{
+  changedFileCount: number;
+  additions: number;
+  deletions: number;
+  changedFiles: string[];
+}> {
+  try {
+    // Get changed files count and names
+    const { stdout: statusOutput } = await execAsync('git status --porcelain', { cwd: worktreePath });
+    const changedFiles = statusOutput.split('\n').filter(Boolean).map(line => line.slice(3));
+    
+    // Get diff stats (additions/deletions)
+    const { stdout: diffOutput } = await execAsync('git diff --shortstat', { cwd: worktreePath });
+    
+    let additions = 0;
+    let deletions = 0;
+    
+    // Parse "2 files changed, 6 insertions(+), 1 deletion(-)"
+    const insertMatch = diffOutput.match(/(\d+) insertion/);
+    const deleteMatch = diffOutput.match(/(\d+) deletion/);
+    
+    if (insertMatch) additions = parseInt(insertMatch[1], 10);
+    if (deleteMatch) deletions = parseInt(deleteMatch[1], 10);
+
+    return {
+      changedFileCount: changedFiles.length,
+      additions,
+      deletions,
+      changedFiles,
+    };
+  } catch {
+    return { changedFileCount: 0, additions: 0, deletions: 0, changedFiles: [] };
+  }
+}
+
+// Get the context hint (primary modified file or branch name)
+function getContextHint(
+  branch: string | null,
+  changedFiles: string[],
+  commitMessage: string
+): string {
+  // Priority 1: Primary modified file (if any changes)
+  if (changedFiles.length > 0) {
+    const primaryFile = changedFiles[0];
+    const basename = path.basename(primaryFile);
+    // Remove extension for cleaner display
+    const name = basename.replace(/\.[^.]+$/, '');
+    return name;
+  }
+
+  // Priority 2: Branch name (if not detached)
+  if (branch) {
+    // Clean up branch name - take last segment if it's a path
+    const segments = branch.split('/');
+    return segments[segments.length - 1];
+  }
+
+  // Priority 3: Commit message (truncated)
+  if (commitMessage) {
+    return commitMessage.slice(0, 20) + (commitMessage.length > 20 ? '…' : '');
+  }
+
+  return 'workspace';
+}
+
+// Get last commit message for a worktree
+async function getWorktreeCommitMessage(worktreePath: string): Promise<string> {
+  try {
+    const { stdout } = await execAsync('git log -1 --format=%s', { cwd: worktreePath });
+    return stdout.trim();
+  } catch {
+    return '';
+  }
+}
+
+// Get directory modification time
+async function getDirectoryMtime(dirPath: string): Promise<string> {
+  try {
+    const stat = await statAsync(dirPath);
+    return stat.mtime.toISOString();
+  } catch {
+    return new Date().toISOString();
+  }
+}
+
+// Get enhanced worktrees with agent detection and metadata
+export async function getEnhancedWorktrees(): Promise<EnhancedWorktree[]> {
+  if (!git) throw new Error('No repository selected');
+
+  // Get basic worktree list
+  const basicWorktrees = await getWorktrees();
+
+  // Enhance each worktree with metadata (in parallel)
+  const enhancedPromises = basicWorktrees.map(async (wt) => {
+    const [diffStats, commitMessage, lastModified] = await Promise.all([
+      getWorktreeDiffStats(wt.path),
+      getWorktreeCommitMessage(wt.path),
+      getDirectoryMtime(wt.path),
+    ]);
+
+    const agent = detectAgent(wt.path);
+    const contextHint = getContextHint(wt.branch, diffStats.changedFiles, commitMessage);
+
+    return {
+      ...wt,
+      agent,
+      agentIndex: 0, // Will be assigned after sorting
+      contextHint,
+      displayName: '', // Will be set after agentIndex is assigned
+      changedFileCount: diffStats.changedFileCount,
+      additions: diffStats.additions,
+      deletions: diffStats.deletions,
+      lastModified,
+    };
+  });
+
+  const enhanced = await Promise.all(enhancedPromises);
+
+  // Sort by lastModified to assign agent indices in creation order
+  enhanced.sort((a, b) => new Date(a.lastModified).getTime() - new Date(b.lastModified).getTime());
+
+  // Assign agent indices per agent type
+  const agentCounters: Record<WorktreeAgent, number> = {
+    cursor: 0,
+    claude: 0,
+    gemini: 0,
+    junie: 0,
+    unknown: 0,
+  };
+
+  for (const wt of enhanced) {
+    agentCounters[wt.agent]++;
+    wt.agentIndex = agentCounters[wt.agent];
+    
+    // Format displayName as "Agent N: contextHint"
+    const agentName = wt.agent.charAt(0).toUpperCase() + wt.agent.slice(1);
+    wt.displayName = `${agentName} ${wt.agentIndex}: ${wt.contextHint}`;
+  }
+
+  return enhanced;
+}
+
 // Check if there are uncommitted changes
 export async function hasUncommittedChanges(): Promise<boolean> {
   if (!git) throw new Error('No repository selected');
@@ -300,6 +484,8 @@ export interface PullRequest {
   deletions: number;
   reviewDecision: string | null;
   labels: string[];
+  isDraft: boolean;
+  comments: number;
 }
 
 // Fetch open, non-draft pull requests using GitHub CLI
@@ -310,17 +496,16 @@ export async function getPullRequests(): Promise<{ prs: PullRequest[]; error?: s
 
   try {
     // Use gh CLI to list PRs in JSON format
-    // Filter: open state, not draft
+    // Fetch all open PRs (filtering will happen in UI)
     const { stdout } = await execAsync(
-      `gh pr list --state open --json number,title,author,headRefName,baseRefName,url,createdAt,updatedAt,additions,deletions,reviewDecision,labels,isDraft`,
+      `gh pr list --state open --json number,title,author,headRefName,baseRefName,url,createdAt,updatedAt,additions,deletions,reviewDecision,labels,isDraft,comments`,
       { cwd: repoPath }
     );
 
     const rawPRs = JSON.parse(stdout);
     
-    // Filter out drafts and map to our interface
+    // Map to our interface (include all, filtering done in UI)
     const prs: PullRequest[] = rawPRs
-      .filter((pr: any) => !pr.isDraft)
       .map((pr: any) => ({
         number: pr.number,
         title: pr.title,
@@ -334,6 +519,8 @@ export async function getPullRequests(): Promise<{ prs: PullRequest[]; error?: s
         deletions: pr.deletions || 0,
         reviewDecision: pr.reviewDecision,
         labels: (pr.labels || []).map((l: any) => l.name),
+        isDraft: pr.isDraft || false,
+        comments: pr.comments?.totalCount || 0,
       }));
 
     return { prs };

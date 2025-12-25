@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo, useCallback, useRef } from 'react'
-import type { Branch, Worktree, BranchFilter, BranchSort, CheckoutResult, PullRequest, Commit, WorkingStatus } from './types/electron'
+import type { Branch, Worktree, BranchFilter, BranchSort, CheckoutResult, PullRequest, Commit, WorkingStatus, PRFilter, PRSort } from './types/electron'
 import './styles/app.css'
 
 interface StatusMessage {
@@ -43,6 +43,13 @@ export default function App() {
   const [localSort, setLocalSort] = useState<BranchSort>('name')
   const [remoteFilter, setRemoteFilter] = useState<BranchFilter>('all')
   const [remoteSort, setRemoteSort] = useState<BranchSort>('name')
+  const [prFilter, setPrFilter] = useState<PRFilter>('open-not-draft')
+  const [prSort, setPrSort] = useState<PRSort>('updated')
+  
+  // Collapsible controls state
+  const [prControlsOpen, setPrControlsOpen] = useState(false)
+  const [localControlsOpen, setLocalControlsOpen] = useState(false)
+  const [remoteControlsOpen, setRemoteControlsOpen] = useState(false)
 
   const menuRef = useRef<HTMLDivElement>(null)
 
@@ -370,6 +377,43 @@ export default function App() {
     return sortBranches(filtered, remoteSort)
   }, [branches, remoteFilter, remoteSort])
 
+  // Filter and sort PRs
+  const filteredPRs = useMemo(() => {
+    let filtered = [...pullRequests]
+    
+    // Apply filter
+    switch (prFilter) {
+      case 'open-not-draft':
+        filtered = filtered.filter(pr => !pr.isDraft)
+        break
+      case 'open-draft':
+        filtered = filtered.filter(pr => pr.isDraft)
+        break
+      case 'all':
+      default:
+        break
+    }
+    
+    // Apply sort
+    switch (prSort) {
+      case 'comments':
+        filtered.sort((a, b) => b.comments - a.comments)
+        break
+      case 'first-commit':
+        filtered.sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime())
+        break
+      case 'last-commit':
+        filtered.sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime())
+        break
+      case 'updated':
+      default:
+        filtered.sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime())
+        break
+    }
+    
+    return filtered
+  }, [pullRequests, prFilter, prSort])
+
   const formatDate = (dateStr?: string) => {
     if (!dateStr) return ''
     const date = new Date(dateStr)
@@ -497,33 +541,70 @@ export default function App() {
         <main className="ledger-content five-columns">
           {/* Pull Requests Column */}
           <section className="column pr-column">
-            <div className="column-header">
-              <h2>
-                <span className="column-icon">⬡</span>
-                Pull Requests
-              </h2>
-              <span className="count-badge">{pullRequests.length}</span>
+            <div 
+              className={`column-header clickable-header ${prControlsOpen ? 'open' : ''}`}
+              onClick={() => setPrControlsOpen(!prControlsOpen)}
+            >
+              <div className="column-title">
+                <h2>
+                  <span className="column-icon">⬡</span>
+                  Pull Requests
+                </h2>
+                <span className={`header-chevron ${prControlsOpen ? 'open' : ''}`}>▾</span>
+              </div>
+              <span className="count-badge">{filteredPRs.length}</span>
             </div>
+            {prControlsOpen && (
+              <div className="column-controls" onClick={(e) => e.stopPropagation()}>
+                <div className="control-group">
+                  <label>Filter</label>
+                  <select 
+                    value={prFilter} 
+                    onChange={(e) => setPrFilter(e.target.value as PRFilter)}
+                    className="control-select"
+                  >
+                    <option value="all">All Open</option>
+                    <option value="open-not-draft">Open + Not Draft</option>
+                    <option value="open-draft">Open + Draft</option>
+                  </select>
+                </div>
+                <div className="control-group">
+                  <label>Sort</label>
+                  <select 
+                    value={prSort} 
+                    onChange={(e) => setPrSort(e.target.value as PRSort)}
+                    className="control-select"
+                  >
+                    <option value="updated">Last Updated</option>
+                    <option value="comments">Comments</option>
+                    <option value="first-commit">First Commit</option>
+                    <option value="last-commit">Last Commit</option>
+                  </select>
+                </div>
+              </div>
+            )}
             <div className="column-content">
               {prError ? (
                 <div className="empty-column pr-error">
                   <span className="pr-error-icon">⚠</span>
                   {prError}
                 </div>
-              ) : pullRequests.length === 0 ? (
-                <div className="empty-column">No open PRs</div>
+              ) : filteredPRs.length === 0 ? (
+                <div className="empty-column">
+                  {prFilter !== 'all' ? 'No PRs match filter' : 'No open PRs'}
+                </div>
               ) : (
                 <ul className="item-list">
-                  {pullRequests.map((pr) => (
+                  {filteredPRs.map((pr) => (
                     <li
                       key={pr.number}
-                      className="item pr-item clickable"
+                      className={`item pr-item clickable ${pr.isDraft ? 'draft' : ''}`}
                       onDoubleClick={() => handlePRDoubleClick(pr)}
                       onContextMenu={(e) => handleContextMenu(e, 'pr', pr)}
                     >
                       <div className="item-main">
-                        <span className="pr-number">#{pr.number}</span>
                         <div className="item-badges">
+                          {pr.isDraft && <span className="badge badge-draft">draft</span>}
                           {getReviewBadge(pr.reviewDecision)}
                         </div>
                       </div>
@@ -538,6 +619,9 @@ export default function App() {
                       <div className="item-meta">
                         <span className="pr-author">@{pr.author}</span>
                         <span className="pr-time">{formatRelativeTime(pr.updatedAt)}</span>
+                        {pr.comments > 0 && (
+                          <span className="pr-comments">💬 {pr.comments}</span>
+                        )}
                         <span className="pr-diff">
                           <span className="pr-additions">+{pr.additions}</span>
                           <span className="pr-deletions">-{pr.deletions}</span>
@@ -554,14 +638,14 @@ export default function App() {
           <section className="column worktrees-column">
             <div className="column-header">
               <h2>
-                <span className="column-icon">📁</span>
-                Worktrees
+                <span className="column-icon">⧉</span>
+                Workspaces
               </h2>
               <span className="count-badge">{worktrees.length}</span>
             </div>
             <div className="column-content">
               {worktrees.length === 0 ? (
-                <div className="empty-column">No worktrees found</div>
+                <div className="empty-column">No workspaces found</div>
               ) : (
                 <ul className="item-list">
                   {worktrees.map((wt) => (
@@ -572,15 +656,24 @@ export default function App() {
                       onContextMenu={(e) => handleContextMenu(e, 'worktree', wt)}
                     >
                       <div className="item-main">
-                        <span className="item-name">{wt.branch || '(detached HEAD)'}</span>
+                        <span className="workspace-name-badge">{wt.displayName}</span>
                         {wt.branch === currentBranch && <span className="current-indicator">●</span>}
                       </div>
                       <div className="item-path" title={wt.path}>
-                        {wt.path}
+                        {wt.path.replace(/^\/Users\/[^/]+/, '~')}
                       </div>
-                      <div className="item-meta">
-                        <code className="commit-hash">{wt.head?.slice(0, 7)}</code>
-                        {wt.bare && <span className="bare-badge">bare</span>}
+                      <div className="item-meta worktree-stats">
+                        {(wt.additions > 0 || wt.deletions > 0) && (
+                          <>
+                            {wt.additions > 0 && <span className="diff-additions">+{wt.additions}</span>}
+                            {wt.deletions > 0 && <span className="diff-deletions">-{wt.deletions}</span>}
+                            <span className="diff-separator">·</span>
+                          </>
+                        )}
+                        {wt.changedFileCount > 0 && (
+                          <span className="file-count">{wt.changedFileCount} {wt.changedFileCount === 1 ? 'file' : 'files'}</span>
+                        )}
+                        {wt.changedFileCount === 0 && <span className="clean-indicator">clean</span>}
                       </div>
                     </li>
                   ))}
@@ -659,42 +752,48 @@ export default function App() {
 
           {/* Local Branches Column */}
           <section className="column branches-column">
-            <div className="column-header">
+            <div 
+              className={`column-header clickable-header ${localControlsOpen ? 'open' : ''}`}
+              onClick={() => setLocalControlsOpen(!localControlsOpen)}
+            >
               <div className="column-title">
                 <h2>
                   <span className="column-icon">⎇</span>
                   Local Branches
                 </h2>
-                <span className="count-badge">{localBranches.length}</span>
+                <span className={`header-chevron ${localControlsOpen ? 'open' : ''}`}>▾</span>
               </div>
+              <span className="count-badge">{localBranches.length}</span>
             </div>
-            <div className="column-controls">
-              <div className="control-group">
-                <label>Filter</label>
-                <select 
-                  value={localFilter} 
-                  onChange={(e) => setLocalFilter(e.target.value as BranchFilter)}
-                  className="control-select"
-                >
-                  <option value="all">All</option>
-                  <option value="local-only">Local Only</option>
-                  <option value="unmerged">Unmerged</option>
-                </select>
+            {localControlsOpen && (
+              <div className="column-controls" onClick={(e) => e.stopPropagation()}>
+                <div className="control-group">
+                  <label>Filter</label>
+                  <select 
+                    value={localFilter} 
+                    onChange={(e) => setLocalFilter(e.target.value as BranchFilter)}
+                    className="control-select"
+                  >
+                    <option value="all">All</option>
+                    <option value="local-only">Local Only</option>
+                    <option value="unmerged">Unmerged</option>
+                  </select>
+                </div>
+                <div className="control-group">
+                  <label>Sort</label>
+                  <select 
+                    value={localSort} 
+                    onChange={(e) => setLocalSort(e.target.value as BranchSort)}
+                    className="control-select"
+                  >
+                    <option value="name">Name</option>
+                    <option value="last-commit">Last Commit</option>
+                    <option value="first-commit">First Commit</option>
+                    <option value="most-commits">Most Commits</option>
+                  </select>
+                </div>
               </div>
-              <div className="control-group">
-                <label>Sort</label>
-                <select 
-                  value={localSort} 
-                  onChange={(e) => setLocalSort(e.target.value as BranchSort)}
-                  className="control-select"
-                >
-                  <option value="name">Name</option>
-                  <option value="last-commit">Last Commit</option>
-                  <option value="first-commit">First Commit</option>
-                  <option value="most-commits">Most Commits</option>
-                </select>
-              </div>
-            </div>
+            )}
             <div className="column-content">
               {localBranches.length === 0 ? (
                 <div className="empty-column">
@@ -738,41 +837,47 @@ export default function App() {
 
           {/* Remote Branches Column */}
           <section className="column remotes-column">
-            <div className="column-header">
+            <div 
+              className={`column-header clickable-header ${remoteControlsOpen ? 'open' : ''}`}
+              onClick={() => setRemoteControlsOpen(!remoteControlsOpen)}
+            >
               <div className="column-title">
                 <h2>
                   <span className="column-icon">☁</span>
                   Remote Branches
                 </h2>
-                <span className="count-badge">{remoteBranches.length}</span>
+                <span className={`header-chevron ${remoteControlsOpen ? 'open' : ''}`}>▾</span>
               </div>
+              <span className="count-badge">{remoteBranches.length}</span>
             </div>
-            <div className="column-controls">
-              <div className="control-group">
-                <label>Filter</label>
-                <select 
-                  value={remoteFilter} 
-                  onChange={(e) => setRemoteFilter(e.target.value as BranchFilter)}
-                  className="control-select"
-                >
-                  <option value="all">All</option>
-                  <option value="unmerged">Unmerged</option>
-                </select>
+            {remoteControlsOpen && (
+              <div className="column-controls" onClick={(e) => e.stopPropagation()}>
+                <div className="control-group">
+                  <label>Filter</label>
+                  <select 
+                    value={remoteFilter} 
+                    onChange={(e) => setRemoteFilter(e.target.value as BranchFilter)}
+                    className="control-select"
+                  >
+                    <option value="all">All</option>
+                    <option value="unmerged">Unmerged</option>
+                  </select>
+                </div>
+                <div className="control-group">
+                  <label>Sort</label>
+                  <select 
+                    value={remoteSort} 
+                    onChange={(e) => setRemoteSort(e.target.value as BranchSort)}
+                    className="control-select"
+                  >
+                    <option value="name">Name</option>
+                    <option value="last-commit">Last Commit</option>
+                    <option value="first-commit">First Commit</option>
+                    <option value="most-commits">Most Commits</option>
+                  </select>
+                </div>
               </div>
-              <div className="control-group">
-                <label>Sort</label>
-                <select 
-                  value={remoteSort} 
-                  onChange={(e) => setRemoteSort(e.target.value as BranchSort)}
-                  className="control-select"
-                >
-                  <option value="name">Name</option>
-                  <option value="last-commit">Last Commit</option>
-                  <option value="first-commit">First Commit</option>
-                  <option value="most-commits">Most Commits</option>
-                </select>
-              </div>
-            </div>
+            )}
             <div className="column-content">
               {remoteBranches.length === 0 ? (
                 <div className="empty-column">
@@ -788,7 +893,7 @@ export default function App() {
                       onContextMenu={(e) => handleContextMenu(e, 'remote-branch', branch)}
                     >
                       <div className="item-main">
-                        <span className="item-name">{branch.name.replace('remotes/', '')}</span>
+                        <span className="item-name">{branch.name.replace('remotes/', '').replace(/^origin\//, '')}</span>
                         <div className="item-badges">
                           {!branch.isMerged && <span className="badge badge-unmerged">unmerged</span>}
                         </div>

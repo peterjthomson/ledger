@@ -271,6 +271,28 @@ body,
   color: var(--text-secondary);
 }
 
+/* Clickable header for filter/sort toggle */
+.column-header.clickable-header {
+  cursor: pointer;
+  user-select: none;
+  transition: background 0.15s ease;
+}
+
+.column-header.clickable-header:hover {
+  background: var(--bg-tertiary);
+}
+
+.header-chevron {
+  font-size: 10px;
+  color: var(--text-muted);
+  transition: transform 0.2s ease;
+  margin-left: 2px;
+}
+
+.header-chevron.open {
+  transform: rotate(180deg);
+}
+
 .column-icon {
   font-size: 14px;
 }
@@ -404,15 +426,15 @@ body,
   border-radius: 3px;
 }
 
-/* Remote items - more compact */
+/* Remote items - same style as local branches */
 .remote-item {
   padding: 6px 10px;
 }
 
 .remote-item .item-name {
-  font-size: 11px;
-  font-weight: 400;
-  color: var(--text-secondary);
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-primary);
 }
 
 /* Empty Column State */
@@ -516,6 +538,11 @@ body,
 .badge-unmerged {
   background: #F5E6E6;
   color: #A85050;
+}
+
+.badge-draft {
+  background: #E8E8E8;
+  color: #666666;
 }
 
 /* Date and commit count info */
@@ -695,12 +722,65 @@ body,
   gap: 4px;
 }
 
+.pr-comments {
+  font-size: 10px;
+  color: var(--text-secondary);
+}
+
+/* Draft PR styling */
+.pr-item.draft {
+  opacity: 0.7;
+}
+
+.pr-item.draft .pr-title {
+  font-style: italic;
+}
+
 .pr-additions {
   color: #4A8C50;
 }
 
 .pr-deletions {
   color: #A85050;
+}
+
+/* Worktree/Workspace Styles */
+.workspace-name-badge {
+  display: inline-block;
+  padding: 2px 8px;
+  background: var(--bg-tertiary);
+  border-radius: 4px;
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--text-primary);
+}
+
+.worktree-stats {
+  font-size: 11px;
+}
+
+.diff-additions {
+  color: #4A8C50;
+  font-weight: 500;
+}
+
+.diff-deletions {
+  color: #A85050;
+  font-weight: 500;
+}
+
+.diff-separator {
+  color: var(--text-muted);
+  margin: 0 2px;
+}
+
+.file-count {
+  color: var(--text-secondary);
+}
+
+.clean-indicator {
+  color: var(--text-muted);
+  font-style: italic;
 }
 
 .pr-error {

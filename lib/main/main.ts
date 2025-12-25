@@ -6,7 +6,7 @@ import {
   getRepoPath, 
   getBranches, 
   getBranchesWithMetadata, 
-  getWorktrees,
+  getEnhancedWorktrees,
   checkoutBranch,
   checkoutRemoteBranch,
   getPullRequests,
@@ -85,7 +85,7 @@ app.whenReady().then(() => {
 
   ipcMain.handle('get-worktrees', async () => {
     try {
-      return await getWorktrees();
+      return await getEnhancedWorktrees();
     } catch (error) {
       return { error: (error as Error).message };
     }
