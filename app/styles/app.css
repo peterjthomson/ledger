@@ -2686,6 +2686,60 @@ body,
   background: var(--bg-primary);
   display: flex;
   justify-content: flex-end;
+  gap: 8px;
+}
+
+/* Merge Container */
+.pr-merge-container {
+  position: relative;
+}
+
+.pr-merge-dropdown {
+  position: absolute;
+  bottom: 100%;
+  right: 0;
+  margin-bottom: 4px;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+  min-width: 280px;
+  z-index: 100;
+  overflow: hidden;
+}
+
+.pr-merge-option {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  width: 100%;
+  padding: 12px 14px;
+  background: transparent;
+  border: none;
+  border-bottom: 1px solid var(--border);
+  cursor: pointer;
+  text-align: left;
+}
+
+.pr-merge-option:last-child {
+  border-bottom: none;
+}
+
+.pr-merge-option:hover {
+  background: var(--bg-hover);
+}
+
+.pr-merge-option-title {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-primary);
+  margin-bottom: 4px;
+}
+
+.pr-merge-option-desc {
+  font-size: 11px;
+  color: var(--text-secondary);
+  line-height: 1.4;
 }
 
 /* ========================================

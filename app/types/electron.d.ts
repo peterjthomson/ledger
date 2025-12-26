@@ -327,6 +327,10 @@ export interface ElectronAPI {
   getPRDetail: (prNumber: number) => Promise<PRDetail | null>;
   getPRReviewComments: (prNumber: number) => Promise<PRReviewComment[]>;
   getPRFileDiff: (prNumber: number, filePath: string) => Promise<string | null>;
+  mergePullRequest: (
+    prNumber: number,
+    options?: { method?: 'merge' | 'squash' | 'rebase'; deleteAfterMerge?: boolean }
+  ) => Promise<{ success: boolean; message: string }>;
 }
 
 declare global {

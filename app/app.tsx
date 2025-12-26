@@ -1505,9 +1505,12 @@ export default function App() {
                 onStatusChange={setStatus}
               />
             ) : sidebarFocus?.type === 'pr' ? (
-              <PRReviewPanel 
+              <PRReviewPanel
                 pr={sidebarFocus.data as PullRequest}
                 formatRelativeTime={formatRelativeTime}
+                onStatusChange={setStatus}
+                onRefresh={refresh}
+                onClearFocus={() => setSidebarFocus(null)}
               />
             ) : sidebarFocus ? (
               <SidebarDetailPanel 
@@ -2474,6 +2477,9 @@ function StagingPanel({ workingStatus, currentBranch, onRefresh, onStatusChange 
 interface PRReviewPanelProps {
   pr: PullRequest;
   formatRelativeTime: (date: string) => string;
+  onStatusChange?: (status: StatusMessage | null) => void;
+  onRefresh?: () => Promise<void>;
+  onClearFocus?: () => void;
 }
 
 type PRTab = 'conversation' | 'files' | 'commits';
@@ -2486,7 +2492,7 @@ function isAIAuthor(login: string): boolean {
   return AI_AUTHORS.some(ai => lower.includes(ai)) || lower.endsWith('[bot]') || lower.endsWith('-bot');
 }
 
-function PRReviewPanel({ pr, formatRelativeTime }: PRReviewPanelProps) {
+function PRReviewPanel({ pr, formatRelativeTime, onStatusChange, onRefresh, onClearFocus }: PRReviewPanelProps) {
   const [activeTab, setActiveTab] = useState<PRTab>('conversation');
   const [prDetail, setPrDetail] = useState<PRDetail | null>(null);
   const [reviewComments, setReviewComments] = useState<PRReviewComment[]>([]);
@@ -2495,6 +2501,8 @@ function PRReviewPanel({ pr, formatRelativeTime }: PRReviewPanelProps) {
   const [fileDiff, setFileDiff] = useState<string | null>(null);
   const [loadingDiff, setLoadingDiff] = useState(false);
   const [showAIComments, setShowAIComments] = useState(true);
+  const [merging, setMerging] = useState(false);
+  const [showMergeOptions, setShowMergeOptions] = useState(false);
 
   // Load full PR details
   useEffect(() => {
@@ -2569,6 +2577,32 @@ function PRReviewPanel({ pr, formatRelativeTime }: PRReviewPanelProps) {
   const getFileComments = (filePath: string) => {
     return reviewComments.filter(c => c.path === filePath);
   };
+
+  // Handle PR merge
+  const handleMerge = async (method: 'merge' | 'squash' | 'rebase') => {
+    setMerging(true);
+    setShowMergeOptions(false);
+    onStatusChange?.({ type: 'info', text: `Merging PR #${pr.number}...` });
+
+    try {
+      const result = await window.electronAPI.mergePullRequest(pr.number, { method });
+      if (result.success) {
+        onStatusChange?.({ type: 'success', text: result.message });
+        // Refresh the PR list and clear focus since PR is now merged
+        await onRefresh?.();
+        onClearFocus?.();
+      } else {
+        onStatusChange?.({ type: 'error', text: result.message });
+      }
+    } catch (error) {
+      onStatusChange?.({ type: 'error', text: (error as Error).message });
+    } finally {
+      setMerging(false);
+    }
+  };
+
+  // Check if PR can be merged
+  const canMerge = prDetail?.state === 'OPEN';
 
   // Get review state badge
   const getReviewStateBadge = (state: string) => {
@@ -2808,14 +2842,52 @@ function PRReviewPanel({ pr, formatRelativeTime }: PRReviewPanelProps) {
         )}
       </div>
 
-      {/* Footer with GitHub link */}
+      {/* Footer with GitHub link and Merge button */}
       <div className="pr-review-footer">
-        <button 
+        <button
           className="btn btn-secondary"
           onClick={() => window.electronAPI.openPullRequest(pr.url)}
         >
           Open on GitHub
         </button>
+
+        {canMerge && (
+          <div className="pr-merge-container">
+            <button
+              className="btn btn-primary"
+              onClick={() => setShowMergeOptions(!showMergeOptions)}
+              disabled={merging}
+            >
+              {merging ? 'Merging...' : 'Merge'}
+            </button>
+
+            {showMergeOptions && (
+              <div className="pr-merge-dropdown">
+                <button
+                  className="pr-merge-option"
+                  onClick={() => handleMerge('merge')}
+                >
+                  <span className="pr-merge-option-title">Create a merge commit</span>
+                  <span className="pr-merge-option-desc">All commits will be added to the base branch via a merge commit.</span>
+                </button>
+                <button
+                  className="pr-merge-option"
+                  onClick={() => handleMerge('squash')}
+                >
+                  <span className="pr-merge-option-title">Squash and merge</span>
+                  <span className="pr-merge-option-desc">All commits will be combined into one commit in the base branch.</span>
+                </button>
+                <button
+                  className="pr-merge-option"
+                  onClick={() => handleMerge('rebase')}
+                >
+                  <span className="pr-merge-option-title">Rebase and merge</span>
+                  <span className="pr-merge-option-desc">All commits will be rebased and added to the base branch.</span>
+                </button>
+              </div>
+            )}
+          </div>
+        )}
       </div>
     </div>
   );

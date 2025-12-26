@@ -679,6 +679,62 @@ export async function createPullRequest(options: {
   }
 }
 
+// Merge a pull request
+export type MergeMethod = 'merge' | 'squash' | 'rebase';
+
+export async function mergePullRequest(
+  prNumber: number,
+  options?: {
+    method?: MergeMethod;
+    deleteAfterMerge?: boolean;
+  }
+): Promise<{ success: boolean; message: string }> {
+  if (!repoPath) {
+    return { success: false, message: 'No repository selected' };
+  }
+
+  try {
+    const args = ['pr', 'merge', prNumber.toString()];
+
+    // Add merge method
+    const method = options?.method || 'merge';
+    args.push(`--${method}`);
+
+    // Delete branch after merge (default: true)
+    if (options?.deleteAfterMerge !== false) {
+      args.push('--delete-branch');
+    }
+
+    // Non-interactive
+    args.push('--yes');
+
+    await execAsync(`gh ${args.join(' ')}`, { cwd: repoPath });
+
+    return {
+      success: true,
+      message: `Pull request #${prNumber} merged successfully`
+    };
+  } catch (error) {
+    const errorMessage = (error as Error).message;
+
+    // Check for common errors
+    if (errorMessage.includes('not mergeable')) {
+      return { success: false, message: 'Pull request is not mergeable. Check for conflicts or required checks.' };
+    }
+    if (errorMessage.includes('not logged')) {
+      return { success: false, message: 'Not logged into GitHub CLI. Run `gh auth login` in terminal.' };
+    }
+    if (errorMessage.includes('MERGED')) {
+      return { success: false, message: 'Pull request has already been merged.' };
+    }
+    if (errorMessage.includes('CLOSED')) {
+      return { success: false, message: 'Pull request is closed.' };
+    }
+
+    return { success: false, message: errorMessage };
+  }
+}
+
 // ========================================
 // PR Review Types and Functions
 // ========================================
