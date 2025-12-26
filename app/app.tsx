@@ -3,7 +3,7 @@ import type { Branch, Worktree, BranchFilter, BranchSort, CheckoutResult, PullRe
 import './styles/app.css'
 import { useWindowContext } from './components/window'
 
-type ViewMode = 'columns' | 'work'
+type ViewMode = 'radar' | 'focus'
 
 interface StatusMessage {
   type: 'success' | 'error' | 'info';
@@ -54,7 +54,7 @@ export default function App() {
   const { setTitle } = useWindowContext()
   
   // View mode state
-  const [viewMode, setViewMode] = useState<ViewMode>('columns')
+  const [viewMode, setViewMode] = useState<ViewMode>('radar')
   
   // Work mode state
   const [graphCommits, setGraphCommits] = useState<GraphCommit[]>([])
@@ -215,6 +215,31 @@ export default function App() {
   const toggleSidebarSection = useCallback((section: keyof typeof sidebarSections) => {
     setSidebarSections(prev => ({ ...prev, [section]: !prev[section] }))
   }, [])
+
+  // Radar card double-click handlers - switch to Focus mode with item selected
+  const handleRadarPRClick = useCallback((pr: PullRequest) => {
+    setViewMode('focus')
+    setSidebarSections(prev => ({ ...prev, prs: true }))
+    handleSidebarFocus('pr', pr)
+  }, [handleSidebarFocus])
+
+  const handleRadarWorktreeClick = useCallback((wt: Worktree) => {
+    setViewMode('focus')
+    setSidebarSections(prev => ({ ...prev, worktrees: true }))
+    handleSidebarFocus('worktree', wt)
+  }, [handleSidebarFocus])
+
+  const handleRadarBranchClick = useCallback((branch: Branch) => {
+    setViewMode('focus')
+    setSidebarSections(prev => ({ ...prev, branches: true }))
+    handleSidebarFocus('branch', branch)
+  }, [handleSidebarFocus])
+
+  const handleRadarRemoteBranchClick = useCallback((branch: Branch) => {
+    setViewMode('focus')
+    setSidebarSections(prev => ({ ...prev, remotes: true }))
+    handleSidebarFocus('remote', branch)
+  }, [handleSidebarFocus])
 
   // Context menu handlers
   const handleContextMenu = (e: React.MouseEvent, type: ContextMenuType, data: PullRequest | Worktree | Branch | Commit) => {
@@ -405,6 +430,7 @@ export default function App() {
       case 'remote-branch': {
         const branch = contextMenu.data as Branch
         return [
+          { label: 'Check Out', action: () => handleRemoteBranchDoubleClick(branch), disabled: switching },
           { label: 'Pull', action: () => handleRemoteBranchPull(branch) },
           { label: 'View Remote', action: () => handleRemoteBranchViewGitHub(branch) },
         ]
@@ -812,18 +838,20 @@ export default function App() {
           {repoPath && (
             <div className="view-toggle">
               <button
-                className={`view-toggle-btn ${viewMode === 'columns' ? 'active' : ''}`}
-                onClick={() => setViewMode('columns')}
-                title="Column View"
+                className={`view-toggle-btn ${viewMode === 'radar' ? 'active' : ''}`}
+                onClick={() => setViewMode('radar')}
+                title="Radar Mode"
               >
                 <span className="view-icon">⊞</span>
+                <span className="view-label">Radar</span>
               </button>
               <button
-                className={`view-toggle-btn ${viewMode === 'work' ? 'active' : ''}`}
-                onClick={() => setViewMode('work')}
-                title="Work View"
+                className={`view-toggle-btn ${viewMode === 'focus' ? 'active' : ''}`}
+                onClick={() => setViewMode('focus')}
+                title="Focus Mode"
               >
                 <span className="view-icon">☰</span>
+                <span className="view-label">Focus</span>
               </button>
             </div>
           )}
@@ -862,7 +890,7 @@ export default function App() {
       )}
 
       {/* Main Content */}
-      {repoPath && !error && viewMode === 'columns' && (
+      {repoPath && !error && viewMode === 'radar' && (
         <main className="ledger-content five-columns">
           {/* Pull Requests Column */}
           <section className="column pr-column">
@@ -924,7 +952,7 @@ export default function App() {
                     <li
                       key={pr.number}
                       className={`item pr-item clickable ${pr.isDraft ? 'draft' : ''}`}
-                      onDoubleClick={() => handlePRDoubleClick(pr)}
+                      onDoubleClick={() => handleRadarPRClick(pr)}
                       onContextMenu={(e) => handleContextMenu(e, 'pr', pr)}
                     >
                       <div className="item-main">
@@ -1001,7 +1029,7 @@ export default function App() {
                     <li
                       key={wt.path}
                       className={`item worktree-item clickable ${wt.branch === currentBranch ? 'current' : ''}`}
-                      onDoubleClick={() => handleWorktreeDoubleClick(wt)}
+                      onDoubleClick={() => handleRadarWorktreeClick(wt)}
                       onContextMenu={(e) => handleContextMenu(e, 'worktree', wt)}
                     >
                       <div className="item-main">
@@ -1152,7 +1180,7 @@ export default function App() {
                     <li
                       key={branch.name}
                       className={`item branch-item clickable ${branch.current ? 'current' : ''} ${switching ? 'disabled' : ''}`}
-                      onDoubleClick={() => handleBranchDoubleClick(branch)}
+                      onDoubleClick={() => handleRadarBranchClick(branch)}
                       onContextMenu={(e) => handleContextMenu(e, 'local-branch', branch)}
                     >
                       <div className="item-main">
@@ -1236,7 +1264,7 @@ export default function App() {
                     <li 
                       key={branch.name} 
                       className={`item remote-item clickable ${switching ? 'disabled' : ''}`}
-                      onDoubleClick={() => handleRemoteBranchDoubleClick(branch)}
+                      onDoubleClick={() => handleRadarRemoteBranchClick(branch)}
                       onContextMenu={(e) => handleContextMenu(e, 'remote-branch', branch)}
                     >
                       <div className="item-main">
@@ -1263,20 +1291,22 @@ export default function App() {
         </main>
       )}
 
-      {/* Work Mode Layout */}
-      {repoPath && !error && viewMode === 'work' && (
+      {/* Focus Mode Layout */}
+      {repoPath && !error && viewMode === 'focus' && (
         <main className="work-mode-layout">
           {/* Sidebar */}
           <aside className="work-sidebar">
             {/* PRs Section */}
             <div className="sidebar-section">
-              <div 
-                className="sidebar-section-header"
-                onClick={() => toggleSidebarSection('prs')}
-              >
-                <span className={`sidebar-chevron ${sidebarSections.prs ? 'open' : ''}`}>▸</span>
-                <span className="sidebar-section-title">Pull Requests</span>
-                <span className="sidebar-count">{filteredPRs.length}</span>
+              <div className="sidebar-section-header">
+                <div 
+                  className="sidebar-section-toggle"
+                  onClick={() => toggleSidebarSection('prs')}
+                >
+                  <span className={`sidebar-chevron ${sidebarSections.prs ? 'open' : ''}`}>▸</span>
+                  <span className="sidebar-section-title">Pull Requests</span>
+                  <span className="sidebar-count">{filteredPRs.length}</span>
+                </div>
               </div>
               {sidebarSections.prs && (
                 <ul className="sidebar-list">
@@ -1357,13 +1387,15 @@ export default function App() {
 
             {/* Remotes Section */}
             <div className="sidebar-section">
-              <div 
-                className="sidebar-section-header"
-                onClick={() => toggleSidebarSection('remotes')}
-              >
-                <span className={`sidebar-chevron ${sidebarSections.remotes ? 'open' : ''}`}>▸</span>
-                <span className="sidebar-section-title">Remotes</span>
-                <span className="sidebar-count">{remoteBranches.length}</span>
+              <div className="sidebar-section-header">
+                <div 
+                  className="sidebar-section-toggle"
+                  onClick={() => toggleSidebarSection('remotes')}
+                >
+                  <span className={`sidebar-chevron ${sidebarSections.remotes ? 'open' : ''}`}>▸</span>
+                  <span className="sidebar-section-title">Remotes</span>
+                  <span className="sidebar-count">{remoteBranches.length}</span>
+                </div>
               </div>
               {sidebarSections.remotes && (
                 <ul className="sidebar-list">
@@ -1383,13 +1415,15 @@ export default function App() {
 
             {/* Worktrees Section */}
             <div className="sidebar-section">
-              <div 
-                className="sidebar-section-header"
-                onClick={() => toggleSidebarSection('worktrees')}
-              >
-                <span className={`sidebar-chevron ${sidebarSections.worktrees ? 'open' : ''}`}>▸</span>
-                <span className="sidebar-section-title">Worktrees</span>
-                <span className="sidebar-count">{worktrees.length}</span>
+              <div className="sidebar-section-header">
+                <div 
+                  className="sidebar-section-toggle"
+                  onClick={() => toggleSidebarSection('worktrees')}
+                >
+                  <span className={`sidebar-chevron ${sidebarSections.worktrees ? 'open' : ''}`}>▸</span>
+                  <span className="sidebar-section-title">Worktrees</span>
+                  <span className="sidebar-count">{worktrees.length}</span>
+                </div>
               </div>
               {sidebarSections.worktrees && (
                 <ul className="sidebar-list">
@@ -1410,13 +1444,15 @@ export default function App() {
 
             {/* Stashes Section */}
             <div className="sidebar-section">
-              <div 
-                className="sidebar-section-header"
-                onClick={() => toggleSidebarSection('stashes')}
-              >
-                <span className={`sidebar-chevron ${sidebarSections.stashes ? 'open' : ''}`}>▸</span>
-                <span className="sidebar-section-title">Stashes</span>
-                <span className="sidebar-count">{stashes.length}</span>
+              <div className="sidebar-section-header">
+                <div 
+                  className="sidebar-section-toggle"
+                  onClick={() => toggleSidebarSection('stashes')}
+                >
+                  <span className={`sidebar-chevron ${sidebarSections.stashes ? 'open' : ''}`}>▸</span>
+                  <span className="sidebar-section-title">Stashes</span>
+                  <span className="sidebar-count">{stashes.length}</span>
+                </div>
               </div>
               {sidebarSections.stashes && (
                 <ul className="sidebar-list">
