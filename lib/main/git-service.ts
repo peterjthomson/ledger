@@ -424,6 +424,43 @@ export async function checkoutBranch(branchName: string): Promise<{ success: boo
   }
 }
 
+// Push a branch to origin
+export async function pushBranch(branchName?: string, setUpstream: boolean = true): Promise<{ success: boolean; message: string }> {
+  if (!git) throw new Error('No repository selected');
+  
+  try {
+    const args = ['origin'];
+    
+    if (branchName) {
+      args.push(branchName);
+    }
+    
+    if (setUpstream) {
+      await git.push(args, ['-u']);
+    } else {
+      await git.push(args);
+    }
+    
+    const pushedBranch = branchName || 'current branch';
+    return { success: true, message: `Pushed ${pushedBranch} to origin` };
+  } catch (error) {
+    const errorMessage = (error as Error).message;
+    
+    // Handle common errors
+    if (errorMessage.includes('no upstream')) {
+      return { success: false, message: 'No upstream branch set. Try pushing with set-upstream.' };
+    }
+    if (errorMessage.includes('rejected')) {
+      return { success: false, message: 'Push rejected. Pull changes first or force push.' };
+    }
+    if (errorMessage.includes('Permission denied') || errorMessage.includes('authentication')) {
+      return { success: false, message: 'Authentication failed. Check your Git credentials.' };
+    }
+    
+    return { success: false, message: errorMessage };
+  }
+}
+
 // Create a new branch
 export async function createBranch(branchName: string, checkout: boolean = true): Promise<{ success: boolean; message: string }> {
   if (!git) throw new Error('No repository selected');

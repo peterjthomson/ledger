@@ -13,6 +13,7 @@ const electronAPI = {
   // Checkout operations
   checkoutBranch: (branchName: string) => ipcRenderer.invoke('checkout-branch', branchName),
   createBranch: (branchName: string, checkout?: boolean) => ipcRenderer.invoke('create-branch', branchName, checkout),
+  pushBranch: (branchName?: string, setUpstream?: boolean) => ipcRenderer.invoke('push-branch', branchName, setUpstream),
   checkoutRemoteBranch: (remoteBranch: string) => ipcRenderer.invoke('checkout-remote-branch', remoteBranch),
   openWorktree: (worktreePath: string) => ipcRenderer.invoke('open-worktree', worktreePath),
   // Pull requests

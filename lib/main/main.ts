@@ -9,6 +9,7 @@ import {
   getEnhancedWorktrees,
   checkoutBranch,
   createBranch,
+  pushBranch,
   checkoutRemoteBranch,
   getPullRequests,
   openPullRequest,
@@ -123,6 +124,14 @@ app.whenReady().then(() => {
   ipcMain.handle('create-branch', async (_, branchName: string, checkout: boolean = true) => {
     try {
       return await createBranch(branchName, checkout);
+    } catch (error) {
+      return { success: false, message: (error as Error).message };
+    }
+  });
+
+  ipcMain.handle('push-branch', async (_, branchName?: string, setUpstream: boolean = true) => {
+    try {
+      return await pushBranch(branchName, setUpstream);
     } catch (error) {
       return { success: false, message: (error as Error).message };
     }

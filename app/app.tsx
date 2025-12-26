@@ -1838,6 +1838,7 @@ interface SidebarDetailPanelProps {
 
 function SidebarDetailPanel({ focus, formatRelativeTime, formatDate, currentBranch, onStatusChange }: SidebarDetailPanelProps) {
   const [creatingPR, setCreatingPR] = useState(false);
+  const [pushing, setPushing] = useState(false);
 
   const handleCreatePR = async (branchName: string) => {
     setCreatingPR(true);
@@ -1859,6 +1860,25 @@ function SidebarDetailPanel({ focus, formatRelativeTime, formatDate, currentBran
       onStatusChange?.({ type: 'error', message: (error as Error).message });
     } finally {
       setCreatingPR(false);
+    }
+  };
+
+  const handlePush = async (branchName: string) => {
+    setPushing(true);
+    onStatusChange?.({ type: 'info', message: `Pushing ${branchName} to origin...` });
+    
+    try {
+      const result = await window.electronAPI.pushBranch(branchName, true);
+      
+      if (result.success) {
+        onStatusChange?.({ type: 'success', message: result.message });
+      } else {
+        onStatusChange?.({ type: 'error', message: result.message });
+      }
+    } catch (error) {
+      onStatusChange?.({ type: 'error', message: (error as Error).message });
+    } finally {
+      setPushing(false);
     }
   };
 
@@ -1913,9 +1933,18 @@ function SidebarDetailPanel({ focus, formatRelativeTime, formatDate, currentBran
           
           {/* Actions */}
           <div className="detail-actions">
-            {branch.current && !isMainOrMaster && (
+            {branch.current && (
               <button 
                 className="btn btn-primary"
+                onClick={() => handlePush(branch.name)}
+                disabled={pushing}
+              >
+                {pushing ? 'Pushing...' : 'Push to Origin'}
+              </button>
+            )}
+            {branch.current && !isMainOrMaster && (
+              <button 
+                className="btn btn-secondary"
                 onClick={() => handleCreatePR(branch.name)}
                 disabled={creatingPR}
               >
