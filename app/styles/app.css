@@ -3088,3 +3088,217 @@ body,
   border-top: 1px solid var(--border);
   background: var(--bg-secondary);
 }
+
+/* ========================================
+   Resizable Panels
+   ======================================== */
+
+.resize-handle {
+  width: 4px;
+  background: transparent;
+  cursor: col-resize;
+  flex-shrink: 0;
+  position: relative;
+  z-index: 10;
+  transition: background 0.15s ease;
+}
+
+.resize-handle::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 8px;
+}
+
+.resize-handle:hover,
+.resize-handle.active {
+  background: var(--accent);
+}
+
+.resize-handle-sidebar {
+  margin-left: -2px;
+}
+
+.resize-handle-detail {
+  margin-right: -2px;
+}
+
+/* ========================================
+   Panel Toggle Buttons
+   ======================================== */
+
+.panel-toggle {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 20px;
+  height: 48px;
+  background: #3C3C3C;
+  border: none;
+  border-radius: 0 4px 4px 0;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 20;
+  transition: all 0.15s ease;
+  box-shadow: 2px 0 8px rgba(0, 0, 0, 0.2);
+}
+
+.panel-toggle:hover {
+  background: #4C4C4C;
+  width: 24px;
+}
+
+.panel-toggle-left {
+  left: 0;
+  border-radius: 0 4px 4px 0;
+}
+
+.panel-toggle-right {
+  right: 0;
+  border-radius: 4px 0 0 4px;
+  box-shadow: -2px 0 8px rgba(0, 0, 0, 0.2);
+}
+
+.panel-toggle-icon {
+  color: #999;
+  font-size: 10px;
+  transition: color 0.15s ease;
+}
+
+.panel-toggle:hover .panel-toggle-icon {
+  color: #FFF;
+}
+
+/* Panel Collapse Buttons (inside panels) */
+.panel-collapse-btn {
+  position: absolute;
+  bottom: 12px;
+  width: 20px;
+  height: 48px;
+  background: #3C3C3C;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  transition: all 0.15s ease;
+  z-index: 10;
+}
+
+.work-sidebar:hover .panel-collapse-btn,
+.work-detail:hover .panel-collapse-btn {
+  opacity: 1;
+}
+
+.panel-collapse-btn:hover {
+  background: #4C4C4C;
+}
+
+.panel-collapse-icon {
+  color: #999;
+  font-size: 10px;
+}
+
+.panel-collapse-btn:hover .panel-collapse-icon {
+  color: #FFF;
+}
+
+/* Position collapse buttons */
+.work-sidebar .panel-collapse-btn {
+  right: 8px;
+}
+
+.panel-collapse-btn-right {
+  left: 8px;
+}
+
+/* Make sidebar and detail positioned for collapse buttons */
+.work-sidebar,
+.work-detail {
+  position: relative;
+}
+
+/* ========================================
+   Radar Column Drag and Drop
+   ======================================== */
+
+.ledger-content {
+  display: flex;
+}
+
+.column {
+  position: relative;
+  transition: transform 0.15s ease, opacity 0.15s ease, box-shadow 0.15s ease;
+}
+
+.column.dragging {
+  opacity: 0.5;
+  transform: scale(0.98);
+}
+
+.column.drag-over {
+  box-shadow: inset 0 0 0 2px var(--accent);
+}
+
+.column.drag-over::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(91, 155, 213, 0.08);
+  pointer-events: none;
+  z-index: 5;
+}
+
+/* Column Drag Handle */
+.column-drag-handle {
+  position: absolute;
+  top: 10px;
+  right: 8px;
+  width: 20px;
+  height: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  color: var(--text-muted);
+  cursor: grab;
+  opacity: 0;
+  transition: opacity 0.15s ease, color 0.15s ease;
+  z-index: 10;
+  letter-spacing: -2px;
+  user-select: none;
+}
+
+.column:hover .column-drag-handle {
+  opacity: 0.6;
+}
+
+.column-drag-handle:hover {
+  opacity: 1 !important;
+  color: var(--accent);
+}
+
+.column-drag-handle:active {
+  cursor: grabbing;
+}
+
+/* Ensure proper flex behavior for columns */
+.ledger-content.five-columns {
+  display: flex;
+  gap: 1px;
+}
+
+.ledger-content.five-columns .column {
+  flex: 1;
+  min-width: 0;
+}

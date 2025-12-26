@@ -696,7 +696,7 @@ export async function mergePullRequest(
   try {
     const args = ['pr', 'merge', prNumber.toString()];
 
-    // Add merge method
+    // Add merge method (providing this explicitly avoids interactive prompts)
     const method = options?.method || 'merge';
     args.push(`--${method}`);
 
@@ -704,9 +704,6 @@ export async function mergePullRequest(
     if (options?.deleteAfterMerge !== false) {
       args.push('--delete-branch');
     }
-
-    // Non-interactive
-    args.push('--yes');
 
     await execAsync(`gh ${args.join(' ')}`, { cwd: repoPath });
 
@@ -716,6 +713,14 @@ export async function mergePullRequest(
     };
   } catch (error) {
     const errorMessage = (error as Error).message;
+
+    // Check if merge succeeded but branch deletion failed (e.g., branch in use by worktree)
+    if (errorMessage.includes('was already merged') && errorMessage.includes('Cannot delete branch')) {
+      return { 
+        success: true, 
+        message: `PR #${prNumber} merged! Branch not deleted (in use by a worktree).`
+      };
+    }
 
     // Check for common errors
     if (errorMessage.includes('not mergeable')) {
