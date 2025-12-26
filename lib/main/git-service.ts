@@ -429,20 +429,17 @@ export async function pushBranch(branchName?: string, setUpstream: boolean = tru
   if (!git) throw new Error('No repository selected');
   
   try {
-    const args = ['origin'];
-    
-    if (branchName) {
-      args.push(branchName);
-    }
+    // Get current branch if not specified
+    const branch = branchName || (await git.branchLocal()).current;
     
     if (setUpstream) {
-      await git.push(args, ['-u']);
+      // Use --set-upstream to establish tracking
+      await git.push(['--set-upstream', 'origin', branch]);
     } else {
-      await git.push(args);
+      await git.push('origin', branch);
     }
     
-    const pushedBranch = branchName || 'current branch';
-    return { success: true, message: `Pushed ${pushedBranch} to origin` };
+    return { success: true, message: `Pushed ${branch} to origin` };
   } catch (error) {
     const errorMessage = (error as Error).message;
     
