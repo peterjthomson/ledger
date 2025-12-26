@@ -470,6 +470,115 @@ export function getWorktreePath(worktreePath: string): string {
   return worktreePath;
 }
 
+// Helper to apply a git diff via stdin
+async function applyDiff(diff: string, targetDir: string): Promise<void> {
+  return new Promise((resolve, reject) => {
+    const child = exec('git apply --3way -', { cwd: targetDir }, (error) => {
+      if (error) {
+        reject(error);
+      } else {
+        resolve();
+      }
+    });
+    child.stdin?.write(diff);
+    child.stdin?.end();
+  });
+}
+
+// Apply a worktree's changes to the current working directory (non-destructive copy)
+// This copies uncommitted changes from the worktree as uncommitted changes here
+export async function applyWorktree(worktreePath: string, worktreeBranch: string): Promise<{ success: boolean; message: string; stashed?: string }> {
+  if (!git || !repoPath) throw new Error('No repository selected');
+  
+  try {
+    // First, stash any uncommitted changes in the main repo
+    const stashResult = await stashChanges();
+    
+    // Get uncommitted changes from the worktree (both staged and unstaged)
+    const { stdout: unstagedDiff } = await execAsync('git diff', { cwd: worktreePath });
+    const { stdout: stagedDiff } = await execAsync('git diff --cached', { cwd: worktreePath });
+    
+    const hasUnstagedChanges = unstagedDiff.trim().length > 0;
+    const hasStagedChanges = stagedDiff.trim().length > 0;
+    
+    if (!hasUnstagedChanges && !hasStagedChanges) {
+      return {
+        success: true,
+        message: `No uncommitted changes in worktree '${worktreeBranch}'`,
+        stashed: stashResult.stashed ? stashResult.message : undefined,
+      };
+    }
+    
+    // Apply the diffs to the main repo
+    if (hasUnstagedChanges) {
+      try {
+        await applyDiff(unstagedDiff, repoPath);
+      } catch (applyError) {
+        const msg = (applyError as Error).message;
+        if (msg.includes('patch does not apply') || msg.includes('CONFLICT')) {
+          return {
+            success: false,
+            message: `Conflicts applying changes. Some files may differ between worktree and main repo.`,
+            stashed: stashResult.stashed ? stashResult.message : undefined,
+          };
+        }
+        throw applyError;
+      }
+    }
+    
+    if (hasStagedChanges) {
+      try {
+        await applyDiff(stagedDiff, repoPath);
+      } catch (applyError) {
+        const msg = (applyError as Error).message;
+        if (msg.includes('patch does not apply') || msg.includes('CONFLICT')) {
+          return {
+            success: false,
+            message: `Conflicts applying staged changes. Some files may differ between worktree and main repo.`,
+            stashed: stashResult.stashed ? stashResult.message : undefined,
+          };
+        }
+        throw applyError;
+      }
+    }
+    
+    return {
+      success: true,
+      message: `Copied changes from '${worktreeBranch}' to working directory`,
+      stashed: stashResult.stashed ? stashResult.message : undefined,
+    };
+  } catch (error) {
+    return {
+      success: false,
+      message: (error as Error).message,
+    };
+  }
+}
+
+// Remove a worktree (after applying or when no longer needed)
+export async function removeWorktree(worktreePath: string, force: boolean = false): Promise<{ success: boolean; message: string }> {
+  if (!git) throw new Error('No repository selected');
+  
+  try {
+    const args = ['worktree', 'remove', worktreePath];
+    if (force) {
+      args.push('--force');
+    }
+    
+    await git.raw(args);
+    
+    return {
+      success: true,
+      message: `Removed worktree at ${worktreePath}`,
+    };
+  } catch (error) {
+    return {
+      success: false,
+      message: (error as Error).message,
+    };
+  }
+}
+
 // Pull Request types
 export interface PullRequest {
   number: number;

@@ -197,6 +197,28 @@ export default function App() {
   }
 
   // Worktree context menu actions
+  const handleWorktreeApply = async (wt: Worktree) => {
+    closeContextMenu()
+    if (!wt.branch || switching) return
+    
+    setSwitching(true)
+    setStatus({ type: 'info', message: `Copying changes from ${wt.displayName}...` })
+    
+    try {
+      const result: CheckoutResult = await window.electronAPI.applyWorktree(wt.path, wt.branch)
+      if (result.success) {
+        setStatus({ type: 'success', message: result.message, stashed: result.stashed })
+        await refresh()
+      } else {
+        setStatus({ type: 'error', message: result.message })
+      }
+    } catch (err) {
+      setStatus({ type: 'error', message: (err as Error).message })
+    } finally {
+      setSwitching(false)
+    }
+  }
+
   const handleWorktreeOpen = async (wt: Worktree) => {
     closeContextMenu()
     try {
@@ -208,6 +230,28 @@ export default function App() {
       }
     } catch (err) {
       setStatus({ type: 'error', message: (err as Error).message })
+    }
+  }
+
+  const handleWorktreeRemove = async (wt: Worktree) => {
+    closeContextMenu()
+    if (switching) return
+    
+    setSwitching(true)
+    setStatus({ type: 'info', message: `Removing worktree ${wt.displayName}...` })
+    
+    try {
+      const result = await window.electronAPI.removeWorktree(wt.path)
+      if (result.success) {
+        setStatus({ type: 'success', message: result.message })
+        await refresh()
+      } else {
+        setStatus({ type: 'error', message: result.message })
+      }
+    } catch (err) {
+      setStatus({ type: 'error', message: (err as Error).message })
+    } finally {
+      setSwitching(false)
     }
   }
 
@@ -304,8 +348,9 @@ export default function App() {
       case 'worktree': {
         const wt = contextMenu.data as Worktree
         return [
-          { label: 'Check Out Worktree', action: () => handleWorktreeDoubleClick(wt), disabled: !wt.branch || wt.branch === currentBranch || switching },
+          { label: 'Copy Changes Here', action: () => handleWorktreeApply(wt), disabled: !wt.branch || switching },
           { label: 'Open in Finder', action: () => handleWorktreeOpen(wt) },
+          { label: 'Remove Worktree', action: () => handleWorktreeRemove(wt), disabled: switching },
         ]
       }
       case 'local-branch': {
@@ -362,13 +407,13 @@ export default function App() {
   }, [switching])
 
   const handleWorktreeDoubleClick = useCallback(async (worktree: Worktree) => {
-    if (!worktree.branch || worktree.branch === currentBranch || switching) return
+    if (!worktree.branch || switching) return
     
     setSwitching(true)
-    setStatus({ type: 'info', message: `Checking out worktree ${worktree.displayName}...` })
+    setStatus({ type: 'info', message: `Copying changes from ${worktree.displayName}...` })
     
     try {
-      const result: CheckoutResult = await window.electronAPI.checkoutBranch(worktree.branch)
+      const result: CheckoutResult = await window.electronAPI.applyWorktree(worktree.path, worktree.branch)
       if (result.success) {
         setStatus({ type: 'success', message: result.message, stashed: result.stashed })
         await refresh()
@@ -487,10 +532,19 @@ export default function App() {
     return Array.from(parents).sort()
   }, [worktrees, repoPath])
 
-  // Filter worktrees by parent
+  // Filter worktrees by parent or time
   const filteredWorktrees = useMemo(() => {
     if (worktreeParentFilter === 'all') {
       return worktrees
+    }
+    if (worktreeParentFilter === 'today') {
+      const today = new Date()
+      today.setHours(0, 0, 0, 0)
+      return worktrees.filter(wt => {
+        const wtDate = new Date(wt.lastModified)
+        wtDate.setHours(0, 0, 0, 0)
+        return wtDate.getTime() === today.getTime()
+      })
     }
     return worktrees.filter(wt => {
       if (worktreeParentFilter === 'main') {
@@ -791,13 +845,14 @@ export default function App() {
             {worktreeControlsOpen && (
               <div className="column-controls" onClick={(e) => e.stopPropagation()}>
                 <div className="control-group">
-                  <label>Parent</label>
+                  <label>Filter</label>
                   <select 
                     value={worktreeParentFilter} 
                     onChange={(e) => setWorktreeParentFilter(e.target.value)}
                     className="control-select"
                   >
                     <option value="all">All</option>
+                    <option value="today">Today</option>
                     {worktreeParents.map(parent => (
                       <option key={parent} value={parent}>{parent}</option>
                     ))}

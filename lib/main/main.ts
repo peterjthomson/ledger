@@ -18,6 +18,8 @@ import {
   getCommitHistory,
   getWorkingStatus,
   resetToCommit,
+  applyWorktree,
+  removeWorktree,
 } from './git-service'
 import { getLastRepoPath, saveLastRepoPath } from './settings-service'
 
@@ -162,6 +164,22 @@ app.whenReady().then(() => {
   ipcMain.handle('reset-to-commit', async (_, commitHash: string, mode: 'soft' | 'mixed' | 'hard') => {
     try {
       return await resetToCommit(commitHash, mode);
+    } catch (error) {
+      return { success: false, message: (error as Error).message };
+    }
+  });
+
+  ipcMain.handle('apply-worktree', async (_, worktreePath: string, worktreeBranch: string) => {
+    try {
+      return await applyWorktree(worktreePath, worktreeBranch);
+    } catch (error) {
+      return { success: false, message: (error as Error).message };
+    }
+  });
+
+  ipcMain.handle('remove-worktree', async (_, worktreePath: string, force: boolean) => {
+    try {
+      return await removeWorktree(worktreePath, force);
     } catch (error) {
       return { success: false, message: (error as Error).message };
     }

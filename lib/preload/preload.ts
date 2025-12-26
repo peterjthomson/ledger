@@ -14,6 +14,8 @@ const electronAPI = {
   checkoutBranch: (branchName: string) => ipcRenderer.invoke('checkout-branch', branchName),
   checkoutRemoteBranch: (remoteBranch: string) => ipcRenderer.invoke('checkout-remote-branch', remoteBranch),
   openWorktree: (worktreePath: string) => ipcRenderer.invoke('open-worktree', worktreePath),
+  applyWorktree: (worktreePath: string, worktreeBranch: string) => ipcRenderer.invoke('apply-worktree', worktreePath, worktreeBranch),
+  removeWorktree: (worktreePath: string, force?: boolean) => ipcRenderer.invoke('remove-worktree', worktreePath, force ?? false),
   // Pull requests
   getPullRequests: () => ipcRenderer.invoke('get-pull-requests'),
   openPullRequest: (url: string) => ipcRenderer.invoke('open-pull-request', url),
