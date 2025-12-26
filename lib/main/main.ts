@@ -24,6 +24,7 @@ import {
   // Work mode APIs
   getCommitGraphHistory,
   getCommitDiff,
+  getBranchDiff,
   getStashes,
   getStashFiles,
   getStashFileDiff,
@@ -237,6 +238,14 @@ app.whenReady().then(() => {
   ipcMain.handle('get-commit-diff', async (_, commitHash: string) => {
     try {
       return await getCommitDiff(commitHash);
+    } catch (error) {
+      return null;
+    }
+  });
+
+  ipcMain.handle('get-branch-diff', async (_, branchName: string) => {
+    try {
+      return await getBranchDiff(branchName);
     } catch (error) {
       return null;
     }

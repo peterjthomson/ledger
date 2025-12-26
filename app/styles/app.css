@@ -2207,6 +2207,81 @@ body,
 }
 
 /* ========================================
+   Branch Diff Section
+   ======================================== */
+
+.branch-diff-section {
+  margin-top: 16px;
+  border-top: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  overflow: hidden;
+  min-height: 200px;
+}
+
+.branch-diff-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.branch-diff-title {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.branch-diff-stats {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 11px;
+}
+
+.branch-diff-stats .diff-stat-files {
+  color: var(--text-muted);
+}
+
+.branch-diff-loading,
+.branch-diff-empty {
+  padding: 24px;
+  text-align: center;
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
+.branch-diff-files {
+  flex: 1;
+  overflow-y: auto;
+}
+
+.branch-diff-file {
+  border-bottom: 1px solid var(--border);
+}
+
+.branch-diff-file:last-child {
+  border-bottom: none;
+}
+
+.branch-diff-file-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 0;
+  cursor: pointer;
+  font-size: 11px;
+}
+
+.branch-diff-file-header:hover {
+  background: var(--bg-tertiary);
+  margin: 0 -16px;
+  padding: 8px 16px;
+}
+
+/* ========================================
    PR Review Panel
    ======================================== */
 

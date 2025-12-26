@@ -36,6 +36,7 @@ const electronAPI = {
   // Work mode APIs
   getCommitGraphHistory: (limit?: number) => ipcRenderer.invoke('get-commit-graph-history', limit),
   getCommitDiff: (commitHash: string) => ipcRenderer.invoke('get-commit-diff', commitHash),
+  getBranchDiff: (branchName: string) => ipcRenderer.invoke('get-branch-diff', branchName),
   getStashes: () => ipcRenderer.invoke('get-stashes'),
   getStashFiles: (stashIndex: number) => ipcRenderer.invoke('get-stash-files', stashIndex),
   getStashFileDiff: (stashIndex: number, filePath: string) => ipcRenderer.invoke('get-stash-file-diff', stashIndex, filePath),

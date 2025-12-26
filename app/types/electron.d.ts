@@ -139,6 +139,15 @@ export interface CommitDiff {
   totalDeletions: number;
 }
 
+export interface BranchDiff {
+  branchName: string;
+  baseBranch: string;
+  files: FileDiff[];
+  totalAdditions: number;
+  totalDeletions: number;
+  commitCount: number;
+}
+
 // Stash entry
 export interface StashEntry {
   index: number;
@@ -305,6 +314,7 @@ export interface ElectronAPI {
   // Work mode APIs
   getCommitGraphHistory: (limit?: number) => Promise<GraphCommit[]>;
   getCommitDiff: (commitHash: string) => Promise<CommitDiff | null>;
+  getBranchDiff: (branchName: string) => Promise<BranchDiff | null>;
   getStashes: () => Promise<StashEntry[]>;
   getStashFiles: (stashIndex: number) => Promise<StashFile[]>;
   getStashFileDiff: (stashIndex: number, filePath: string) => Promise<string | null>;

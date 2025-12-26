@@ -1244,9 +1244,6 @@ export async function getCommitDetails(commitHash: string): Promise<CommitDetail
     const parentRaw = await git.raw(['rev-parse', `${commitHash}^@`]).catch(() => '');
     const parentHashes = parentRaw.trim().split('\n').filter(Boolean);
 
-    // Get file changes with stats
-    const diffOutput = await git.raw(['diff-tree', '--no-commit-id', '--name-status', '-r', '--numstat', commitHash]);
-    
     // Parse numstat for additions/deletions
     const numstatOutput = await git.raw(['diff-tree', '--no-commit-id', '-r', '--numstat', commitHash]);
     const numstatLines = numstatOutput.trim().split('\n').filter(Boolean);
@@ -1775,6 +1772,177 @@ export async function getCommitDiff(commitHash: string): Promise<CommitDiff | nu
   }
 }
 
+// Branch diff interface - shows diff between a branch and master/main
+export interface BranchDiff {
+  branchName: string;
+  baseBranch: string;
+  files: FileDiff[];
+  totalAdditions: number;
+  totalDeletions: number;
+  commitCount: number;
+}
+
+// Get diff for a branch compared to master/main
+export async function getBranchDiff(branchName: string): Promise<BranchDiff | null> {
+  if (!git) throw new Error('No repository selected');
+
+  try {
+    // Find the base branch (master or main)
+    let baseBranch = 'origin/master';
+    try {
+      await git.raw(['rev-parse', '--verify', 'origin/master']);
+    } catch {
+      try {
+        await git.raw(['rev-parse', '--verify', 'origin/main']);
+        baseBranch = 'origin/main';
+      } catch {
+        // Try local master/main
+        const branches = await git.branchLocal();
+        if (branches.all.includes('main')) {
+          baseBranch = 'main';
+        } else if (branches.all.includes('master')) {
+          baseBranch = 'master';
+        } else {
+          return null; // No base branch found
+        }
+      }
+    }
+
+    // Count commits between base and branch
+    let commitCount = 0;
+    try {
+      const countOutput = await git.raw(['rev-list', '--count', `${baseBranch}..${branchName}`]);
+      commitCount = parseInt(countOutput.trim()) || 0;
+    } catch {
+      // Ignore count errors
+    }
+
+    // Get diff between base and branch (three-dot syntax shows changes since branches diverged)
+    const diffOutput = await git.raw([
+      'diff',
+      `${baseBranch}...${branchName}`,
+      '--patch',
+      '--stat'
+    ]);
+
+    if (!diffOutput.trim()) {
+      return {
+        branchName,
+        baseBranch: baseBranch.replace('origin/', ''),
+        files: [],
+        totalAdditions: 0,
+        totalDeletions: 0,
+        commitCount,
+      };
+    }
+
+    // Parse the diff output (same logic as getCommitDiff)
+    const files: FileDiff[] = [];
+    let totalAdditions = 0;
+    let totalDeletions = 0;
+
+    // Split by file diffs
+    const diffParts = diffOutput.split(/^diff --git /m).filter(Boolean);
+    
+    for (const part of diffParts) {
+      const lines = part.split('\n');
+      
+      // Parse file header
+      const headerMatch = lines[0].match(/a\/(.+) b\/(.+)/);
+      if (!headerMatch) continue;
+      
+      const oldPath = headerMatch[1];
+      const newPath = headerMatch[2];
+      
+      // Determine status
+      let status: 'added' | 'modified' | 'deleted' | 'renamed' = 'modified';
+      if (part.includes('new file mode')) status = 'added';
+      else if (part.includes('deleted file mode')) status = 'deleted';
+      else if (oldPath !== newPath) status = 'renamed';
+      
+      // Check for binary
+      const isBinary = part.includes('Binary files');
+      
+      // Parse hunks
+      const hunks: DiffHunk[] = [];
+      let fileAdditions = 0;
+      let fileDeletions = 0;
+      
+      if (!isBinary) {
+        const hunkMatches = part.matchAll(/@@ -(\d+)(?:,(\d+))? \+(\d+)(?:,(\d+))? @@(.*)/g);
+        
+        for (const match of hunkMatches) {
+          const oldStart = parseInt(match[1]);
+          const oldLinesCount = match[2] ? parseInt(match[2]) : 1;
+          const newStart = parseInt(match[3]);
+          const newLinesCount = match[4] ? parseInt(match[4]) : 1;
+          
+          // Find the lines after this hunk header
+          const hunkStartIndex = part.indexOf(match[0]);
+          const hunkContent = part.slice(hunkStartIndex + match[0].length);
+          const hunkLines: DiffLine[] = [];
+          
+          let oldLine = oldStart;
+          let newLine = newStart;
+          
+          for (const line of hunkContent.split('\n')) {
+            if (line.startsWith('@@') || line.startsWith('diff --git')) break;
+            
+            if (line.startsWith('+') && !line.startsWith('+++')) {
+              hunkLines.push({ type: 'add', content: line.slice(1), newLineNumber: newLine });
+              newLine++;
+              fileAdditions++;
+            } else if (line.startsWith('-') && !line.startsWith('---')) {
+              hunkLines.push({ type: 'delete', content: line.slice(1), oldLineNumber: oldLine });
+              oldLine++;
+              fileDeletions++;
+            } else if (line.startsWith(' ')) {
+              hunkLines.push({ type: 'context', content: line.slice(1), oldLineNumber: oldLine, newLineNumber: newLine });
+              oldLine++;
+              newLine++;
+            }
+          }
+          
+          hunks.push({
+            oldStart,
+            oldLines: oldLinesCount,
+            newStart,
+            newLines: newLinesCount,
+            lines: hunkLines,
+          });
+        }
+      }
+
+      totalAdditions += fileAdditions;
+      totalDeletions += fileDeletions;
+
+      files.push({
+        file: {
+          path: newPath,
+          status,
+          additions: fileAdditions,
+          deletions: fileDeletions,
+          oldPath: status === 'renamed' ? oldPath : undefined,
+        },
+        hunks,
+        isBinary,
+      });
+    }
+
+    return {
+      branchName,
+      baseBranch: baseBranch.replace('origin/', ''),
+      files,
+      totalAdditions,
+      totalDeletions,
+      commitCount,
+    };
+  } catch (error) {
+    console.error('Error getting branch diff:', error);
+    return null;
+  }
+}
+
 // Stash entry
 export interface StashEntry {
   index: number;
@@ -2033,35 +2201,35 @@ export async function discardFileChanges(filePath: string): Promise<{ success: b
   }
 }
 
-// File diff types
-export interface FileDiffHunk {
+// Staging file diff types (for working directory changes)
+export interface StagingDiffHunk {
   header: string;
   oldStart: number;
   oldLines: number;
   newStart: number;
   newLines: number;
-  lines: FileDiffLine[];
+  lines: StagingDiffLine[];
 }
 
-export interface FileDiffLine {
+export interface StagingDiffLine {
   type: 'context' | 'add' | 'delete';
   content: string;
   oldLineNumber?: number;
   newLineNumber?: number;
 }
 
-export interface FileDiff {
+export interface StagingFileDiff {
   filePath: string;
   oldPath?: string;
   status: 'added' | 'modified' | 'deleted' | 'renamed' | 'untracked';
-  hunks: FileDiffHunk[];
+  hunks: StagingDiffHunk[];
   isBinary: boolean;
   additions: number;
   deletions: number;
 }
 
 // Get diff for a specific file
-export async function getFileDiff(filePath: string, staged: boolean): Promise<FileDiff | null> {
+export async function getFileDiff(filePath: string, staged: boolean): Promise<StagingFileDiff | null> {
   if (!git) throw new Error('No repository selected');
 
   try {
@@ -2120,16 +2288,16 @@ export async function getFileDiff(filePath: string, staged: boolean): Promise<Fi
 }
 
 // Parse unified diff format
-function parseDiff(diffOutput: string, filePath: string): FileDiff {
+function parseDiff(diffOutput: string, filePath: string): StagingFileDiff {
   const lines = diffOutput.split('\n');
-  const hunks: FileDiffHunk[] = [];
-  let currentHunk: FileDiffHunk | null = null;
+  const hunks: StagingDiffHunk[] = [];
+  let currentHunk: StagingDiffHunk | null = null;
   let oldLineNum = 0;
   let newLineNum = 0;
   let additions = 0;
   let deletions = 0;
   let isBinary = false;
-  let status: FileDiff['status'] = 'modified';
+  let status: StagingFileDiff['status'] = 'modified';
   let oldPath: string | undefined;
 
   for (const line of lines) {
