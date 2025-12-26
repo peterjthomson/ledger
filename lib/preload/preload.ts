@@ -35,6 +35,14 @@ const electronAPI = {
   getStashes: () => ipcRenderer.invoke('get-stashes'),
   // Worktree operations
   convertWorktreeToBranch: (worktreePath: string) => ipcRenderer.invoke('convert-worktree-to-branch', worktreePath),
+  // Staging & commit operations
+  stageFile: (filePath: string) => ipcRenderer.invoke('stage-file', filePath),
+  unstageFile: (filePath: string) => ipcRenderer.invoke('unstage-file', filePath),
+  stageAll: () => ipcRenderer.invoke('stage-all'),
+  unstageAll: () => ipcRenderer.invoke('unstage-all'),
+  discardFileChanges: (filePath: string) => ipcRenderer.invoke('discard-file-changes', filePath),
+  getFileDiff: (filePath: string, staged: boolean) => ipcRenderer.invoke('get-file-diff', filePath, staged),
+  commitChanges: (message: string, description?: string) => ipcRenderer.invoke('commit-changes', message, description),
 }
 
 // Use `contextBridge` APIs to expose APIs to

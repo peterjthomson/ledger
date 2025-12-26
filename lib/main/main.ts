@@ -23,6 +23,14 @@ import {
   getCommitDiff,
   getStashes,
   convertWorktreeToBranch,
+  // Staging & commit APIs
+  stageFile,
+  unstageFile,
+  stageAll,
+  unstageAll,
+  discardFileChanges,
+  getFileDiff,
+  commitChanges,
 } from './git-service'
 import { getLastRepoPath, saveLastRepoPath } from './settings-service'
 
@@ -202,6 +210,63 @@ app.whenReady().then(() => {
       return await getStashes();
     } catch (error) {
       return [];
+    }
+  });
+
+  // Staging & Commit handlers
+  ipcMain.handle('stage-file', async (_, filePath: string) => {
+    try {
+      return await stageFile(filePath);
+    } catch (error) {
+      return { success: false, message: (error as Error).message };
+    }
+  });
+
+  ipcMain.handle('unstage-file', async (_, filePath: string) => {
+    try {
+      return await unstageFile(filePath);
+    } catch (error) {
+      return { success: false, message: (error as Error).message };
+    }
+  });
+
+  ipcMain.handle('stage-all', async () => {
+    try {
+      return await stageAll();
+    } catch (error) {
+      return { success: false, message: (error as Error).message };
+    }
+  });
+
+  ipcMain.handle('unstage-all', async () => {
+    try {
+      return await unstageAll();
+    } catch (error) {
+      return { success: false, message: (error as Error).message };
+    }
+  });
+
+  ipcMain.handle('discard-file-changes', async (_, filePath: string) => {
+    try {
+      return await discardFileChanges(filePath);
+    } catch (error) {
+      return { success: false, message: (error as Error).message };
+    }
+  });
+
+  ipcMain.handle('get-file-diff', async (_, filePath: string, staged: boolean) => {
+    try {
+      return await getFileDiff(filePath, staged);
+    } catch (error) {
+      return null;
+    }
+  });
+
+  ipcMain.handle('commit-changes', async (_, message: string, description?: string) => {
+    try {
+      return await commitChanges(message, description);
+    } catch (error) {
+      return { success: false, message: (error as Error).message };
     }
   });
 

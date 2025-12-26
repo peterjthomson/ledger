@@ -695,42 +695,54 @@ export async function getUncommittedFiles(): Promise<UncommittedFile[]> {
   try {
     const status = await git.status();
     const files: UncommittedFile[] = [];
+    const addedPaths = new Set<string>();
 
-    // Staged files
-    for (const file of status.staged) {
-      files.push({ path: file, status: 'added', staged: true });
-    }
-    
-    // Modified files
-    for (const file of status.modified) {
-      const isStaged = status.staged.includes(file);
-      files.push({ path: file, status: 'modified', staged: isStaged });
-    }
-
-    // Deleted files
-    for (const file of status.deleted) {
-      files.push({ path: file, status: 'deleted', staged: false });
-    }
-
-    // Renamed files
-    for (const file of status.renamed) {
-      files.push({ path: file.to, status: 'renamed', staged: true });
-    }
-
-    // Untracked (new) files
-    for (const file of status.not_added) {
-      files.push({ path: file, status: 'untracked', staged: false });
-    }
-
-    // Also check created files
-    for (const file of status.created) {
-      if (!files.some(f => f.path === file)) {
-        files.push({ path: file, status: 'added', staged: true });
+    // Process the files array which has detailed info about each file
+    // status.files is an array of FileStatusResult with index, working_dir, path
+    for (const file of status.files) {
+      const path = file.path;
+      
+      // Skip if we've already processed this file
+      if (addedPaths.has(path)) continue;
+      
+      // Index status (staged area): ' ' = unmodified, M = modified, A = added, D = deleted, R = renamed, ? = untracked
+      // Working dir status: same meanings for unstaged changes
+      const indexStatus = file.index;
+      const workingStatus = file.working_dir;
+      
+      // Determine file status and staged state
+      // A file can have both staged and unstaged changes
+      
+      // Staged changes (index !== ' ' and index !== '?')
+      if (indexStatus && indexStatus !== ' ' && indexStatus !== '?') {
+        let status: UncommittedFile['status'] = 'modified';
+        if (indexStatus === 'A') status = 'added';
+        else if (indexStatus === 'D') status = 'deleted';
+        else if (indexStatus === 'R') status = 'renamed';
+        else if (indexStatus === 'M') status = 'modified';
+        
+        files.push({ path, status, staged: true });
+        addedPaths.add(path + ':staged');
       }
+      
+      // Unstaged changes (working_dir !== ' ' and working_dir !== '?')
+      if (workingStatus && workingStatus !== ' ') {
+        let status: UncommittedFile['status'] = 'modified';
+        if (workingStatus === '?') status = 'untracked';
+        else if (workingStatus === 'A') status = 'added';
+        else if (workingStatus === 'D') status = 'deleted';
+        else if (workingStatus === 'M') status = 'modified';
+        
+        files.push({ path, status, staged: false });
+        addedPaths.add(path + ':unstaged');
+      }
+      
+      addedPaths.add(path);
     }
 
     return files;
-  } catch {
+  } catch (error) {
+    console.error('Error getting uncommitted files:', error);
     return [];
   }
 }
@@ -1426,5 +1438,284 @@ export async function getStashes(): Promise<StashEntry[]> {
     return stashes;
   } catch {
     return [];
+  }
+}
+
+// ========================================
+// Staging & Commit Functions
+// ========================================
+
+// Stage a single file
+export async function stageFile(filePath: string): Promise<{ success: boolean; message: string }> {
+  if (!git) throw new Error('No repository selected');
+
+  try {
+    await git.add(filePath);
+    return { success: true, message: `Staged ${filePath}` };
+  } catch (error) {
+    return { success: false, message: (error as Error).message };
+  }
+}
+
+// Unstage a single file
+export async function unstageFile(filePath: string): Promise<{ success: boolean; message: string }> {
+  if (!git) throw new Error('No repository selected');
+
+  try {
+    await git.raw(['restore', '--staged', filePath]);
+    return { success: true, message: `Unstaged ${filePath}` };
+  } catch (error) {
+    return { success: false, message: (error as Error).message };
+  }
+}
+
+// Stage all changes
+export async function stageAll(): Promise<{ success: boolean; message: string }> {
+  if (!git) throw new Error('No repository selected');
+
+  try {
+    await git.add('-A');
+    return { success: true, message: 'Staged all changes' };
+  } catch (error) {
+    return { success: false, message: (error as Error).message };
+  }
+}
+
+// Unstage all changes
+export async function unstageAll(): Promise<{ success: boolean; message: string }> {
+  if (!git) throw new Error('No repository selected');
+
+  try {
+    await git.raw(['restore', '--staged', '.']);
+    return { success: true, message: 'Unstaged all changes' };
+  } catch (error) {
+    return { success: false, message: (error as Error).message };
+  }
+}
+
+// Discard changes in a file (revert to last commit)
+export async function discardFileChanges(filePath: string): Promise<{ success: boolean; message: string }> {
+  if (!git) throw new Error('No repository selected');
+
+  try {
+    await git.raw(['restore', filePath]);
+    return { success: true, message: `Discarded changes in ${filePath}` };
+  } catch (error) {
+    return { success: false, message: (error as Error).message };
+  }
+}
+
+// File diff types
+export interface FileDiffHunk {
+  header: string;
+  oldStart: number;
+  oldLines: number;
+  newStart: number;
+  newLines: number;
+  lines: FileDiffLine[];
+}
+
+export interface FileDiffLine {
+  type: 'context' | 'add' | 'delete';
+  content: string;
+  oldLineNumber?: number;
+  newLineNumber?: number;
+}
+
+export interface FileDiff {
+  filePath: string;
+  oldPath?: string;
+  status: 'added' | 'modified' | 'deleted' | 'renamed' | 'untracked';
+  hunks: FileDiffHunk[];
+  isBinary: boolean;
+  additions: number;
+  deletions: number;
+}
+
+// Get diff for a specific file
+export async function getFileDiff(filePath: string, staged: boolean): Promise<FileDiff | null> {
+  if (!git) throw new Error('No repository selected');
+
+  try {
+    const args = staged 
+      ? ['diff', '--staged', '--', filePath]
+      : ['diff', '--', filePath];
+    
+    const diffOutput = await git.raw(args);
+    
+    // If no diff output, the file might be untracked
+    if (!diffOutput.trim()) {
+      // Check if it's an untracked file
+      const status = await git.status();
+      const isUntracked = status.not_added.includes(filePath);
+      
+      if (isUntracked) {
+        // Read the file content for untracked files
+        const fullPath = path.join(repoPath!, filePath);
+        try {
+          const content = await fs.promises.readFile(fullPath, 'utf-8');
+          const lines = content.split('\n');
+          
+          return {
+            filePath,
+            status: 'untracked',
+            isBinary: false,
+            additions: lines.length,
+            deletions: 0,
+            hunks: [{
+              header: `@@ -0,0 +1,${lines.length} @@`,
+              oldStart: 0,
+              oldLines: 0,
+              newStart: 1,
+              newLines: lines.length,
+              lines: lines.map((line, idx) => ({
+                type: 'add' as const,
+                content: line,
+                newLineNumber: idx + 1,
+              })),
+            }],
+          };
+        } catch {
+          return null;
+        }
+      }
+      
+      return null;
+    }
+
+    // Parse the diff output
+    return parseDiff(diffOutput, filePath);
+  } catch (error) {
+    console.error('Error getting file diff:', error);
+    return null;
+  }
+}
+
+// Parse unified diff format
+function parseDiff(diffOutput: string, filePath: string): FileDiff {
+  const lines = diffOutput.split('\n');
+  const hunks: FileDiffHunk[] = [];
+  let currentHunk: FileDiffHunk | null = null;
+  let oldLineNum = 0;
+  let newLineNum = 0;
+  let additions = 0;
+  let deletions = 0;
+  let isBinary = false;
+  let status: FileDiff['status'] = 'modified';
+  let oldPath: string | undefined;
+
+  for (const line of lines) {
+    // Check for binary file
+    if (line.startsWith('Binary files')) {
+      isBinary = true;
+      continue;
+    }
+
+    // Check for new file
+    if (line.startsWith('new file mode')) {
+      status = 'added';
+      continue;
+    }
+
+    // Check for deleted file
+    if (line.startsWith('deleted file mode')) {
+      status = 'deleted';
+      continue;
+    }
+
+    // Check for rename
+    if (line.startsWith('rename from ')) {
+      oldPath = line.replace('rename from ', '');
+      status = 'renamed';
+      continue;
+    }
+
+    // Parse hunk header
+    const hunkMatch = line.match(/^@@ -(\d+)(?:,(\d+))? \+(\d+)(?:,(\d+))? @@(.*)$/);
+    if (hunkMatch) {
+      if (currentHunk) {
+        hunks.push(currentHunk);
+      }
+      
+      oldLineNum = parseInt(hunkMatch[1]);
+      newLineNum = parseInt(hunkMatch[3]);
+      
+      currentHunk = {
+        header: line,
+        oldStart: oldLineNum,
+        oldLines: parseInt(hunkMatch[2] || '1'),
+        newStart: newLineNum,
+        newLines: parseInt(hunkMatch[4] || '1'),
+        lines: [],
+      };
+      continue;
+    }
+
+    // Parse diff lines
+    if (currentHunk) {
+      if (line.startsWith('+') && !line.startsWith('+++')) {
+        additions++;
+        currentHunk.lines.push({
+          type: 'add',
+          content: line.slice(1),
+          newLineNumber: newLineNum++,
+        });
+      } else if (line.startsWith('-') && !line.startsWith('---')) {
+        deletions++;
+        currentHunk.lines.push({
+          type: 'delete',
+          content: line.slice(1),
+          oldLineNumber: oldLineNum++,
+        });
+      } else if (line.startsWith(' ')) {
+        currentHunk.lines.push({
+          type: 'context',
+          content: line.slice(1),
+          oldLineNumber: oldLineNum++,
+          newLineNumber: newLineNum++,
+        });
+      }
+    }
+  }
+
+  // Don't forget the last hunk
+  if (currentHunk) {
+    hunks.push(currentHunk);
+  }
+
+  return {
+    filePath,
+    oldPath,
+    status,
+    hunks,
+    isBinary,
+    additions,
+    deletions,
+  };
+}
+
+// Commit staged changes
+export async function commitChanges(
+  message: string, 
+  description?: string
+): Promise<{ success: boolean; message: string }> {
+  if (!git) throw new Error('No repository selected');
+
+  try {
+    // Check if there are staged changes
+    const status = await git.status();
+    if (status.staged.length === 0) {
+      return { success: false, message: 'No staged changes to commit' };
+    }
+
+    // Build commit message (summary + optional description)
+    const fullMessage = description 
+      ? `${message}\n\n${description}`
+      : message;
+
+    await git.commit(fullMessage);
+    return { success: true, message: `Committed: ${message}` };
+  } catch (error) {
+    return { success: false, message: (error as Error).message };
   }
 }

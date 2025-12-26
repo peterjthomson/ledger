@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo, useCallback, useRef } from 'react'
-import type { Branch, Worktree, BranchFilter, BranchSort, CheckoutResult, PullRequest, Commit, WorkingStatus, PRFilter, PRSort, GraphCommit, CommitDiff, StashEntry } from './types/electron'
+import type { Branch, Worktree, BranchFilter, BranchSort, CheckoutResult, PullRequest, Commit, WorkingStatus, UncommittedFile, PRFilter, PRSort, GraphCommit, CommitDiff, StashEntry, StagingFileDiff } from './types/electron'
 import './styles/app.css'
 import { useWindowContext } from './components/window'
 
@@ -24,6 +24,13 @@ interface MenuItem {
   label: string;
   action: () => void;
   disabled?: boolean;
+}
+
+type SidebarFocusType = 'pr' | 'branch' | 'remote' | 'worktree' | 'stash' | 'uncommitted';
+
+interface SidebarFocus {
+  type: SidebarFocusType;
+  data: PullRequest | Branch | Worktree | StashEntry | WorkingStatus;
 }
 
 export default function App() {
@@ -52,6 +59,7 @@ export default function App() {
   const [commitDiff, setCommitDiff] = useState<CommitDiff | null>(null)
   const [stashes, setStashes] = useState<StashEntry[]>([])
   const [loadingDiff, setLoadingDiff] = useState(false)
+  const [sidebarFocus, setSidebarFocus] = useState<SidebarFocus | null>(null)
   
   // Sidebar collapsed state
   const [sidebarSections, setSidebarSections] = useState({
@@ -59,6 +67,7 @@ export default function App() {
     remotes: false,
     worktrees: true,
     stashes: false,
+    prs: true,
   })
   
   // Filter and sort state
@@ -179,6 +188,7 @@ export default function App() {
 
   // Fetch diff when a commit is selected
   const handleSelectCommit = useCallback(async (commit: GraphCommit) => {
+    setSidebarFocus(null) // Clear sidebar focus when selecting a commit
     setSelectedCommit(commit)
     setLoadingDiff(true)
     try {
@@ -189,6 +199,13 @@ export default function App() {
     } finally {
       setLoadingDiff(false)
     }
+  }, [])
+
+  // Handle sidebar item focus (single click)
+  const handleSidebarFocus = useCallback((type: SidebarFocusType, data: PullRequest | Branch | Worktree | StashEntry | WorkingStatus) => {
+    setSelectedCommit(null) // Clear commit selection when focusing sidebar item
+    setCommitDiff(null)
+    setSidebarFocus({ type, data })
   }, [])
 
   // Toggle sidebar section
@@ -1169,6 +1186,44 @@ export default function App() {
         <main className="work-mode-layout">
           {/* Sidebar */}
           <aside className="work-sidebar">
+            {/* PRs Section */}
+            <div className="sidebar-section">
+              <div 
+                className="sidebar-section-header"
+                onClick={() => toggleSidebarSection('prs')}
+              >
+                <span className={`sidebar-chevron ${sidebarSections.prs ? 'open' : ''}`}>▸</span>
+                <span className="sidebar-section-title">Pull Requests</span>
+                <span className="sidebar-count">{filteredPRs.length}</span>
+              </div>
+              {sidebarSections.prs && (
+                <ul className="sidebar-list">
+                  {prError ? (
+                    <li className="sidebar-empty sidebar-error">{prError}</li>
+                  ) : filteredPRs.length === 0 ? (
+                    <li className="sidebar-empty">No open PRs</li>
+                  ) : (
+                    filteredPRs.map((pr) => (
+                      <li
+                        key={pr.number}
+                        className={`sidebar-item ${pr.isDraft ? 'draft' : ''} ${switching ? 'disabled' : ''} ${sidebarFocus?.type === 'pr' && (sidebarFocus.data as PullRequest).number === pr.number ? 'selected' : ''}`}
+                        onClick={() => handleSidebarFocus('pr', pr)}
+                        onDoubleClick={() => handlePRDoubleClick(pr)}
+                        onContextMenu={(e) => handleContextMenu(e, 'pr', pr)}
+                        title={`#${pr.number} ${pr.title}`}
+                      >
+                        <span className="sidebar-item-name">
+                          <span className="sidebar-pr-number">#{pr.number}</span>
+                          {pr.title}
+                        </span>
+                        {pr.isDraft && <span className="sidebar-pr-draft">draft</span>}
+                      </li>
+                    ))
+                  )}
+                </ul>
+              )}
+            </div>
+
             {/* Branches Section */}
             <div className="sidebar-section">
               <div 
@@ -1181,10 +1236,24 @@ export default function App() {
               </div>
               {sidebarSections.branches && (
                 <ul className="sidebar-list">
+                  {/* Uncommitted changes entry */}
+                  {workingStatus?.hasChanges && (
+                    <li
+                      className={`sidebar-item uncommitted ${sidebarFocus?.type === 'uncommitted' ? 'selected' : ''}`}
+                      onClick={() => handleSidebarFocus('uncommitted', workingStatus)}
+                    >
+                      <span className="sidebar-uncommitted-icon">◐</span>
+                      <span className="sidebar-item-name">Uncommitted</span>
+                      <span className="sidebar-uncommitted-count">
+                        {workingStatus.stagedCount + workingStatus.unstagedCount}
+                      </span>
+                    </li>
+                  )}
                   {localBranches.map((branch) => (
                     <li
                       key={branch.name}
-                      className={`sidebar-item ${branch.current ? 'current' : ''} ${switching ? 'disabled' : ''}`}
+                      className={`sidebar-item ${branch.current ? 'current' : ''} ${switching ? 'disabled' : ''} ${sidebarFocus?.type === 'branch' && (sidebarFocus.data as Branch).name === branch.name ? 'selected' : ''}`}
+                      onClick={() => handleSidebarFocus('branch', branch)}
                       onDoubleClick={() => handleBranchDoubleClick(branch)}
                     >
                       {branch.current && <span className="sidebar-current-dot">●</span>}
@@ -1210,7 +1279,8 @@ export default function App() {
                   {remoteBranches.map((branch) => (
                     <li
                       key={branch.name}
-                      className={`sidebar-item ${switching ? 'disabled' : ''}`}
+                      className={`sidebar-item ${switching ? 'disabled' : ''} ${sidebarFocus?.type === 'remote' && (sidebarFocus.data as Branch).name === branch.name ? 'selected' : ''}`}
+                      onClick={() => handleSidebarFocus('remote', branch)}
                       onDoubleClick={() => handleRemoteBranchDoubleClick(branch)}
                     >
                       <span className="sidebar-item-name">{branch.name.replace('remotes/', '').replace(/^origin\//, '')}</span>
@@ -1235,7 +1305,8 @@ export default function App() {
                   {worktrees.map((wt) => (
                     <li
                       key={wt.path}
-                      className={`sidebar-item ${wt.branch === currentBranch ? 'current' : ''} ${switching ? 'disabled' : ''}`}
+                      className={`sidebar-item ${wt.branch === currentBranch ? 'current' : ''} ${switching ? 'disabled' : ''} ${sidebarFocus?.type === 'worktree' && (sidebarFocus.data as Worktree).path === wt.path ? 'selected' : ''}`}
+                      onClick={() => handleSidebarFocus('worktree', wt)}
                       onDoubleClick={() => handleWorktreeDoubleClick(wt)}
                     >
                       {wt.branch === currentBranch && <span className="sidebar-current-dot">●</span>}
@@ -1262,7 +1333,11 @@ export default function App() {
                     <li className="sidebar-empty">No stashes</li>
                   ) : (
                     stashes.map((stash) => (
-                      <li key={stash.index} className="sidebar-item">
+                      <li 
+                        key={stash.index} 
+                        className={`sidebar-item ${sidebarFocus?.type === 'stash' && (sidebarFocus.data as StashEntry).index === stash.index ? 'selected' : ''}`}
+                        onClick={() => handleSidebarFocus('stash', stash)}
+                      >
                         <span className="sidebar-item-name" title={stash.message}>
                           stash@{`{${stash.index}}`}: {stash.message}
                         </span>
@@ -1295,10 +1370,23 @@ export default function App() {
 
           {/* Detail Panel */}
           <aside className="work-detail">
-            {!selectedCommit ? (
+            {sidebarFocus?.type === 'uncommitted' && workingStatus ? (
+              <StagingPanel 
+                workingStatus={workingStatus}
+                onRefresh={refresh}
+                onStatusChange={setStatus}
+              />
+            ) : sidebarFocus ? (
+              <SidebarDetailPanel 
+                focus={sidebarFocus} 
+                formatRelativeTime={formatRelativeTime}
+                formatDate={formatDate}
+                currentBranch={currentBranch}
+              />
+            ) : !selectedCommit ? (
               <div className="detail-empty">
                 <span className="detail-empty-icon">◇</span>
-                <p>Select a commit to view details</p>
+                <p>Select an item to view details</p>
               </div>
             ) : loadingDiff ? (
               <div className="detail-loading">Loading diff...</div>
@@ -1634,6 +1722,555 @@ function DiffPanel({ diff, formatRelativeTime }: DiffPanelProps) {
             )}
           </div>
         ))}
+      </div>
+    </div>
+  );
+}
+
+// ========================================
+// Sidebar Detail Panel Component
+// ========================================
+
+interface SidebarDetailPanelProps {
+  focus: SidebarFocus;
+  formatRelativeTime: (date: string) => string;
+  formatDate: (date?: string) => string;
+  currentBranch: string;
+}
+
+function SidebarDetailPanel({ focus, formatRelativeTime, formatDate, currentBranch }: SidebarDetailPanelProps) {
+  switch (focus.type) {
+    case 'pr': {
+      const pr = focus.data as PullRequest;
+      return (
+        <div className="sidebar-detail-panel">
+          <div className="detail-type-badge">Pull Request</div>
+          <h3 className="detail-title">{pr.title}</h3>
+          <div className="detail-meta-grid">
+            <div className="detail-meta-item">
+              <span className="meta-label">Number</span>
+              <span className="meta-value">#{pr.number}</span>
+            </div>
+            <div className="detail-meta-item">
+              <span className="meta-label">Author</span>
+              <span className="meta-value">@{pr.author}</span>
+            </div>
+            <div className="detail-meta-item">
+              <span className="meta-label">Branch</span>
+              <code className="meta-value">{pr.branch}</code>
+            </div>
+            <div className="detail-meta-item">
+              <span className="meta-label">Base</span>
+              <code className="meta-value">{pr.baseBranch}</code>
+            </div>
+            <div className="detail-meta-item">
+              <span className="meta-label">Status</span>
+              <span className="meta-value">
+                {pr.isDraft ? 'Draft' : 'Open'}
+                {pr.reviewDecision && ` · ${pr.reviewDecision.replace(/_/g, ' ').toLowerCase()}`}
+              </span>
+            </div>
+            <div className="detail-meta-item">
+              <span className="meta-label">Updated</span>
+              <span className="meta-value">{formatRelativeTime(pr.updatedAt)}</span>
+            </div>
+            <div className="detail-meta-item">
+              <span className="meta-label">Changes</span>
+              <span className="meta-value">
+                <span className="diff-additions">+{pr.additions}</span>
+                {' '}
+                <span className="diff-deletions">-{pr.deletions}</span>
+              </span>
+            </div>
+            <div className="detail-meta-item">
+              <span className="meta-label">Comments</span>
+              <span className="meta-value">{pr.comments}</span>
+            </div>
+          </div>
+          <div className="detail-actions-hint">
+            Double-click to open in browser
+          </div>
+        </div>
+      );
+    }
+    
+    case 'branch': {
+      const branch = focus.data as Branch;
+      return (
+        <div className="sidebar-detail-panel">
+          <div className="detail-type-badge">Local Branch</div>
+          <h3 className="detail-title">{branch.name}</h3>
+          <div className="detail-meta-grid">
+            <div className="detail-meta-item">
+              <span className="meta-label">Commit</span>
+              <code className="meta-value">{branch.commit?.slice(0, 7) || '—'}</code>
+            </div>
+            <div className="detail-meta-item">
+              <span className="meta-label">Status</span>
+              <span className="meta-value">
+                {branch.current ? 'Current' : 'Not checked out'}
+                {branch.isLocalOnly && ' · Local only'}
+              </span>
+            </div>
+            {branch.lastCommitDate && (
+              <div className="detail-meta-item">
+                <span className="meta-label">Last Commit</span>
+                <span className="meta-value">{formatDate(branch.lastCommitDate)}</span>
+              </div>
+            )}
+            {branch.firstCommitDate && (
+              <div className="detail-meta-item">
+                <span className="meta-label">First Commit</span>
+                <span className="meta-value">{formatDate(branch.firstCommitDate)}</span>
+              </div>
+            )}
+            {branch.commitCount !== undefined && (
+              <div className="detail-meta-item">
+                <span className="meta-label">Commits</span>
+                <span className="meta-value">{branch.commitCount}</span>
+              </div>
+            )}
+            <div className="detail-meta-item">
+              <span className="meta-label">Merged</span>
+              <span className="meta-value">{branch.isMerged ? 'Yes' : 'No'}</span>
+            </div>
+          </div>
+          {!branch.current && (
+            <div className="detail-actions-hint">
+              Double-click to switch to this branch
+            </div>
+          )}
+        </div>
+      );
+    }
+    
+    case 'remote': {
+      const branch = focus.data as Branch;
+      const displayName = branch.name.replace('remotes/', '').replace(/^origin\//, '');
+      return (
+        <div className="sidebar-detail-panel">
+          <div className="detail-type-badge">Remote Branch</div>
+          <h3 className="detail-title">{displayName}</h3>
+          <div className="detail-meta-grid">
+            <div className="detail-meta-item">
+              <span className="meta-label">Full Name</span>
+              <code className="meta-value">{branch.name}</code>
+            </div>
+            <div className="detail-meta-item">
+              <span className="meta-label">Commit</span>
+              <code className="meta-value">{branch.commit?.slice(0, 7) || '—'}</code>
+            </div>
+            {branch.lastCommitDate && (
+              <div className="detail-meta-item">
+                <span className="meta-label">Last Commit</span>
+                <span className="meta-value">{formatDate(branch.lastCommitDate)}</span>
+              </div>
+            )}
+            {branch.commitCount !== undefined && (
+              <div className="detail-meta-item">
+                <span className="meta-label">Commits</span>
+                <span className="meta-value">{branch.commitCount}</span>
+              </div>
+            )}
+            <div className="detail-meta-item">
+              <span className="meta-label">Merged</span>
+              <span className="meta-value">{branch.isMerged ? 'Yes' : 'No'}</span>
+            </div>
+          </div>
+          <div className="detail-actions-hint">
+            Double-click to checkout this branch
+          </div>
+        </div>
+      );
+    }
+    
+    case 'worktree': {
+      const wt = focus.data as Worktree;
+      const isCurrent = wt.branch === currentBranch;
+      return (
+        <div className="sidebar-detail-panel">
+          <div className="detail-type-badge">Worktree</div>
+          <h3 className="detail-title">{wt.displayName}</h3>
+          <div className="detail-meta-grid">
+            <div className="detail-meta-item full-width">
+              <span className="meta-label">Path</span>
+              <code className="meta-value path">{wt.path}</code>
+            </div>
+            {wt.branch && (
+              <div className="detail-meta-item">
+                <span className="meta-label">Branch</span>
+                <code className="meta-value">{wt.branch}</code>
+              </div>
+            )}
+            <div className="detail-meta-item">
+              <span className="meta-label">Status</span>
+              <span className="meta-value">
+                {isCurrent ? 'Current' : 'Not checked out'}
+              </span>
+            </div>
+            <div className="detail-meta-item">
+              <span className="meta-label">Changes</span>
+              <span className="meta-value">
+                {wt.changedFileCount > 0 ? (
+                  <>
+                    {wt.changedFileCount} {wt.changedFileCount === 1 ? 'file' : 'files'}
+                    {(wt.additions > 0 || wt.deletions > 0) && (
+                      <>
+                        {' · '}
+                        <span className="diff-additions">+{wt.additions}</span>
+                        {' '}
+                        <span className="diff-deletions">-{wt.deletions}</span>
+                      </>
+                    )}
+                  </>
+                ) : (
+                  'Clean'
+                )}
+              </span>
+            </div>
+          </div>
+          {!isCurrent && wt.branch && (
+            <div className="detail-actions-hint">
+              Double-click to checkout this worktree
+            </div>
+          )}
+        </div>
+      );
+    }
+    
+    case 'stash': {
+      const stash = focus.data as StashEntry;
+      return (
+        <div className="sidebar-detail-panel">
+          <div className="detail-type-badge">Stash</div>
+          <h3 className="detail-title">stash@{`{${stash.index}}`}</h3>
+          <div className="detail-meta-grid">
+            <div className="detail-meta-item full-width">
+              <span className="meta-label">Message</span>
+              <span className="meta-value">{stash.message}</span>
+            </div>
+            <div className="detail-meta-item">
+              <span className="meta-label">Branch</span>
+              <code className="meta-value">{stash.branch || '—'}</code>
+            </div>
+            <div className="detail-meta-item">
+              <span className="meta-label">Date</span>
+              <span className="meta-value">{formatRelativeTime(stash.date)}</span>
+            </div>
+          </div>
+        </div>
+      );
+    }
+    
+    case 'uncommitted': {
+      // Render the full staging panel
+      return null; // Handled by parent component
+    }
+    
+    default:
+      return null;
+  }
+}
+
+// ========================================
+// Staging Panel Component
+// ========================================
+
+interface StagingPanelProps {
+  workingStatus: WorkingStatus;
+  onRefresh: () => Promise<void>;
+  onStatusChange: (status: StatusMessage | null) => void;
+}
+
+function StagingPanel({ workingStatus, onRefresh, onStatusChange }: StagingPanelProps) {
+  const [selectedFile, setSelectedFile] = useState<UncommittedFile | null>(null);
+  const [fileDiff, setFileDiff] = useState<StagingFileDiff | null>(null);
+  const [loadingDiff, setLoadingDiff] = useState(false);
+  const [commitMessage, setCommitMessage] = useState('');
+  const [commitDescription, setCommitDescription] = useState('');
+  const [isCommitting, setIsCommitting] = useState(false);
+
+  const stagedFiles = workingStatus.files.filter(f => f.staged);
+  const unstagedFiles = workingStatus.files.filter(f => !f.staged);
+
+  // Load diff when file is selected
+  useEffect(() => {
+    if (!selectedFile) {
+      setFileDiff(null);
+      return;
+    }
+
+    const loadDiff = async () => {
+      setLoadingDiff(true);
+      try {
+        const diff = await window.electronAPI.getFileDiff(selectedFile.path, selectedFile.staged);
+        setFileDiff(diff);
+      } catch (error) {
+        setFileDiff(null);
+      } finally {
+        setLoadingDiff(false);
+      }
+    };
+
+    loadDiff();
+  }, [selectedFile]);
+
+  // Stage a file
+  const handleStageFile = async (file: UncommittedFile) => {
+    const result = await window.electronAPI.stageFile(file.path);
+    if (result.success) {
+      onStatusChange({ type: 'success', message: result.message });
+      await onRefresh();
+    } else {
+      onStatusChange({ type: 'error', message: result.message });
+    }
+  };
+
+  // Unstage a file
+  const handleUnstageFile = async (file: UncommittedFile) => {
+    const result = await window.electronAPI.unstageFile(file.path);
+    if (result.success) {
+      onStatusChange({ type: 'success', message: result.message });
+      await onRefresh();
+    } else {
+      onStatusChange({ type: 'error', message: result.message });
+    }
+  };
+
+  // Stage all files
+  const handleStageAll = async () => {
+    const result = await window.electronAPI.stageAll();
+    if (result.success) {
+      onStatusChange({ type: 'success', message: result.message });
+      await onRefresh();
+    } else {
+      onStatusChange({ type: 'error', message: result.message });
+    }
+  };
+
+  // Unstage all files
+  const handleUnstageAll = async () => {
+    const result = await window.electronAPI.unstageAll();
+    if (result.success) {
+      onStatusChange({ type: 'success', message: result.message });
+      await onRefresh();
+    } else {
+      onStatusChange({ type: 'error', message: result.message });
+    }
+  };
+
+  // Commit changes
+  const handleCommit = async () => {
+    if (!commitMessage.trim() || stagedFiles.length === 0) return;
+
+    setIsCommitting(true);
+    try {
+      const result = await window.electronAPI.commitChanges(
+        commitMessage.trim(),
+        commitDescription.trim() || undefined
+      );
+      if (result.success) {
+        onStatusChange({ type: 'success', message: result.message });
+        setCommitMessage('');
+        setCommitDescription('');
+        await onRefresh();
+      } else {
+        onStatusChange({ type: 'error', message: result.message });
+      }
+    } catch (error) {
+      onStatusChange({ type: 'error', message: (error as Error).message });
+    } finally {
+      setIsCommitting(false);
+    }
+  };
+
+  // File status helpers
+  const getFileStatusIcon = (status: UncommittedFile['status']) => {
+    switch (status) {
+      case 'added': return '+';
+      case 'deleted': return '−';
+      case 'modified': return '●';
+      case 'renamed': return '→';
+      case 'untracked': return '?';
+      default: return '?';
+    }
+  };
+
+  const getFileStatusClass = (status: UncommittedFile['status']) => {
+    switch (status) {
+      case 'added': return 'file-added';
+      case 'deleted': return 'file-deleted';
+      case 'modified': return 'file-modified';
+      case 'renamed': return 'file-renamed';
+      case 'untracked': return 'file-untracked';
+      default: return '';
+    }
+  };
+
+  return (
+    <div className="staging-panel">
+      {/* Header */}
+      <div className="staging-header">
+        <div className="staging-title">
+          <span className="detail-type-badge uncommitted">Changes</span>
+          <span className="staging-stats">
+            <span className="diff-additions">+{workingStatus.additions}</span>
+            <span className="diff-deletions">-{workingStatus.deletions}</span>
+          </span>
+        </div>
+      </div>
+
+      {/* File Lists */}
+      <div className="staging-files">
+        {/* Unstaged Section */}
+        <div className="staging-section">
+          <div className="staging-section-header">
+            <span className="staging-section-title">Unstaged</span>
+            <span className="staging-section-count">{unstagedFiles.length}</span>
+            {unstagedFiles.length > 0 && (
+              <button 
+                className="staging-action-btn"
+                onClick={handleStageAll}
+                title="Stage all"
+              >
+                Stage All ↑
+              </button>
+            )}
+          </div>
+          {unstagedFiles.length > 0 ? (
+            <ul className="staging-file-list">
+              {unstagedFiles.map((file) => (
+                <li 
+                  key={file.path} 
+                  className={`staging-file-item ${getFileStatusClass(file.status)} ${selectedFile?.path === file.path && !selectedFile.staged ? 'selected' : ''}`}
+                  onClick={() => setSelectedFile(file)}
+                >
+                  <span className="file-status-icon">{getFileStatusIcon(file.status)}</span>
+                  <span className="file-path" title={file.path}>{file.path}</span>
+                  <button 
+                    className="file-action-btn stage"
+                    onClick={(e) => { e.stopPropagation(); handleStageFile(file); }}
+                    title="Stage file"
+                  >
+                    +
+                  </button>
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <div className="staging-empty">No unstaged changes</div>
+          )}
+        </div>
+
+        {/* Staged Section */}
+        <div className="staging-section">
+          <div className="staging-section-header">
+            <span className="staging-section-title">Staged</span>
+            <span className="staging-section-count">{stagedFiles.length}</span>
+            {stagedFiles.length > 0 && (
+              <button 
+                className="staging-action-btn"
+                onClick={handleUnstageAll}
+                title="Unstage all"
+              >
+                Unstage All ↓
+              </button>
+            )}
+          </div>
+          {stagedFiles.length > 0 ? (
+            <ul className="staging-file-list">
+              {stagedFiles.map((file) => (
+                <li 
+                  key={file.path} 
+                  className={`staging-file-item ${getFileStatusClass(file.status)} ${selectedFile?.path === file.path && selectedFile.staged ? 'selected' : ''}`}
+                  onClick={() => setSelectedFile(file)}
+                >
+                  <span className="file-status-icon">{getFileStatusIcon(file.status)}</span>
+                  <span className="file-path" title={file.path}>{file.path}</span>
+                  <button 
+                    className="file-action-btn unstage"
+                    onClick={(e) => { e.stopPropagation(); handleUnstageFile(file); }}
+                    title="Unstage file"
+                  >
+                    −
+                  </button>
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <div className="staging-empty">No staged changes</div>
+          )}
+        </div>
+      </div>
+
+      {/* Diff Preview */}
+      {selectedFile && (
+        <div className="staging-diff">
+          <div className="staging-diff-header">
+            <span className="staging-diff-title">{selectedFile.path}</span>
+            {fileDiff && (
+              <span className="staging-diff-stats">
+                <span className="diff-additions">+{fileDiff.additions}</span>
+                <span className="diff-deletions">-{fileDiff.deletions}</span>
+              </span>
+            )}
+          </div>
+          <div className="staging-diff-content">
+            {loadingDiff ? (
+              <div className="staging-diff-loading">Loading diff...</div>
+            ) : fileDiff?.isBinary ? (
+              <div className="staging-diff-binary">Binary file</div>
+            ) : fileDiff?.hunks.length === 0 ? (
+              <div className="staging-diff-empty">No changes to display</div>
+            ) : fileDiff ? (
+              fileDiff.hunks.map((hunk, hunkIdx) => (
+                <div key={hunkIdx} className="staging-hunk">
+                  <div className="staging-hunk-header">{hunk.header}</div>
+                  <div className="staging-hunk-lines">
+                    {hunk.lines.map((line, lineIdx) => (
+                      <div key={lineIdx} className={`staging-diff-line diff-line-${line.type}`}>
+                        <span className="diff-line-number old">{line.oldLineNumber || ''}</span>
+                        <span className="diff-line-number new">{line.newLineNumber || ''}</span>
+                        <span className="diff-line-prefix">
+                          {line.type === 'add' ? '+' : line.type === 'delete' ? '-' : ' '}
+                        </span>
+                        <span className="diff-line-content">{line.content}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ))
+            ) : (
+              <div className="staging-diff-empty">Select a file to view diff</div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Commit Form */}
+      <div className="staging-commit">
+        <input
+          type="text"
+          className="commit-summary-input"
+          placeholder="Commit message (required)"
+          value={commitMessage}
+          onChange={(e) => setCommitMessage(e.target.value)}
+          maxLength={72}
+        />
+        <textarea
+          className="commit-description-input"
+          placeholder="Description (optional)"
+          value={commitDescription}
+          onChange={(e) => setCommitDescription(e.target.value)}
+          rows={3}
+        />
+        <button
+          className="btn btn-primary commit-btn"
+          onClick={handleCommit}
+          disabled={!commitMessage.trim() || stagedFiles.length === 0 || isCommitting}
+        >
+          {isCommitting ? 'Committing...' : `Commit ${stagedFiles.length} file${stagedFiles.length !== 1 ? 's' : ''}`}
+        </button>
       </div>
     </div>
   );

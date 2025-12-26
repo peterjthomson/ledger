@@ -147,6 +147,33 @@ export interface StashEntry {
   date: string;
 }
 
+// Staging file diff types (for working directory changes)
+export interface StagingDiffHunk {
+  header: string;
+  oldStart: number;
+  oldLines: number;
+  newStart: number;
+  newLines: number;
+  lines: StagingDiffLine[];
+}
+
+export interface StagingDiffLine {
+  type: 'context' | 'add' | 'delete';
+  content: string;
+  oldLineNumber?: number;
+  newLineNumber?: number;
+}
+
+export interface StagingFileDiff {
+  filePath: string;
+  oldPath?: string;
+  status: 'added' | 'modified' | 'deleted' | 'renamed' | 'untracked';
+  hunks: StagingDiffHunk[];
+  isBinary: boolean;
+  additions: number;
+  deletions: number;
+}
+
 export interface UncommittedFile {
   path: string;
   status: 'modified' | 'added' | 'deleted' | 'renamed' | 'untracked';
@@ -193,6 +220,14 @@ export interface ElectronAPI {
   getStashes: () => Promise<StashEntry[]>;
   // Worktree operations
   convertWorktreeToBranch: (worktreePath: string) => Promise<{ success: boolean; message: string; branchName?: string }>;
+  // Staging & commit operations
+  stageFile: (filePath: string) => Promise<{ success: boolean; message: string }>;
+  unstageFile: (filePath: string) => Promise<{ success: boolean; message: string }>;
+  stageAll: () => Promise<{ success: boolean; message: string }>;
+  unstageAll: () => Promise<{ success: boolean; message: string }>;
+  discardFileChanges: (filePath: string) => Promise<{ success: boolean; message: string }>;
+  getFileDiff: (filePath: string, staged: boolean) => Promise<StagingFileDiff | null>;
+  commitChanges: (message: string, description?: string) => Promise<{ success: boolean; message: string }>;
 }
 
 declare global {
