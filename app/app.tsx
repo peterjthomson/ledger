@@ -254,6 +254,29 @@ export default function App() {
     }
   }
 
+  const handleWorktreeConvertToBranch = async (wt: Worktree) => {
+    closeContextMenu()
+    if (switching) return
+    
+    setSwitching(true)
+    const folderName = wt.path.split('/').pop() || 'worktree'
+    setStatus({ type: 'info', message: `Converting ${folderName} to branch...` })
+    
+    try {
+      const result = await window.electronAPI.convertWorktreeToBranch(wt.path)
+      if (result.success) {
+        setStatus({ type: 'success', message: result.message })
+        await refresh()
+      } else {
+        setStatus({ type: 'error', message: result.message })
+      }
+    } catch (err) {
+      setStatus({ type: 'error', message: (err as Error).message })
+    } finally {
+      setSwitching(false)
+    }
+  }
+
   // Local branch context menu actions
   const handleLocalBranchSwitch = async (branch: Branch) => {
     closeContextMenu()
@@ -346,8 +369,10 @@ export default function App() {
       }
       case 'worktree': {
         const wt = contextMenu.data as Worktree
+        const hasChanges = wt.changedFileCount > 0 || wt.additions > 0 || wt.deletions > 0
         return [
           { label: 'Check Out Worktree', action: () => handleWorktreeDoubleClick(wt), disabled: !wt.branch || wt.branch === currentBranch || switching },
+          { label: 'Convert to Branch', action: () => handleWorktreeConvertToBranch(wt), disabled: !hasChanges || switching },
           { label: 'Open in Finder', action: () => handleWorktreeOpen(wt) },
         ]
       }

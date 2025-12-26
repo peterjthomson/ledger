@@ -22,6 +22,7 @@ import {
   getCommitGraphHistory,
   getCommitDiff,
   getStashes,
+  convertWorktreeToBranch,
 } from './git-service'
 import { getLastRepoPath, saveLastRepoPath } from './settings-service'
 
@@ -183,6 +184,14 @@ app.whenReady().then(() => {
   ipcMain.handle('get-commit-diff', async (_, commitHash: string) => {
     try {
       return await getCommitDiff(commitHash);
+    } catch (error) {
+      return null;
+    }
+  });
+
+  ipcMain.handle('convert-worktree-to-branch', async (_, worktreePath: string) => {
+    try {
+      return await convertWorktreeToBranch(worktreePath);
     } catch (error) {
       return null;
     }

@@ -33,6 +33,8 @@ const electronAPI = {
   getCommitGraphHistory: (limit?: number) => ipcRenderer.invoke('get-commit-graph-history', limit),
   getCommitDiff: (commitHash: string) => ipcRenderer.invoke('get-commit-diff', commitHash),
   getStashes: () => ipcRenderer.invoke('get-stashes'),
+  // Worktree operations
+  convertWorktreeToBranch: (worktreePath: string) => ipcRenderer.invoke('convert-worktree-to-branch', worktreePath),
 }
 
 // Use `contextBridge` APIs to expose APIs to

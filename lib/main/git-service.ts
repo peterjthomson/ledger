@@ -978,6 +978,129 @@ export async function getCommitHistoryForRef(ref: string, limit: number = 50): P
   }
 }
 
+// Convert a worktree to a branch
+// Takes changes from a worktree, creates a new branch from master/main with the folder name, and applies the changes
+export async function convertWorktreeToBranch(worktreePath: string): Promise<{ success: boolean; message: string; branchName?: string }> {
+  if (!git) throw new Error('No repository selected');
+
+  try {
+    // Get the folder name from the worktree path to use as branch name
+    const folderName = path.basename(worktreePath);
+    
+    // Sanitize folder name for use as branch name (replace spaces and special chars)
+    const branchName = folderName
+      .replace(/[^a-zA-Z0-9_-]/g, '-')
+      .replace(/--+/g, '-')
+      .replace(/^-|-$/g, '');
+
+    if (!branchName) {
+      return { success: false, message: 'Could not derive a valid branch name from the folder' };
+    }
+
+    // Check if branch already exists
+    const branches = await git.branchLocal();
+    if (branches.all.includes(branchName)) {
+      return { success: false, message: `Branch '${branchName}' already exists` };
+    }
+
+    // Find the base branch (master or main)
+    let baseBranch = 'master';
+    try {
+      await git.raw(['rev-parse', '--verify', 'origin/master']);
+    } catch {
+      try {
+        await git.raw(['rev-parse', '--verify', 'origin/main']);
+        baseBranch = 'main';
+      } catch {
+        // Try local master/main
+        if (branches.all.includes('main')) {
+          baseBranch = 'main';
+        } else if (!branches.all.includes('master')) {
+          return { success: false, message: 'Could not find master or main branch' };
+        }
+      }
+    }
+
+    // Get the diff from the worktree as a patch
+    const { stdout: patchOutput } = await execAsync('git diff HEAD', { cwd: worktreePath });
+    
+    // Also get untracked files
+    const { stdout: untrackedOutput } = await execAsync('git ls-files --others --exclude-standard', { cwd: worktreePath });
+    const untrackedFiles = untrackedOutput.split('\n').filter(Boolean);
+
+    // Check if there are any changes
+    if (!patchOutput.trim() && untrackedFiles.length === 0) {
+      return { success: false, message: 'No changes to convert - worktree is clean' };
+    }
+
+    // Stash any changes in the main repo first
+    const stashResult = await stashChanges();
+
+    // Create a new branch from the base branch
+    const baseRef = branches.all.includes(baseBranch) ? baseBranch : `origin/${baseBranch}`;
+    await git.checkout(['-b', branchName, baseRef]);
+
+    // Apply the patch if there are tracked file changes
+    if (patchOutput.trim()) {
+      // Write patch to a temp file
+      const tempPatchFile = path.join(repoPath!, '.ledger-temp-patch');
+      try {
+        await fs.promises.writeFile(tempPatchFile, patchOutput);
+        await execAsync(`git apply --3way "${tempPatchFile}"`, { cwd: repoPath! });
+      } catch (applyError) {
+        // If apply fails, try to apply with less strict options
+        try {
+          await execAsync(`git apply --reject --whitespace=fix "${tempPatchFile}"`, { cwd: repoPath! });
+        } catch {
+          // Clean up and revert to the base branch
+          try {
+            await fs.promises.unlink(tempPatchFile);
+          } catch { /* ignore */ }
+          await git.checkout(stashResult.stashed ? '-' : baseBranch);
+          await git.branch(['-D', branchName]);
+          if (stashResult.stashed) {
+            await git.stash(['pop']);
+          }
+          return { success: false, message: `Failed to apply changes: ${(applyError as Error).message}` };
+        }
+      } finally {
+        // Clean up temp file
+        try {
+          await fs.promises.unlink(tempPatchFile);
+        } catch { /* ignore */ }
+      }
+    }
+
+    // Copy untracked files from worktree to main repo
+    for (const file of untrackedFiles) {
+      const srcPath = path.join(worktreePath, file);
+      const destPath = path.join(repoPath!, file);
+      
+      // Ensure destination directory exists
+      const destDir = path.dirname(destPath);
+      await fs.promises.mkdir(destDir, { recursive: true });
+      
+      // Copy the file
+      await fs.promises.copyFile(srcPath, destPath);
+    }
+
+    // Stage all changes
+    await git.add(['-A']);
+
+    // Commit the changes
+    const commitMessage = `Changes from worktree: ${folderName}`;
+    await git.commit(commitMessage);
+
+    return {
+      success: true,
+      message: `Created branch '${branchName}' with changes from worktree`,
+      branchName,
+    };
+  } catch (error) {
+    return { success: false, message: (error as Error).message };
+  }
+}
+
 // Checkout a PR branch (by branch name)
 export async function checkoutPRBranch(branchName: string): Promise<{ success: boolean; message: string; stashed?: string }> {
   if (!git) throw new Error('No repository selected');

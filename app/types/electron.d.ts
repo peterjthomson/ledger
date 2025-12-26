@@ -191,6 +191,8 @@ export interface ElectronAPI {
   getCommitGraphHistory: (limit?: number) => Promise<GraphCommit[]>;
   getCommitDiff: (commitHash: string) => Promise<CommitDiff | null>;
   getStashes: () => Promise<StashEntry[]>;
+  // Worktree operations
+  convertWorktreeToBranch: (worktreePath: string) => Promise<{ success: boolean; message: string; branchName?: string }>;
 }
 
 declare global {
