@@ -309,6 +309,10 @@ export interface ElectronAPI {
   getStashFiles: (stashIndex: number) => Promise<StashFile[]>;
   getStashFileDiff: (stashIndex: number, filePath: string) => Promise<string | null>;
   getStashDiff: (stashIndex: number) => Promise<string | null>;
+  applyStash: (stashIndex: number) => Promise<{ success: boolean; message: string }>;
+  popStash: (stashIndex: number) => Promise<{ success: boolean; message: string }>;
+  dropStash: (stashIndex: number) => Promise<{ success: boolean; message: string }>;
+  stashToBranch: (stashIndex: number, branchName: string) => Promise<{ success: boolean; message: string }>;
   // Worktree operations
   convertWorktreeToBranch: (worktreePath: string) => Promise<{ success: boolean; message: string; branchName?: string }>;
   // Staging & commit operations

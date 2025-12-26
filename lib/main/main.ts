@@ -28,6 +28,10 @@ import {
   getStashFiles,
   getStashFileDiff,
   getStashDiff,
+  applyStash,
+  popStash,
+  dropStash,
+  stashToBranch,
   convertWorktreeToBranch,
   // Staging & commit APIs
   stageFile,
@@ -274,6 +278,38 @@ app.whenReady().then(() => {
       return await getStashDiff(stashIndex);
     } catch (error) {
       return null;
+    }
+  });
+
+  ipcMain.handle('apply-stash', async (_, stashIndex: number) => {
+    try {
+      return await applyStash(stashIndex);
+    } catch (error) {
+      return { success: false, message: (error as Error).message };
+    }
+  });
+
+  ipcMain.handle('pop-stash', async (_, stashIndex: number) => {
+    try {
+      return await popStash(stashIndex);
+    } catch (error) {
+      return { success: false, message: (error as Error).message };
+    }
+  });
+
+  ipcMain.handle('drop-stash', async (_, stashIndex: number) => {
+    try {
+      return await dropStash(stashIndex);
+    } catch (error) {
+      return { success: false, message: (error as Error).message };
+    }
+  });
+
+  ipcMain.handle('stash-to-branch', async (_, stashIndex: number, branchName: string) => {
+    try {
+      return await stashToBranch(stashIndex, branchName);
+    } catch (error) {
+      return { success: false, message: (error as Error).message };
     }
   });
 

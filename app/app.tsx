@@ -3,7 +3,7 @@ import type { Branch, Worktree, BranchFilter, BranchSort, CheckoutResult, PullRe
 import './styles/app.css'
 import { useWindowContext } from './components/window'
 
-type ViewMode = 'columns' | 'work'
+type ViewMode = 'radar' | 'focus'
 
 interface StatusMessage {
   type: 'success' | 'error' | 'info';
@@ -54,7 +54,7 @@ export default function App() {
   const { setTitle } = useWindowContext()
   
   // View mode state
-  const [viewMode, setViewMode] = useState<ViewMode>('columns')
+  const [viewMode, setViewMode] = useState<ViewMode>('radar')
   
   // Work mode state
   const [graphCommits, setGraphCommits] = useState<GraphCommit[]>([])
@@ -215,6 +215,31 @@ export default function App() {
   const toggleSidebarSection = useCallback((section: keyof typeof sidebarSections) => {
     setSidebarSections(prev => ({ ...prev, [section]: !prev[section] }))
   }, [])
+
+  // Radar card double-click handlers - switch to Focus mode with item selected
+  const handleRadarPRClick = useCallback((pr: PullRequest) => {
+    setViewMode('focus')
+    setSidebarSections(prev => ({ ...prev, prs: true }))
+    handleSidebarFocus('pr', pr)
+  }, [handleSidebarFocus])
+
+  const handleRadarWorktreeClick = useCallback((wt: Worktree) => {
+    setViewMode('focus')
+    setSidebarSections(prev => ({ ...prev, worktrees: true }))
+    handleSidebarFocus('worktree', wt)
+  }, [handleSidebarFocus])
+
+  const handleRadarBranchClick = useCallback((branch: Branch) => {
+    setViewMode('focus')
+    setSidebarSections(prev => ({ ...prev, branches: true }))
+    handleSidebarFocus('branch', branch)
+  }, [handleSidebarFocus])
+
+  const handleRadarRemoteBranchClick = useCallback((branch: Branch) => {
+    setViewMode('focus')
+    setSidebarSections(prev => ({ ...prev, remotes: true }))
+    handleSidebarFocus('remote', branch)
+  }, [handleSidebarFocus])
 
   // Context menu handlers
   const handleContextMenu = (e: React.MouseEvent, type: ContextMenuType, data: PullRequest | Worktree | Branch | Commit) => {
@@ -405,6 +430,7 @@ export default function App() {
       case 'remote-branch': {
         const branch = contextMenu.data as Branch
         return [
+          { label: 'Check Out', action: () => handleRemoteBranchDoubleClick(branch), disabled: switching },
           { label: 'Pull', action: () => handleRemoteBranchPull(branch) },
           { label: 'View Remote', action: () => handleRemoteBranchViewGitHub(branch) },
         ]
@@ -812,18 +838,20 @@ export default function App() {
           {repoPath && (
             <div className="view-toggle">
               <button
-                className={`view-toggle-btn ${viewMode === 'columns' ? 'active' : ''}`}
-                onClick={() => setViewMode('columns')}
-                title="Column View"
+                className={`view-toggle-btn ${viewMode === 'radar' ? 'active' : ''}`}
+                onClick={() => setViewMode('radar')}
+                title="Radar Mode"
               >
                 <span className="view-icon">⊞</span>
+                <span className="view-label">Radar</span>
               </button>
               <button
-                className={`view-toggle-btn ${viewMode === 'work' ? 'active' : ''}`}
-                onClick={() => setViewMode('work')}
-                title="Work View"
+                className={`view-toggle-btn ${viewMode === 'focus' ? 'active' : ''}`}
+                onClick={() => setViewMode('focus')}
+                title="Focus Mode"
               >
                 <span className="view-icon">☰</span>
+                <span className="view-label">Focus</span>
               </button>
             </div>
           )}
@@ -862,7 +890,7 @@ export default function App() {
       )}
 
       {/* Main Content */}
-      {repoPath && !error && viewMode === 'columns' && (
+      {repoPath && !error && viewMode === 'radar' && (
         <main className="ledger-content five-columns">
           {/* Pull Requests Column */}
           <section className="column pr-column">
@@ -924,7 +952,7 @@ export default function App() {
                     <li
                       key={pr.number}
                       className={`item pr-item clickable ${pr.isDraft ? 'draft' : ''}`}
-                      onDoubleClick={() => handlePRDoubleClick(pr)}
+                      onDoubleClick={() => handleRadarPRClick(pr)}
                       onContextMenu={(e) => handleContextMenu(e, 'pr', pr)}
                     >
                       <div className="item-main">
@@ -1001,7 +1029,7 @@ export default function App() {
                     <li
                       key={wt.path}
                       className={`item worktree-item clickable ${wt.branch === currentBranch ? 'current' : ''}`}
-                      onDoubleClick={() => handleWorktreeDoubleClick(wt)}
+                      onDoubleClick={() => handleRadarWorktreeClick(wt)}
                       onContextMenu={(e) => handleContextMenu(e, 'worktree', wt)}
                     >
                       <div className="item-main">
@@ -1152,7 +1180,7 @@ export default function App() {
                     <li
                       key={branch.name}
                       className={`item branch-item clickable ${branch.current ? 'current' : ''} ${switching ? 'disabled' : ''}`}
-                      onDoubleClick={() => handleBranchDoubleClick(branch)}
+                      onDoubleClick={() => handleRadarBranchClick(branch)}
                       onContextMenu={(e) => handleContextMenu(e, 'local-branch', branch)}
                     >
                       <div className="item-main">
@@ -1236,7 +1264,7 @@ export default function App() {
                     <li 
                       key={branch.name} 
                       className={`item remote-item clickable ${switching ? 'disabled' : ''}`}
-                      onDoubleClick={() => handleRemoteBranchDoubleClick(branch)}
+                      onDoubleClick={() => handleRadarRemoteBranchClick(branch)}
                       onContextMenu={(e) => handleContextMenu(e, 'remote-branch', branch)}
                     >
                       <div className="item-main">
@@ -1263,20 +1291,22 @@ export default function App() {
         </main>
       )}
 
-      {/* Work Mode Layout */}
-      {repoPath && !error && viewMode === 'work' && (
+      {/* Focus Mode Layout */}
+      {repoPath && !error && viewMode === 'focus' && (
         <main className="work-mode-layout">
           {/* Sidebar */}
           <aside className="work-sidebar">
             {/* PRs Section */}
             <div className="sidebar-section">
-              <div 
-                className="sidebar-section-header"
-                onClick={() => toggleSidebarSection('prs')}
-              >
-                <span className={`sidebar-chevron ${sidebarSections.prs ? 'open' : ''}`}>▸</span>
-                <span className="sidebar-section-title">Pull Requests</span>
-                <span className="sidebar-count">{filteredPRs.length}</span>
+              <div className="sidebar-section-header">
+                <div 
+                  className="sidebar-section-toggle"
+                  onClick={() => toggleSidebarSection('prs')}
+                >
+                  <span className={`sidebar-chevron ${sidebarSections.prs ? 'open' : ''}`}>▸</span>
+                  <span className="sidebar-section-title">Pull Requests</span>
+                  <span className="sidebar-count">{filteredPRs.length}</span>
+                </div>
               </div>
               {sidebarSections.prs && (
                 <ul className="sidebar-list">
@@ -1357,13 +1387,15 @@ export default function App() {
 
             {/* Remotes Section */}
             <div className="sidebar-section">
-              <div 
-                className="sidebar-section-header"
-                onClick={() => toggleSidebarSection('remotes')}
-              >
-                <span className={`sidebar-chevron ${sidebarSections.remotes ? 'open' : ''}`}>▸</span>
-                <span className="sidebar-section-title">Remotes</span>
-                <span className="sidebar-count">{remoteBranches.length}</span>
+              <div className="sidebar-section-header">
+                <div 
+                  className="sidebar-section-toggle"
+                  onClick={() => toggleSidebarSection('remotes')}
+                >
+                  <span className={`sidebar-chevron ${sidebarSections.remotes ? 'open' : ''}`}>▸</span>
+                  <span className="sidebar-section-title">Remotes</span>
+                  <span className="sidebar-count">{remoteBranches.length}</span>
+                </div>
               </div>
               {sidebarSections.remotes && (
                 <ul className="sidebar-list">
@@ -1383,13 +1415,15 @@ export default function App() {
 
             {/* Worktrees Section */}
             <div className="sidebar-section">
-              <div 
-                className="sidebar-section-header"
-                onClick={() => toggleSidebarSection('worktrees')}
-              >
-                <span className={`sidebar-chevron ${sidebarSections.worktrees ? 'open' : ''}`}>▸</span>
-                <span className="sidebar-section-title">Worktrees</span>
-                <span className="sidebar-count">{worktrees.length}</span>
+              <div className="sidebar-section-header">
+                <div 
+                  className="sidebar-section-toggle"
+                  onClick={() => toggleSidebarSection('worktrees')}
+                >
+                  <span className={`sidebar-chevron ${sidebarSections.worktrees ? 'open' : ''}`}>▸</span>
+                  <span className="sidebar-section-title">Worktrees</span>
+                  <span className="sidebar-count">{worktrees.length}</span>
+                </div>
               </div>
               {sidebarSections.worktrees && (
                 <ul className="sidebar-list">
@@ -1410,13 +1444,15 @@ export default function App() {
 
             {/* Stashes Section */}
             <div className="sidebar-section">
-              <div 
-                className="sidebar-section-header"
-                onClick={() => toggleSidebarSection('stashes')}
-              >
-                <span className={`sidebar-chevron ${sidebarSections.stashes ? 'open' : ''}`}>▸</span>
-                <span className="sidebar-section-title">Stashes</span>
-                <span className="sidebar-count">{stashes.length}</span>
+              <div className="sidebar-section-header">
+                <div 
+                  className="sidebar-section-toggle"
+                  onClick={() => toggleSidebarSection('stashes')}
+                >
+                  <span className={`sidebar-chevron ${sidebarSections.stashes ? 'open' : ''}`}>▸</span>
+                  <span className="sidebar-section-title">Stashes</span>
+                  <span className="sidebar-count">{stashes.length}</span>
+                </div>
               </div>
               {sidebarSections.stashes && (
                 <ul className="sidebar-list">
@@ -1479,6 +1515,8 @@ export default function App() {
                 formatDate={formatDate}
                 currentBranch={currentBranch}
                 onStatusChange={setStatus}
+                onRefresh={refresh}
+                onClearFocus={() => setSidebarFocus(null)}
               />
             ) : !selectedCommit ? (
               <div className="detail-empty">
@@ -1834,9 +1872,11 @@ interface SidebarDetailPanelProps {
   formatDate: (date?: string) => string;
   currentBranch: string;
   onStatusChange?: (status: StatusMessage | null) => void;
+  onRefresh?: () => Promise<void>;
+  onClearFocus?: () => void;
 }
 
-function SidebarDetailPanel({ focus, formatRelativeTime, formatDate, currentBranch, onStatusChange }: SidebarDetailPanelProps) {
+function SidebarDetailPanel({ focus, formatRelativeTime, formatDate, currentBranch, onStatusChange, onRefresh, onClearFocus }: SidebarDetailPanelProps) {
   const [creatingPR, setCreatingPR] = useState(false);
   const [pushing, setPushing] = useState(false);
 
@@ -2067,7 +2107,10 @@ function SidebarDetailPanel({ focus, formatRelativeTime, formatDate, currentBran
       return (
         <StashDetailPanel 
           stash={stash} 
-          formatRelativeTime={formatRelativeTime} 
+          formatRelativeTime={formatRelativeTime}
+          onStatusChange={onStatusChange}
+          onRefresh={onRefresh}
+          onClearFocus={onClearFocus}
         />
       );
     }
@@ -2747,14 +2790,88 @@ function PRReviewPanel({ pr, formatRelativeTime }: PRReviewPanelProps) {
 interface StashDetailPanelProps {
   stash: StashEntry;
   formatRelativeTime: (date: string) => string;
+  onStatusChange?: (status: StatusMessage | null) => void;
+  onRefresh?: () => Promise<void>;
+  onClearFocus?: () => void;
 }
 
-function StashDetailPanel({ stash, formatRelativeTime }: StashDetailPanelProps) {
+function StashDetailPanel({ stash, formatRelativeTime, onStatusChange, onRefresh, onClearFocus }: StashDetailPanelProps) {
   const [files, setFiles] = useState<StashFile[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedFile, setSelectedFile] = useState<string | null>(null);
   const [fileDiff, setFileDiff] = useState<string | null>(null);
   const [loadingDiff, setLoadingDiff] = useState(false);
+  const [actionInProgress, setActionInProgress] = useState(false);
+  const [showBranchModal, setShowBranchModal] = useState(false);
+  const [branchName, setBranchName] = useState('');
+
+  // Handle Apply stash
+  const handleApply = async () => {
+    setActionInProgress(true);
+    onStatusChange?.({ type: 'info', message: `Applying stash@{${stash.index}}...` });
+    
+    try {
+      const result = await window.electronAPI.applyStash(stash.index);
+      if (result.success) {
+        onStatusChange?.({ type: 'success', message: result.message });
+        await onRefresh?.();
+      } else {
+        onStatusChange?.({ type: 'error', message: result.message });
+      }
+    } catch (error) {
+      onStatusChange?.({ type: 'error', message: (error as Error).message });
+    } finally {
+      setActionInProgress(false);
+    }
+  };
+
+  // Handle Drop stash
+  const handleDrop = async () => {
+    if (!confirm(`Drop stash@{${stash.index}}? This cannot be undone.`)) return;
+    
+    setActionInProgress(true);
+    onStatusChange?.({ type: 'info', message: `Dropping stash@{${stash.index}}...` });
+    
+    try {
+      const result = await window.electronAPI.dropStash(stash.index);
+      if (result.success) {
+        onStatusChange?.({ type: 'success', message: result.message });
+        onClearFocus?.();
+        await onRefresh?.();
+      } else {
+        onStatusChange?.({ type: 'error', message: result.message });
+      }
+    } catch (error) {
+      onStatusChange?.({ type: 'error', message: (error as Error).message });
+    } finally {
+      setActionInProgress(false);
+    }
+  };
+
+  // Handle Create branch from stash
+  const handleCreateBranch = async () => {
+    if (!branchName.trim()) return;
+    
+    setActionInProgress(true);
+    onStatusChange?.({ type: 'info', message: `Creating branch '${branchName}' from stash...` });
+    
+    try {
+      const result = await window.electronAPI.stashToBranch(stash.index, branchName.trim());
+      if (result.success) {
+        onStatusChange?.({ type: 'success', message: result.message });
+        setShowBranchModal(false);
+        setBranchName('');
+        onClearFocus?.();
+        await onRefresh?.();
+      } else {
+        onStatusChange?.({ type: 'error', message: result.message });
+      }
+    } catch (error) {
+      onStatusChange?.({ type: 'error', message: (error as Error).message });
+    } finally {
+      setActionInProgress(false);
+    }
+  };
 
   // Load stash files
   useEffect(() => {
@@ -2877,6 +2994,80 @@ function StashDetailPanel({ stash, formatRelativeTime }: StashDetailPanelProps) 
             ) : (
               <div className="stash-diff-empty">Could not load diff</div>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* Action Buttons */}
+      <div className="stash-actions">
+        <button 
+          className="btn btn-primary"
+          onClick={handleApply}
+          disabled={actionInProgress}
+        >
+          Apply
+        </button>
+        <button 
+          className="btn btn-secondary"
+          onClick={() => setShowBranchModal(true)}
+          disabled={actionInProgress}
+        >
+          Create Branch
+        </button>
+        <button 
+          className="btn btn-danger"
+          onClick={handleDrop}
+          disabled={actionInProgress}
+        >
+          Drop
+        </button>
+      </div>
+
+      {/* Create Branch Modal */}
+      {showBranchModal && (
+        <div className="modal-overlay" onClick={() => setShowBranchModal(false)}>
+          <div className="modal" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <h3 className="modal-title">Create Branch from Stash</h3>
+              <button className="modal-close" onClick={() => setShowBranchModal(false)}>×</button>
+            </div>
+            <div className="modal-body">
+              <label className="modal-label">
+                Branch Name
+                <input
+                  type="text"
+                  className="modal-input"
+                  value={branchName}
+                  onChange={(e) => setBranchName(e.target.value)}
+                  placeholder="feature/my-branch"
+                  autoFocus
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' && branchName.trim()) {
+                      handleCreateBranch();
+                    }
+                  }}
+                />
+              </label>
+              <p className="modal-hint">
+                This will create a new branch from the commit where this stash was created, apply the stashed changes, and remove the stash.
+              </p>
+            </div>
+            <div className="modal-footer">
+              <button 
+                className="btn btn-secondary" 
+                onClick={() => setShowBranchModal(false)}
+                disabled={actionInProgress}
+              >
+                Cancel
+              </button>
+              <button 
+                className="btn btn-primary" 
+                onClick={handleCreateBranch}
+                disabled={actionInProgress || !branchName.trim()}
+              >
+                Create Branch
+              </button>
+            </div>
           </div>
         </div>
       )}

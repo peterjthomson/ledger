@@ -40,6 +40,10 @@ const electronAPI = {
   getStashFiles: (stashIndex: number) => ipcRenderer.invoke('get-stash-files', stashIndex),
   getStashFileDiff: (stashIndex: number, filePath: string) => ipcRenderer.invoke('get-stash-file-diff', stashIndex, filePath),
   getStashDiff: (stashIndex: number) => ipcRenderer.invoke('get-stash-diff', stashIndex),
+  applyStash: (stashIndex: number) => ipcRenderer.invoke('apply-stash', stashIndex),
+  popStash: (stashIndex: number) => ipcRenderer.invoke('pop-stash', stashIndex),
+  dropStash: (stashIndex: number) => ipcRenderer.invoke('drop-stash', stashIndex),
+  stashToBranch: (stashIndex: number, branchName: string) => ipcRenderer.invoke('stash-to-branch', stashIndex, branchName),
   // Worktree operations
   convertWorktreeToBranch: (worktreePath: string) => ipcRenderer.invoke('convert-worktree-to-branch', worktreePath),
   // Staging & commit operations

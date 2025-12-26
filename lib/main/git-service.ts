@@ -1855,6 +1855,57 @@ export async function getStashDiff(stashIndex: number): Promise<string | null> {
   }
 }
 
+// Apply a stash (keeps stash in list)
+export async function applyStash(stashIndex: number): Promise<{ success: boolean; message: string }> {
+  if (!git) throw new Error('No repository selected');
+
+  try {
+    await git.raw(['stash', 'apply', `stash@{${stashIndex}}`]);
+    return { success: true, message: `Applied stash@{${stashIndex}}` };
+  } catch (error) {
+    return { success: false, message: (error as Error).message };
+  }
+}
+
+// Pop a stash (applies and removes from list)
+export async function popStash(stashIndex: number): Promise<{ success: boolean; message: string }> {
+  if (!git) throw new Error('No repository selected');
+
+  try {
+    await git.raw(['stash', 'pop', `stash@{${stashIndex}}`]);
+    return { success: true, message: `Applied and removed stash@{${stashIndex}}` };
+  } catch (error) {
+    return { success: false, message: (error as Error).message };
+  }
+}
+
+// Drop a stash (removes without applying)
+export async function dropStash(stashIndex: number): Promise<{ success: boolean; message: string }> {
+  if (!git) throw new Error('No repository selected');
+
+  try {
+    await git.raw(['stash', 'drop', `stash@{${stashIndex}}`]);
+    return { success: true, message: `Dropped stash@{${stashIndex}}` };
+  } catch (error) {
+    return { success: false, message: (error as Error).message };
+  }
+}
+
+// Create a branch from a stash
+export async function stashToBranch(stashIndex: number, branchName: string): Promise<{ success: boolean; message: string }> {
+  if (!git) throw new Error('No repository selected');
+
+  try {
+    // git stash branch <branchname> [<stash>]
+    // Creates a new branch starting from the commit at which the stash was created,
+    // applies the stash, and drops it if successful
+    await git.raw(['stash', 'branch', branchName, `stash@{${stashIndex}}`]);
+    return { success: true, message: `Created branch '${branchName}' from stash@{${stashIndex}}` };
+  } catch (error) {
+    return { success: false, message: (error as Error).message };
+  }
+}
+
 // ========================================
 // Staging & Commit Functions
 // ========================================
