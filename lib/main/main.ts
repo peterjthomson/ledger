@@ -45,7 +45,6 @@ import {
   getPRDetail,
   getPRReviewComments,
   getPRFileDiff,
-  mergePullRequest,
 } from './git-service'
 import { getLastRepoPath, saveLastRepoPath } from './settings-service'
 
@@ -393,14 +392,6 @@ app.whenReady().then(() => {
       return await getPRFileDiff(prNumber, filePath);
     } catch (error) {
       return null;
-    }
-  });
-
-  ipcMain.handle('merge-pull-request', async (_, prNumber: number, options?: { method?: 'merge' | 'squash' | 'rebase'; deleteAfterMerge?: boolean }) => {
-    try {
-      return await mergePullRequest(prNumber, options);
-    } catch (error) {
-      return { success: false, message: (error as Error).message };
     }
   });
 

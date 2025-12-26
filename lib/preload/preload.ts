@@ -58,8 +58,6 @@ const electronAPI = {
   getPRDetail: (prNumber: number) => ipcRenderer.invoke('get-pr-detail', prNumber),
   getPRReviewComments: (prNumber: number) => ipcRenderer.invoke('get-pr-review-comments', prNumber),
   getPRFileDiff: (prNumber: number, filePath: string) => ipcRenderer.invoke('get-pr-file-diff', prNumber, filePath),
-  mergePullRequest: (prNumber: number, options?: { method?: 'merge' | 'squash' | 'rebase'; deleteAfterMerge?: boolean }) =>
-    ipcRenderer.invoke('merge-pull-request', prNumber, options),
 }
 
 // Use `contextBridge` APIs to expose APIs to

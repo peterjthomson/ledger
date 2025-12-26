@@ -11,13 +11,13 @@ interface StatusMessage {
   stashed?: string;
 }
 
-type ContextMenuType = 'pr' | 'worktree' | 'local-branch' | 'remote-branch' | 'commit';
+type ContextMenuType = 'pr' | 'worktree' | 'local-branch' | 'remote-branch' | 'commit' | 'uncommitted';
 
 interface ContextMenu {
   type: ContextMenuType;
   x: number;
   y: number;
-  data: PullRequest | Worktree | Branch | Commit;
+  data: PullRequest | Worktree | Branch | Commit | WorkingStatus;
 }
 
 interface MenuItem {
@@ -90,19 +90,6 @@ export default function App() {
   // Worktree filter state
   const [worktreeParentFilter, setWorktreeParentFilter] = useState<string>('all')
 
-  // Focus view panel state (resizable + collapsible)
-  const [sidebarWidth, setSidebarWidth] = useState(220)
-  const [detailWidth, setDetailWidth] = useState(400)
-  const [sidebarVisible, setSidebarVisible] = useState(true)
-  const [detailVisible, setDetailVisible] = useState(true)
-  const [isResizingSidebar, setIsResizingSidebar] = useState(false)
-  const [isResizingDetail, setIsResizingDetail] = useState(false)
-  
-  // Radar view column order (drag-and-drop)
-  const [radarColumnOrder, setRadarColumnOrder] = useState<string[]>(['prs', 'worktrees', 'commits', 'branches', 'remotes'])
-  const [draggingColumn, setDraggingColumn] = useState<string | null>(null)
-  const [dragOverColumn, setDragOverColumn] = useState<string | null>(null)
-
   const menuRef = useRef<HTMLDivElement>(null)
 
   // Close context menu when clicking outside
@@ -135,78 +122,6 @@ export default function App() {
     }
     return undefined
   }, [status])
-
-  // Handle panel resizing
-  useEffect(() => {
-    const handleMouseMove = (e: MouseEvent) => {
-      if (isResizingSidebar) {
-        const newWidth = Math.max(150, Math.min(400, e.clientX))
-        setSidebarWidth(newWidth)
-      }
-      if (isResizingDetail) {
-        const newWidth = Math.max(250, Math.min(600, window.innerWidth - e.clientX))
-        setDetailWidth(newWidth)
-      }
-    }
-
-    const handleMouseUp = () => {
-      setIsResizingSidebar(false)
-      setIsResizingDetail(false)
-    }
-
-    if (isResizingSidebar || isResizingDetail) {
-      document.addEventListener('mousemove', handleMouseMove)
-      document.addEventListener('mouseup', handleMouseUp)
-      document.body.style.cursor = 'col-resize'
-      document.body.style.userSelect = 'none'
-    }
-
-    return () => {
-      document.removeEventListener('mousemove', handleMouseMove)
-      document.removeEventListener('mouseup', handleMouseUp)
-      document.body.style.cursor = ''
-      document.body.style.userSelect = ''
-    }
-  }, [isResizingSidebar, isResizingDetail])
-
-  // Column drag and drop handlers for Radar view
-  const handleColumnDragStart = useCallback((e: React.DragEvent, columnId: string) => {
-    setDraggingColumn(columnId)
-    e.dataTransfer.effectAllowed = 'move'
-    e.dataTransfer.setData('text/plain', columnId)
-  }, [])
-
-  const handleColumnDragOver = useCallback((e: React.DragEvent, columnId: string) => {
-    e.preventDefault()
-    if (draggingColumn && draggingColumn !== columnId) {
-      setDragOverColumn(columnId)
-    }
-  }, [draggingColumn])
-
-  const handleColumnDragLeave = useCallback(() => {
-    setDragOverColumn(null)
-  }, [])
-
-  const handleColumnDrop = useCallback((e: React.DragEvent, targetColumnId: string) => {
-    e.preventDefault()
-    if (!draggingColumn || draggingColumn === targetColumnId) return
-
-    setRadarColumnOrder(prev => {
-      const newOrder = [...prev]
-      const dragIndex = newOrder.indexOf(draggingColumn)
-      const targetIndex = newOrder.indexOf(targetColumnId)
-      newOrder.splice(dragIndex, 1)
-      newOrder.splice(targetIndex, 0, draggingColumn)
-      return newOrder
-    })
-    setDraggingColumn(null)
-    setDragOverColumn(null)
-  }, [draggingColumn])
-
-  const handleColumnDragEnd = useCallback(() => {
-    setDraggingColumn(null)
-    setDragOverColumn(null)
-  }, [])
 
   const selectRepo = async () => {
     const path = await window.electronAPI.selectRepo()
@@ -326,8 +241,24 @@ export default function App() {
     handleSidebarFocus('remote', branch)
   }, [handleSidebarFocus])
 
+  const handleRadarCommitClick = useCallback((commit: Commit) => {
+    setViewMode('focus')
+    // Find the matching GraphCommit by hash and select it
+    const graphCommit = graphCommits.find(gc => gc.hash === commit.hash)
+    if (graphCommit) {
+      handleSelectCommit(graphCommit)
+    }
+  }, [graphCommits, handleSelectCommit])
+
+  const handleRadarUncommittedClick = useCallback(() => {
+    if (!workingStatus) return
+    setViewMode('focus')
+    setSidebarSections(prev => ({ ...prev, branches: true }))
+    handleSidebarFocus('uncommitted', workingStatus)
+  }, [workingStatus, handleSidebarFocus])
+
   // Context menu handlers
-  const handleContextMenu = (e: React.MouseEvent, type: ContextMenuType, data: PullRequest | Worktree | Branch | Commit) => {
+  const handleContextMenu = (e: React.MouseEvent, type: ContextMenuType, data: PullRequest | Worktree | Branch | Commit | WorkingStatus) => {
     e.preventDefault()
     setContextMenu({ type, x: e.clientX, y: e.clientY, data })
   }
@@ -430,6 +361,24 @@ export default function App() {
     }
   }
 
+  // Push local branch to remote
+  const handleLocalBranchPush = async (branch: Branch) => {
+    closeContextMenu()
+    setStatus({ type: 'info', message: `Pushing ${branch.name} to remote...` })
+    
+    try {
+      const result = await window.electronAPI.pushBranch(branch.name, true)
+      if (result.success) {
+        setStatus({ type: 'success', message: result.message })
+        await refresh()
+      } else {
+        setStatus({ type: 'error', message: result.message })
+      }
+    } catch (err) {
+      setStatus({ type: 'error', message: (err as Error).message })
+    }
+  }
+
   // Remote branch context menu actions
   const handleRemoteBranchPull = async (branch: Branch) => {
     closeContextMenu()
@@ -493,6 +442,7 @@ export default function App() {
       case 'pr': {
         const pr = contextMenu.data as PullRequest
         return [
+          { label: 'Open in Focus', action: () => { closeContextMenu(); handleRadarPRClick(pr) } },
           { label: 'Check Out', action: () => handlePRCheckout(pr), disabled: switching },
           { label: 'View Remote', action: () => handlePRViewRemote(pr) },
         ]
@@ -501,6 +451,7 @@ export default function App() {
         const wt = contextMenu.data as Worktree
         const hasChanges = wt.changedFileCount > 0 || wt.additions > 0 || wt.deletions > 0
         return [
+          { label: 'Open in Focus', action: () => { closeContextMenu(); handleRadarWorktreeClick(wt) } },
           { label: 'Check Out Worktree', action: () => handleWorktreeDoubleClick(wt), disabled: !wt.branch || wt.branch === currentBranch || switching },
           { label: 'Convert to Branch', action: () => handleWorktreeConvertToBranch(wt), disabled: !hasChanges || switching },
           { label: 'Open in Finder', action: () => handleWorktreeOpen(wt) },
@@ -509,12 +460,15 @@ export default function App() {
       case 'local-branch': {
         const branch = contextMenu.data as Branch
         return [
+          { label: 'Open in Focus', action: () => { closeContextMenu(); handleRadarBranchClick(branch) } },
           { label: 'Switch to Latest Commit', action: () => handleLocalBranchSwitch(branch), disabled: branch.current || switching },
+          { label: 'Push to Remote', action: () => handleLocalBranchPush(branch) },
         ]
       }
       case 'remote-branch': {
         const branch = contextMenu.data as Branch
         return [
+          { label: 'Open in Focus', action: () => { closeContextMenu(); handleRadarRemoteBranchClick(branch) } },
           { label: 'Check Out', action: () => handleRemoteBranchDoubleClick(branch), disabled: switching },
           { label: 'Pull', action: () => handleRemoteBranchPull(branch) },
           { label: 'View Remote', action: () => handleRemoteBranchViewGitHub(branch) },
@@ -523,8 +477,14 @@ export default function App() {
       case 'commit': {
         const commit = contextMenu.data as Commit
         return [
+          { label: 'Open in Focus', action: () => { closeContextMenu(); handleRadarCommitClick(commit) } },
           { label: 'Check Out', action: () => handleCommitDoubleClick(commit), disabled: switching },
           { label: 'Reset to This Commit', action: () => handleCommitReset(commit), disabled: switching },
+        ]
+      }
+      case 'uncommitted': {
+        return [
+          { label: 'Open in Focus', action: () => { closeContextMenu(); handleRadarUncommittedClick() } },
         ]
       }
       default:
@@ -978,17 +938,7 @@ export default function App() {
       {repoPath && !error && viewMode === 'radar' && (
         <main className="ledger-content five-columns">
           {/* Pull Requests Column */}
-          <section 
-            className={`column pr-column ${draggingColumn === 'prs' ? 'dragging' : ''} ${dragOverColumn === 'prs' ? 'drag-over' : ''}`}
-            style={{ order: radarColumnOrder.indexOf('prs') }}
-            draggable
-            onDragStart={(e) => handleColumnDragStart(e, 'prs')}
-            onDragOver={(e) => handleColumnDragOver(e, 'prs')}
-            onDragLeave={handleColumnDragLeave}
-            onDrop={(e) => handleColumnDrop(e, 'prs')}
-            onDragEnd={handleColumnDragEnd}
-          >
-            <div className="column-drag-handle" title="Drag to reorder">⋮⋮</div>
+          <section className="column pr-column">
             <div 
               className={`column-header clickable-header ${prControlsOpen ? 'open' : ''}`}
               onClick={() => setPrControlsOpen(!prControlsOpen)}
@@ -1082,17 +1032,7 @@ export default function App() {
           </section>
 
           {/* Worktrees Column */}
-          <section 
-            className={`column worktrees-column ${draggingColumn === 'worktrees' ? 'dragging' : ''} ${dragOverColumn === 'worktrees' ? 'drag-over' : ''}`}
-            style={{ order: radarColumnOrder.indexOf('worktrees') }}
-            draggable
-            onDragStart={(e) => handleColumnDragStart(e, 'worktrees')}
-            onDragOver={(e) => handleColumnDragOver(e, 'worktrees')}
-            onDragLeave={handleColumnDragLeave}
-            onDrop={(e) => handleColumnDrop(e, 'worktrees')}
-            onDragEnd={handleColumnDragEnd}
-          >
-            <div className="column-drag-handle" title="Drag to reorder">⋮⋮</div>
+          <section className="column worktrees-column">
             <div 
               className={`column-header clickable-header ${worktreeControlsOpen ? 'open' : ''}`}
               onClick={() => setWorktreeControlsOpen(!worktreeControlsOpen)}
@@ -1166,17 +1106,7 @@ export default function App() {
           </section>
 
           {/* Commits Timeline Column */}
-          <section 
-            className={`column commits-column ${draggingColumn === 'commits' ? 'dragging' : ''} ${dragOverColumn === 'commits' ? 'drag-over' : ''}`}
-            style={{ order: radarColumnOrder.indexOf('commits') }}
-            draggable
-            onDragStart={(e) => handleColumnDragStart(e, 'commits')}
-            onDragOver={(e) => handleColumnDragOver(e, 'commits')}
-            onDragLeave={handleColumnDragLeave}
-            onDrop={(e) => handleColumnDrop(e, 'commits')}
-            onDragEnd={handleColumnDragEnd}
-          >
-            <div className="column-drag-handle" title="Drag to reorder">⋮⋮</div>
+          <section className="column commits-column">
             <div className="column-header">
               <h2>
                 <span className="column-icon">◉</span>
@@ -1188,7 +1118,11 @@ export default function App() {
             <div className="column-content">
               {/* Uncommitted changes as virtual commit */}
               {workingStatus?.hasChanges && (
-                <div className="commit-item uncommitted">
+                <div 
+                  className="commit-item uncommitted clickable"
+                  onDoubleClick={() => handleRadarUncommittedClick()}
+                  onContextMenu={(e) => handleContextMenu(e, 'uncommitted', workingStatus)}
+                >
                   <div className="commit-message uncommitted-label">
                     Uncommitted changes
                   </div>
@@ -1241,17 +1175,7 @@ export default function App() {
           </section>
 
           {/* Local Branches Column */}
-          <section 
-            className={`column branches-column ${draggingColumn === 'branches' ? 'dragging' : ''} ${dragOverColumn === 'branches' ? 'drag-over' : ''}`}
-            style={{ order: radarColumnOrder.indexOf('branches') }}
-            draggable
-            onDragStart={(e) => handleColumnDragStart(e, 'branches')}
-            onDragOver={(e) => handleColumnDragOver(e, 'branches')}
-            onDragLeave={handleColumnDragLeave}
-            onDrop={(e) => handleColumnDrop(e, 'branches')}
-            onDragEnd={handleColumnDragEnd}
-          >
-            <div className="column-drag-handle" title="Drag to reorder">⋮⋮</div>
+          <section className="column branches-column">
             <div 
               className={`column-header clickable-header ${localControlsOpen ? 'open' : ''}`}
               onClick={() => setLocalControlsOpen(!localControlsOpen)}
@@ -1336,17 +1260,7 @@ export default function App() {
           </section>
 
           {/* Remote Branches Column */}
-          <section 
-            className={`column remotes-column ${draggingColumn === 'remotes' ? 'dragging' : ''} ${dragOverColumn === 'remotes' ? 'drag-over' : ''}`}
-            style={{ order: radarColumnOrder.indexOf('remotes') }}
-            draggable
-            onDragStart={(e) => handleColumnDragStart(e, 'remotes')}
-            onDragOver={(e) => handleColumnDragOver(e, 'remotes')}
-            onDragLeave={handleColumnDragLeave}
-            onDrop={(e) => handleColumnDrop(e, 'remotes')}
-            onDragEnd={handleColumnDragEnd}
-          >
-            <div className="column-drag-handle" title="Drag to reorder">⋮⋮</div>
+          <section className="column remotes-column">
             <div 
               className={`column-header clickable-header ${remoteControlsOpen ? 'open' : ''}`}
               onClick={() => setRemoteControlsOpen(!remoteControlsOpen)}
@@ -1429,20 +1343,8 @@ export default function App() {
       {/* Focus Mode Layout */}
       {repoPath && !error && viewMode === 'focus' && (
         <main className="work-mode-layout">
-          {/* Panel Toggle for Sidebar */}
-          {!sidebarVisible && (
-            <button 
-              className="panel-toggle panel-toggle-left"
-              onClick={() => setSidebarVisible(true)}
-              title="Show sidebar"
-            >
-              <span className="panel-toggle-icon">▸</span>
-            </button>
-          )}
-          
           {/* Sidebar */}
-          {sidebarVisible && (
-          <aside className="work-sidebar" style={{ width: sidebarWidth, minWidth: sidebarWidth }}>
+          <aside className="work-sidebar">
             {/* PRs Section */}
             <div className="sidebar-section">
               <div className="sidebar-section-header">
@@ -1621,24 +1523,7 @@ export default function App() {
                 </ul>
               )}
             </div>
-            {/* Sidebar toggle button */}
-            <button 
-              className="panel-collapse-btn"
-              onClick={() => setSidebarVisible(false)}
-              title="Hide sidebar"
-            >
-              <span className="panel-collapse-icon">◀</span>
-            </button>
           </aside>
-          )}
-          
-          {/* Sidebar Resize Handle */}
-          {sidebarVisible && (
-            <div 
-              className={`resize-handle resize-handle-sidebar ${isResizingSidebar ? 'active' : ''}`}
-              onMouseDown={() => setIsResizingSidebar(true)}
-            />
-          )}
 
           {/* Main Content: Git Graph + Commit List */}
           <div className="work-main">
@@ -1659,17 +1544,8 @@ export default function App() {
             </div>
           </div>
 
-          {/* Detail Panel Resize Handle */}
-          {detailVisible && (
-            <div 
-              className={`resize-handle resize-handle-detail ${isResizingDetail ? 'active' : ''}`}
-              onMouseDown={() => setIsResizingDetail(true)}
-            />
-          )}
-
           {/* Detail Panel */}
-          {detailVisible && (
-          <aside className="work-detail" style={{ width: detailWidth, minWidth: detailWidth }}>
+          <aside className="work-detail">
             {sidebarFocus?.type === 'uncommitted' && workingStatus ? (
               <StagingPanel 
                 workingStatus={workingStatus}
@@ -1678,12 +1554,9 @@ export default function App() {
                 onStatusChange={setStatus}
               />
             ) : sidebarFocus?.type === 'pr' ? (
-              <PRReviewPanel
+              <PRReviewPanel 
                 pr={sidebarFocus.data as PullRequest}
                 formatRelativeTime={formatRelativeTime}
-                onStatusChange={setStatus}
-                onRefresh={refresh}
-                onClearFocus={() => setSidebarFocus(null)}
               />
             ) : sidebarFocus ? (
               <SidebarDetailPanel 
@@ -1707,27 +1580,7 @@ export default function App() {
             ) : (
               <div className="detail-error">Could not load diff</div>
             )}
-            {/* Detail panel collapse button */}
-            <button 
-              className="panel-collapse-btn panel-collapse-btn-right"
-              onClick={() => setDetailVisible(false)}
-              title="Hide detail panel"
-            >
-              <span className="panel-collapse-icon">▶</span>
-            </button>
           </aside>
-          )}
-          
-          {/* Panel Toggle for Detail */}
-          {!detailVisible && (
-            <button 
-              className="panel-toggle panel-toggle-right"
-              onClick={() => setDetailVisible(true)}
-              title="Show detail panel"
-            >
-              <span className="panel-toggle-icon">◂</span>
-            </button>
-          )}
         </main>
       )}
     </div>
@@ -2670,9 +2523,6 @@ function StagingPanel({ workingStatus, currentBranch, onRefresh, onStatusChange 
 interface PRReviewPanelProps {
   pr: PullRequest;
   formatRelativeTime: (date: string) => string;
-  onStatusChange?: (status: StatusMessage | null) => void;
-  onRefresh?: () => Promise<void>;
-  onClearFocus?: () => void;
 }
 
 type PRTab = 'conversation' | 'files' | 'commits';
@@ -2685,7 +2535,7 @@ function isAIAuthor(login: string): boolean {
   return AI_AUTHORS.some(ai => lower.includes(ai)) || lower.endsWith('[bot]') || lower.endsWith('-bot');
 }
 
-function PRReviewPanel({ pr, formatRelativeTime, onStatusChange, onRefresh, onClearFocus }: PRReviewPanelProps) {
+function PRReviewPanel({ pr, formatRelativeTime }: PRReviewPanelProps) {
   const [activeTab, setActiveTab] = useState<PRTab>('conversation');
   const [prDetail, setPrDetail] = useState<PRDetail | null>(null);
   const [reviewComments, setReviewComments] = useState<PRReviewComment[]>([]);
@@ -2694,8 +2544,6 @@ function PRReviewPanel({ pr, formatRelativeTime, onStatusChange, onRefresh, onCl
   const [fileDiff, setFileDiff] = useState<string | null>(null);
   const [loadingDiff, setLoadingDiff] = useState(false);
   const [showAIComments, setShowAIComments] = useState(true);
-  const [merging, setMerging] = useState(false);
-  const [showMergeOptions, setShowMergeOptions] = useState(false);
 
   // Load full PR details
   useEffect(() => {
@@ -2770,32 +2618,6 @@ function PRReviewPanel({ pr, formatRelativeTime, onStatusChange, onRefresh, onCl
   const getFileComments = (filePath: string) => {
     return reviewComments.filter(c => c.path === filePath);
   };
-
-  // Handle PR merge
-  const handleMerge = async (method: 'merge' | 'squash' | 'rebase') => {
-    setMerging(true);
-    setShowMergeOptions(false);
-    onStatusChange?.({ type: 'info', message: `Merging PR #${pr.number}...` });
-
-    try {
-      const result = await window.electronAPI.mergePullRequest(pr.number, { method });
-      if (result.success) {
-        onStatusChange?.({ type: 'success', message: result.message });
-        // Refresh the PR list and clear focus since PR is now merged
-        await onRefresh?.();
-        onClearFocus?.();
-      } else {
-        onStatusChange?.({ type: 'error', message: result.message });
-      }
-    } catch (error) {
-      onStatusChange?.({ type: 'error', message: (error as Error).message });
-    } finally {
-      setMerging(false);
-    }
-  };
-
-  // Check if PR can be merged
-  const canMerge = prDetail?.state === 'OPEN';
 
   // Get review state badge
   const getReviewStateBadge = (state: string) => {
@@ -3035,52 +2857,14 @@ function PRReviewPanel({ pr, formatRelativeTime, onStatusChange, onRefresh, onCl
         )}
       </div>
 
-      {/* Footer with GitHub link and Merge button */}
+      {/* Footer with GitHub link */}
       <div className="pr-review-footer">
-        <button
+        <button 
           className="btn btn-secondary"
           onClick={() => window.electronAPI.openPullRequest(pr.url)}
         >
           Open on GitHub
         </button>
-
-        {canMerge && (
-          <div className="pr-merge-container">
-            <button
-              className="btn btn-primary"
-              onClick={() => setShowMergeOptions(!showMergeOptions)}
-              disabled={merging}
-            >
-              {merging ? 'Merging...' : 'Merge'}
-            </button>
-
-            {showMergeOptions && (
-              <div className="pr-merge-dropdown">
-                <button
-                  className="pr-merge-option"
-                  onClick={() => handleMerge('merge')}
-                >
-                  <span className="pr-merge-option-title">Create a merge commit</span>
-                  <span className="pr-merge-option-desc">All commits will be added to the base branch via a merge commit.</span>
-                </button>
-                <button
-                  className="pr-merge-option"
-                  onClick={() => handleMerge('squash')}
-                >
-                  <span className="pr-merge-option-title">Squash and merge</span>
-                  <span className="pr-merge-option-desc">All commits will be combined into one commit in the base branch.</span>
-                </button>
-                <button
-                  className="pr-merge-option"
-                  onClick={() => handleMerge('rebase')}
-                >
-                  <span className="pr-merge-option-title">Rebase and merge</span>
-                  <span className="pr-merge-option-desc">All commits will be rebased and added to the base branch.</span>
-                </button>
-              </div>
-            )}
-          </div>
-        )}
       </div>
     </div>
   );
