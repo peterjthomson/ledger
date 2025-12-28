@@ -25,3 +25,6 @@ export type { StashDetailPanelProps } from './StashDetailPanel'
 
 export { CreateWorktreePanel } from './CreateWorktreePanel'
 export type { CreateWorktreePanelProps } from './CreateWorktreePanel'
+
+export { EditorRouter, SidebarDetailPanel } from './EditorRouter'
+export type { EditorRouterProps, SidebarDetailPanelProps } from './EditorRouter'
