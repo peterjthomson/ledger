@@ -1092,6 +1092,8 @@ export default function App() {
       additions: workingStatus?.additions ?? 0,
       deletions: workingStatus?.deletions ?? 0,
       lastModified: new Date().toISOString(),
+      activityStatus: 'active' as const, // Working folder is always "active"
+      agentTaskHint: null, // No agent task for working folder
     }
   }, [repoPath, currentBranch, workingStatus])
 
@@ -4822,7 +4824,30 @@ function WorktreeDetailPanel({
             )}
           </span>
         </div>
+        {/* Activity status for agent worktrees */}
+        {worktree.agent !== 'unknown' && worktree.agent !== 'working-folder' && (
+          <div className="detail-meta-item">
+            <span className="meta-label">Activity</span>
+            <span className={`meta-value activity-status activity-${worktree.activityStatus}`}>
+              {worktree.activityStatus === 'active' && '● Active now'}
+              {worktree.activityStatus === 'recent' && '◐ Recent (< 1 hour)'}
+              {worktree.activityStatus === 'stale' && '○ Stale (> 1 hour)'}
+              {worktree.activityStatus === 'unknown' && '○ Inactive'}
+            </span>
+          </div>
+        )}
       </div>
+
+      {/* Show agent task hint for Cursor agents */}
+      {worktree.agent === 'cursor' && worktree.agentTaskHint && (
+        <div className="agent-task-callout">
+          <div className="agent-task-header">
+            <span className="agent-task-icon">🤖</span>
+            <span className="agent-task-label">Agent Task</span>
+          </div>
+          <p className="agent-task-content">{worktree.agentTaskHint}</p>
+        </div>
+      )}
 
       {/* Show WIP callout for worktrees with a branch and uncommitted changes */}
       {worktree.branch && hasChanges && (

@@ -220,6 +220,8 @@ export async function getWorktrees() {
 // Agent workspace types
 export type WorktreeAgent = 'cursor' | 'claude' | 'conductor' | 'gemini' | 'junie' | 'unknown' | 'working-folder'
 
+export type WorktreeActivityStatus = 'active' | 'recent' | 'stale' | 'unknown'
+
 export interface EnhancedWorktree {
   path: string
   head: string
@@ -236,6 +238,9 @@ export interface EnhancedWorktree {
   deletions: number
   // For ordering
   lastModified: string
+  // Activity tracking
+  activityStatus: WorktreeActivityStatus
+  agentTaskHint: string | null // The agent's current task/prompt if available
 }
 
 // Detect which agent created this worktree based on its path
@@ -346,6 +351,84 @@ async function getDirectoryMtime(dirPath: string): Promise<string> {
   }
 }
 
+// Calculate activity status based on last modified time
+function calculateActivityStatus(lastModified: string): WorktreeActivityStatus {
+  const now = Date.now()
+  const modified = new Date(lastModified).getTime()
+  const diffMinutes = (now - modified) / (1000 * 60)
+
+  if (diffMinutes < 5) return 'active' // Modified in last 5 minutes
+  if (diffMinutes < 60) return 'recent' // Modified in last hour
+  if (diffMinutes < 24 * 60) return 'stale' // Modified in last 24 hours
+  return 'unknown' // Older than 24 hours
+}
+
+// Get agent task hint from Cursor transcript files
+async function getCursorAgentTaskHint(worktreePath: string): Promise<string | null> {
+  try {
+    const homeDir = process.env.HOME || ''
+    const projectsDir = path.join(homeDir, '.cursor', 'projects')
+
+    // Check if the projects directory exists
+    if (!fs.existsSync(projectsDir)) return null
+
+    // Get all project folders
+    const projectFolders = fs.readdirSync(projectsDir)
+
+    // Look for agent-transcripts in each project folder
+    for (const folder of projectFolders) {
+      const transcriptsDir = path.join(projectsDir, folder, 'agent-transcripts')
+      if (!fs.existsSync(transcriptsDir)) continue
+
+      // Get transcript files sorted by modification time (newest first)
+      const files = fs.readdirSync(transcriptsDir)
+        .filter(f => f.endsWith('.json'))
+        .map(f => ({
+          name: f,
+          path: path.join(transcriptsDir, f),
+          mtime: fs.statSync(path.join(transcriptsDir, f)).mtime.getTime()
+        }))
+        .sort((a, b) => b.mtime - a.mtime)
+
+      // Check the most recent transcripts for references to this worktree
+      for (const file of files.slice(0, 5)) { // Only check 5 most recent
+        try {
+          const content = fs.readFileSync(file.path, 'utf-8')
+
+          // Quick check if this transcript mentions the worktree path
+          if (!content.includes(worktreePath)) continue
+
+          // Parse and extract the first user query
+          const transcript = JSON.parse(content)
+          if (!Array.isArray(transcript)) continue
+
+          for (const message of transcript) {
+            if (message.role === 'user' && message.text) {
+              // Extract content from <user_query> tags if present
+              const match = message.text.match(/<user_query>([\s\S]*?)<\/user_query>/)
+              if (match) {
+                // Get first line and truncate
+                const firstLine = match[1].trim().split('\n')[0]
+                return firstLine.slice(0, 60) + (firstLine.length > 60 ? '…' : '')
+              }
+              // Fallback: just use first line of text
+              const firstLine = message.text.trim().split('\n')[0]
+              return firstLine.slice(0, 60) + (firstLine.length > 60 ? '…' : '')
+            }
+          }
+        } catch {
+          // Skip malformed transcript files
+          continue
+        }
+      }
+    }
+
+    return null
+  } catch {
+    return null
+  }
+}
+
 // Get enhanced worktrees with agent detection and metadata
 export async function getEnhancedWorktrees(): Promise<EnhancedWorktree[]> {
   if (!git) throw new Error('No repository selected')
@@ -355,14 +438,18 @@ export async function getEnhancedWorktrees(): Promise<EnhancedWorktree[]> {
 
   // Enhance each worktree with metadata (in parallel)
   const enhancedPromises = basicWorktrees.map(async (wt) => {
-    const [diffStats, commitMessage, lastModified] = await Promise.all([
+    const agent = detectAgent(wt.path)
+
+    // Gather all metadata in parallel
+    const [diffStats, commitMessage, lastModified, agentTaskHint] = await Promise.all([
       getWorktreeDiffStats(wt.path),
       getWorktreeCommitMessage(wt.path),
       getDirectoryMtime(wt.path),
+      agent === 'cursor' ? getCursorAgentTaskHint(wt.path) : Promise.resolve(null),
     ])
 
-    const agent = detectAgent(wt.path)
     const contextHint = getContextHint(wt.branch, diffStats.changedFiles, commitMessage)
+    const activityStatus = calculateActivityStatus(lastModified)
 
     return {
       ...wt,
@@ -374,6 +461,8 @@ export async function getEnhancedWorktrees(): Promise<EnhancedWorktree[]> {
       additions: diffStats.additions,
       deletions: diffStats.deletions,
       lastModified,
+      activityStatus,
+      agentTaskHint,
     }
   })
 

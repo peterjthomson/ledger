@@ -19,6 +19,7 @@ export interface BranchesResult {
 }
 
 export type WorktreeAgent = 'cursor' | 'claude' | 'conductor' | 'gemini' | 'junie' | 'unknown' | 'working-folder'
+export type WorktreeActivityStatus = 'active' | 'recent' | 'stale' | 'unknown'
 
 export interface Worktree {
   path: string
@@ -36,6 +37,9 @@ export interface Worktree {
   deletions: number
   // For ordering
   lastModified: string // Directory mtime (ISO string)
+  // Activity tracking
+  activityStatus: WorktreeActivityStatus // 'active' | 'recent' | 'stale' | 'unknown'
+  agentTaskHint: string | null // The agent's current task/prompt if available
 }
 
 export type BranchFilter = 'all' | 'local-only' | 'unmerged'

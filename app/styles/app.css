@@ -1000,6 +1000,63 @@ body,
   font-style: italic;
 }
 
+/* Agent Activity Status (in detail panel) */
+.activity-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.activity-status.activity-active {
+  color: var(--success);
+  font-weight: 500;
+}
+
+.activity-status.activity-recent {
+  color: var(--warning);
+}
+
+.activity-status.activity-stale,
+.activity-status.activity-unknown {
+  color: var(--text-muted);
+}
+
+/* Agent Task Callout (in detail panel) */
+.agent-task-callout {
+  margin: 16px 0;
+  padding: 12px;
+  background: var(--accent-glow);
+  border-radius: var(--radius-sm);
+  border-left: 3px solid var(--accent);
+}
+
+.agent-task-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 6px;
+}
+
+.agent-task-icon {
+  font-size: 14px;
+}
+
+.agent-task-label {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: var(--accent);
+}
+
+.agent-task-content {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--text-primary);
+  font-style: italic;
+}
+
 /* Working Folder Styles */
 
 /* Working folder in radar view - subtle like uncommitted changes */
