@@ -26,3 +26,10 @@ export type { ResizeHandleProps } from './ResizeHandle'
 
 export { EditorSlot } from './EditorSlot'
 export type { EditorSlotProps } from './EditorSlot'
+
+export { CanvasSwitcher } from './CanvasSwitcher'
+export type { CanvasSwitcherProps } from './CanvasSwitcher'
+
+// Navigation hook
+export { useCanvasNavigation } from './useCanvasNavigation'
+export type { UseCanvasNavigationOptions, CanvasNavigationResult } from './useCanvasNavigation'
