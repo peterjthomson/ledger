@@ -18,9 +18,37 @@
 
   --success: #4a8c50;
   --error: #c5060b;
+  --warning: #c08030;
+  --info: #0066ff;
 
   --border: #cccccc;
   --border-subtle: #dddddd;
+
+  /* Semantic badge/status colors - Light mode */
+  --success-bg: #d4edda;
+  --success-text: #155724;
+  --success-border: #a8e6a1;
+  
+  --error-bg: #f8d7da;
+  --error-text: #721c24;
+  --error-border: #f5a8ad;
+  
+  --warning-bg: #fff3cd;
+  --warning-text: #856404;
+  --warning-border: #ffc107;
+  
+  --info-bg: #e3ecff;
+  --info-text: #0066ff;
+  --info-border: #b3d1ff;
+  
+  --accent-bg: #e8f0f8;
+  --accent-text: #5b9bd5;
+
+  /* Diff colors */
+  --diff-add-bg: #e6f6e6;
+  --diff-add-line-bg: #d4edda;
+  --diff-remove-bg: #ffebe9;
+  --diff-remove-line-bg: #f8d7da;
 
   --radius-sm: 4px;
   --radius-md: 6px;
@@ -45,9 +73,37 @@
 
   --success: #6a9955;
   --error: #f14c4c;
+  --warning: #ddb76f;
+  --info: #6cb6ff;
 
   --border: #404040;
   --border-subtle: #333333;
+
+  /* Semantic badge/status colors - Dark mode */
+  --success-bg: #1e3a1e;
+  --success-text: #6a9955;
+  --success-border: #3d5a3d;
+  
+  --error-bg: #3d1e1e;
+  --error-text: #f14c4c;
+  --error-border: #5a3d3d;
+  
+  --warning-bg: #3d3520;
+  --warning-text: #ddb76f;
+  --warning-border: #5a5030;
+  
+  --info-bg: #1e2d3d;
+  --info-text: #6cb6ff;
+  --info-border: #3d4d5a;
+  
+  --accent-bg: #1e2d3d;
+  --accent-text: #569cd6;
+
+  /* Diff colors */
+  --diff-add-bg: #1e3a1e;
+  --diff-add-line-bg: #2d4a2d;
+  --diff-remove-bg: #3d1e1e;
+  --diff-remove-line-bg: #4a2d2d;
 }
 
 * {
@@ -192,7 +248,7 @@ body,
 
 .btn-primary {
   background: var(--accent);
-  color: #ffffff;
+  color: white;
 }
 
 .btn-primary:hover:not(:disabled) {
@@ -200,7 +256,7 @@ body,
 }
 
 .btn-primary:active:not(:disabled) {
-  background: #0044bb;
+  filter: brightness(0.9);
 }
 
 .btn-primary:disabled {
@@ -244,9 +300,9 @@ body,
   align-items: center;
   gap: 8px;
   padding: 10px 16px;
-  background: #f8d7da;
-  border-bottom: 1px solid #f5a8ad;
-  color: var(--error);
+  background: var(--error-bg);
+  border-bottom: 1px solid var(--error-border);
+  color: var(--error-text);
   font-size: 12px;
 }
 
@@ -590,14 +646,10 @@ body,
 
 /* Column-specific colors - using graph colors from MacClassic */
 /* Greyscale icons for a cleaner look */
-.worktrees-column .column-icon {
-  color: #888888;
-}
-.branches-column .column-icon {
-  color: #888888;
-}
+.worktrees-column .column-icon,
+.branches-column .column-icon,
 .remotes-column .column-icon {
-  color: #888888;
+  color: var(--text-muted);
 }
 
 /* Column Title with Count */
@@ -656,7 +708,7 @@ body,
 }
 
 .control-select:hover {
-  border-color: #aaaaaa;
+  border-color: var(--text-muted);
 }
 
 .control-select:focus {
@@ -682,7 +734,7 @@ body,
 }
 
 .control-search:hover {
-  border-color: #aaaaaa;
+  border-color: var(--text-muted);
 }
 
 .control-search:focus {
@@ -713,18 +765,18 @@ body,
 }
 
 .badge-local {
-  background: #e8f0f8;
-  color: #5b9bd5;
+  background: var(--accent-bg);
+  color: var(--accent-text);
 }
 
 .badge-unmerged {
-  background: #fef3e6;
-  color: var(--text-muted);
+  background: var(--warning-bg);
+  color: var(--warning-text);
 }
 
 .badge-draft {
-  background: #e8e8e8;
-  color: #666666;
+  background: var(--bg-tertiary);
+  color: var(--text-secondary);
 }
 
 /* Date and commit count info */
@@ -783,21 +835,21 @@ body,
 }
 
 .status-success {
-  background: #d4edda;
-  color: #036a07;
-  border: 1px solid #a8e6a1;
+  background: var(--success-bg);
+  color: var(--success-text);
+  border: 1px solid var(--success-border);
 }
 
 .status-error {
-  background: #f8d7da;
-  color: #c5060b;
-  border: 1px solid #f5a8ad;
+  background: var(--error-bg);
+  color: var(--error-text);
+  border: 1px solid var(--error-border);
 }
 
 .status-info {
-  background: #e3ecff;
-  color: #0066ff;
-  border: 1px solid #b3d1ff;
+  background: var(--info-bg);
+  color: var(--info-text);
+  border: 1px solid var(--info-border);
 }
 
 .status-icon {
@@ -839,7 +891,7 @@ body,
 
 /* Pull Request Column */
 .pr-column .column-icon {
-  color: #888888;
+  color: var(--text-muted);
 }
 
 .pr-item {
@@ -912,11 +964,11 @@ body,
 }
 
 .pr-additions {
-  color: #4a8c50;
+  color: var(--success);
 }
 
 .pr-deletions {
-  color: #a85050;
+  color: var(--error);
 }
 
 /* Worktree Styles */
@@ -925,12 +977,12 @@ body,
 }
 
 .diff-additions {
-  color: #4a8c50;
+  color: var(--success);
   font-weight: 500;
 }
 
 .diff-deletions {
-  color: #a85050;
+  color: var(--error);
   font-weight: 500;
 }
 
@@ -1023,18 +1075,18 @@ body,
 
 /* Review status badges */
 .badge-approved {
-  background: #e6f0e6;
-  color: #4a8c50;
+  background: var(--success-bg);
+  color: var(--success);
 }
 
 .badge-changes {
-  background: #f5efe0;
-  color: #8c7040;
+  background: var(--warning-bg);
+  color: var(--warning-text);
 }
 
 .badge-review {
-  background: #e8f0f8;
-  color: #5b9bd5;
+  background: var(--accent-bg);
+  color: var(--accent-text);
 }
 
 /* Context Menu */
@@ -1077,7 +1129,7 @@ body,
 
 .context-menu-item:hover:not(.disabled) {
   background: var(--accent);
-  color: #ffffff;
+  color: white;
 }
 
 .context-menu-item.disabled {
@@ -1102,7 +1154,7 @@ body,
    ======================================== */
 
 .commits-column .column-icon {
-  color: #888888;
+  color: var(--text-muted);
 }
 
 /* Commit Item */
@@ -1178,7 +1230,7 @@ body,
 /* Merge commit indicator */
 .commit-item.merge .commit-message::before {
   content: '⎇ ';
-  color: #7c4dff;
+  color: var(--info);
 }
 
 /* ========================================
@@ -1216,7 +1268,7 @@ body,
 
 .view-toggle-btn.active {
   background: var(--accent);
-  color: #ffffff;
+  color: white;
 }
 
 .view-icon {
@@ -1369,7 +1421,7 @@ body,
 }
 
 .sidebar-filter-select:hover {
-  border-color: #aaaaaa;
+  border-color: var(--text-muted);
 }
 
 .sidebar-filter-select:focus {
@@ -1814,7 +1866,7 @@ body,
   color: var(--accent);
 }
 .uncommitted-file.file-renamed .file-status-icon {
-  color: #7030a0;
+  color: var(--info);
 }
 .uncommitted-file.file-untracked .file-status-icon {
   color: var(--text-muted);
@@ -2540,18 +2592,18 @@ body,
 }
 
 .graph-ref.branch {
-  background: #e8f0f8;
-  color: #5b9bd5;
+  background: var(--accent-bg);
+  color: var(--accent-text);
 }
 
 .graph-ref.head {
-  background: #e6f0e6;
-  color: #4a8c50;
+  background: var(--success-bg);
+  color: var(--success);
 }
 
 .graph-ref.tag {
-  background: #fef3e6;
-  color: #c08030;
+  background: var(--warning-bg);
+  color: var(--warning-text);
 }
 
 .graph-commit-message {
@@ -2659,12 +2711,12 @@ body,
 }
 
 .diff-stat-additions {
-  color: #4a8c50;
+  color: var(--success);
   font-weight: 500;
 }
 
 .diff-stat-deletions {
-  color: #a85050;
+  color: var(--error);
   font-weight: 500;
 }
 
@@ -2720,23 +2772,23 @@ body,
 }
 
 .diff-status-added {
-  background: #d4edda;
-  color: #4a8c50;
+  background: var(--success-bg);
+  color: var(--success);
 }
 
 .diff-status-deleted {
-  background: #f8d7da;
-  color: #a85050;
+  background: var(--error-bg);
+  color: var(--error);
 }
 
 .diff-status-modified {
-  background: #fef3e6;
-  color: #c08030;
+  background: var(--warning-bg);
+  color: var(--warning-text);
 }
 
 .diff-status-renamed {
-  background: #e8f0f8;
-  color: #5b9bd5;
+  background: var(--accent-bg);
+  color: var(--accent-text);
 }
 
 .diff-file-path {
@@ -2756,12 +2808,12 @@ body,
   font-size: 10px;
 }
 
-.diff-additions {
-  color: #4a8c50;
+.diff-file-stats .diff-additions {
+  color: var(--success);
 }
 
-.diff-deletions {
-  color: #a85050;
+.diff-file-stats .diff-deletions {
+  color: var(--error);
 }
 
 .diff-file-content {
@@ -2809,11 +2861,11 @@ body,
 }
 
 .diff-line-add {
-  background: #e6f6e6;
+  background: var(--diff-add-bg);
 }
 
 .diff-line-delete {
-  background: #ffebe9;
+  background: var(--diff-remove-bg);
 }
 
 .diff-line-number {
@@ -2827,11 +2879,11 @@ body,
 }
 
 .diff-line-add .diff-line-number.new {
-  background: #d4edda;
+  background: var(--diff-add-line-bg);
 }
 
 .diff-line-delete .diff-line-number.old {
-  background: #f8d7da;
+  background: var(--diff-remove-line-bg);
 }
 
 .diff-line-prefix {
@@ -2842,11 +2894,11 @@ body,
 }
 
 .diff-line-add .diff-line-prefix {
-  color: #4a8c50;
+  color: var(--success);
 }
 
 .diff-line-delete .diff-line-prefix {
-  color: #a85050;
+  color: var(--error);
 }
 
 .diff-line-content {
@@ -2991,18 +3043,18 @@ body,
 }
 
 .pr-review-badge.approved {
-  background: #d4edda;
-  color: #155724;
+  background: var(--success-bg);
+  color: var(--success-text);
 }
 
 .pr-review-badge.changes {
-  background: #f8d7da;
-  color: #721c24;
+  background: var(--error-bg);
+  color: var(--error-text);
 }
 
 .pr-review-badge.commented {
-  background: #fff3cd;
-  color: #856404;
+  background: var(--warning-bg);
+  color: var(--warning-text);
 }
 
 .pr-review-badge.dismissed {
@@ -3147,16 +3199,16 @@ body,
 }
 
 .pr-comment.pr-review {
-  border-left-color: #28a745;
+  border-left-color: var(--success);
 }
 
 .pr-comment.pr-review.changes {
-  border-left-color: #dc3545;
+  border-left-color: var(--error);
 }
 
 .pr-comment.ai-comment {
   opacity: 0.7;
-  border-left-color: #6c757d;
+  border-left-color: var(--text-muted);
 }
 
 .pr-comment-header {
@@ -3462,11 +3514,11 @@ body,
 }
 
 .pr-comment-status.success {
-  color: #28a745;
+  color: var(--success);
 }
 
 .pr-comment-status.error {
-  color: #dc3545;
+  color: var(--error);
 }
 
 .btn-sm {
@@ -3602,23 +3654,23 @@ body,
 }
 
 .stash-file-status.status-added {
-  background: #d4edda;
-  color: #155724;
+  background: var(--success-bg);
+  color: var(--success-text);
 }
 
 .stash-file-status.status-modified {
-  background: #fff3cd;
-  color: #856404;
+  background: var(--warning-bg);
+  color: var(--warning-text);
 }
 
 .stash-file-status.status-deleted {
-  background: #f8d7da;
-  color: #721c24;
+  background: var(--error-bg);
+  color: var(--error-text);
 }
 
 .stash-file-status.status-renamed {
-  background: #d1ecf1;
-  color: #0c5460;
+  background: var(--info-bg);
+  color: var(--info-text);
 }
 
 .stash-file-path {
@@ -4278,6 +4330,30 @@ body,
   background: var(--bg-tertiary);
   color: var(--text-muted);
   border: 1px dashed var(--border);
+}
+
+/* System/Auto theme preview - split light/dark */
+.theme-preview-system {
+  position: relative;
+  overflow: hidden;
+}
+
+.theme-preview-system::before {
+  content: '☀️';
+  position: absolute;
+  top: 4px;
+  left: 6px;
+  font-size: 10px;
+  z-index: 1;
+}
+
+.theme-preview-system::after {
+  content: '🌙';
+  position: absolute;
+  bottom: 4px;
+  right: 6px;
+  font-size: 10px;
+  z-index: 1;
 }
 
 .theme-name {

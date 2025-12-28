@@ -73,7 +73,8 @@ const electronAPI = {
   commentOnPR: (prNumber: number, body: string) => ipcRenderer.invoke('comment-on-pr', prNumber, body),
   // Theme operations
   getThemeMode: () => ipcRenderer.invoke('get-theme-mode'),
-  setThemeMode: (mode: 'light' | 'dark' | 'custom') => ipcRenderer.invoke('set-theme-mode', mode),
+  setThemeMode: (mode: 'light' | 'dark' | 'system' | 'custom') => ipcRenderer.invoke('set-theme-mode', mode),
+  getSystemTheme: () => ipcRenderer.invoke('get-system-theme'),
   getCustomTheme: () => ipcRenderer.invoke('get-custom-theme'),
   loadVSCodeTheme: () => ipcRenderer.invoke('load-vscode-theme'),
   loadBuiltInTheme: (themeFileName: string) => ipcRenderer.invoke('load-built-in-theme', themeFileName),

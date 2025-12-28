@@ -353,8 +353,9 @@ export interface ElectronAPI {
   getPRFileDiff: (prNumber: number, filePath: string) => Promise<string | null>
   commentOnPR: (prNumber: number, body: string) => Promise<{ success: boolean; message: string }>
   // Theme operations
-  getThemeMode: () => Promise<'light' | 'dark' | 'custom'>
-  setThemeMode: (mode: 'light' | 'dark' | 'custom') => Promise<{ success: boolean }>
+  getThemeMode: () => Promise<'light' | 'dark' | 'system' | 'custom'>
+  setThemeMode: (mode: 'light' | 'dark' | 'system' | 'custom') => Promise<{ success: boolean }>
+  getSystemTheme: () => Promise<'light' | 'dark'>
   getCustomTheme: () => Promise<{
     theme: {
       name: string

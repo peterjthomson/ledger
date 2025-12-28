@@ -117,6 +117,13 @@ export const menuItems: TitlebarMenu[] = [
         name: '---',
       },
       {
+        name: 'Auto (System)',
+        action: 'window-theme-system',
+        actionCallback: async () => {
+          await setThemeMode('system')
+        },
+      },
+      {
         name: 'Light Theme',
         action: 'window-theme-light',
         actionCallback: async () => {

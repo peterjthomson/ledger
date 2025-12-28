@@ -1,4 +1,4 @@
-import { app, BrowserWindow, ipcMain, dialog, shell } from 'electron'
+import { app, BrowserWindow, ipcMain, dialog, shell, nativeTheme } from 'electron'
 import { electronApp, optimizer } from '@electron-toolkit/utils'
 import fixPath from 'fix-path'
 import { createAppWindow } from './app'
@@ -480,9 +480,13 @@ app.whenReady().then(() => {
     return getThemeMode()
   })
 
-  ipcMain.handle('set-theme-mode', (_, mode: 'light' | 'dark' | 'custom') => {
+  ipcMain.handle('set-theme-mode', (_, mode: 'light' | 'dark' | 'system' | 'custom') => {
     saveThemeMode(mode)
     return { success: true }
+  })
+
+  ipcMain.handle('get-system-theme', () => {
+    return nativeTheme.shouldUseDarkColors ? 'dark' : 'light'
   })
 
   ipcMain.handle('get-custom-theme', () => {

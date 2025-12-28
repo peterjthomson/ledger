@@ -1,9 +1,17 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { loadBuiltInTheme, loadVSCodeTheme, type ThemeMode } from '../theme'
 
 // Built-in theme definitions with preview colors
 const BUILT_IN_THEMES = [
   // Base themes
+  {
+    id: 'system',
+    name: 'Auto',
+    category: 'Base',
+    type: 'system' as const,
+    colors: { bg: 'linear-gradient(135deg, #ffffff 50%, #1e1e1e 50%)', sidebar: 'linear-gradient(135deg, #f3f3f3 50%, #252526 50%)', accent: '#007aff', text: '#666666' },
+    isGradient: true,
+  },
   {
     id: 'light',
     name: 'Light',
@@ -22,7 +30,7 @@ const BUILT_IN_THEMES = [
   {
     id: 'claude-desktop',
     name: 'Claude Desktop',
-    category: 'AI Apps',
+    category: 'Applications',
     type: 'light' as const,
     path: 'claude-desktop.json',
     colors: { bg: '#f9f5f1', sidebar: '#ede7e1', accent: '#dc8850', text: '#1a1612' },
@@ -30,7 +38,7 @@ const BUILT_IN_THEMES = [
   {
     id: 'claude-desktop-dark',
     name: 'Claude Desktop Dark',
-    category: 'AI Apps',
+    category: 'Applications',
     type: 'dark' as const,
     path: 'claude-desktop-dark.json',
     colors: { bg: '#2b2724', sidebar: '#1f1d1a', accent: '#dc8850', text: '#f2ebe4' },
@@ -38,48 +46,64 @@ const BUILT_IN_THEMES = [
   {
     id: 'chatgpt',
     name: 'ChatGPT',
-    category: 'AI Apps',
-    type: 'dark' as const,
+    category: 'Applications',
+    type: 'light' as const,
     path: 'chatgpt.json',
-    colors: { bg: '#212121', sidebar: '#171717', accent: '#10a37f', text: '#ececec' },
+    colors: { bg: '#ffffff', sidebar: '#ffffff', accent: '#0d0d0d', text: '#0d0d0d' },
   },
   {
     id: 'conductor',
     name: 'Conductor',
-    category: 'AI Apps',
-    type: 'dark' as const,
+    category: 'Applications',
+    type: 'light' as const,
     path: 'conductor.json',
-    colors: { bg: '#0f0f10', sidebar: '#0a0a0b', accent: '#e07c3b', text: '#e8e4df' },
+    colors: { bg: '#fcfcfb', sidebar: '#f5f5f3', accent: '#70706a', text: '#1a1a1a' },
   },
   {
     id: 'opencode',
     name: 'OpenCode',
-    category: 'AI Apps',
-    type: 'dark' as const,
+    category: 'Applications',
+    type: 'light' as const,
     path: 'opencode.json',
-    colors: { bg: '#0c0c0c', sidebar: '#000000', accent: '#00aa00', text: '#00ff00' },
+    colors: { bg: '#fafafa', sidebar: '#f5f5f5', accent: '#3d4550', text: '#1a1a1a' },
   },
   {
     id: 'cursor-default',
     name: 'Cursor',
-    category: 'AI Apps',
+    category: 'Applications',
     type: 'dark' as const,
     path: 'cursor-default.json',
     colors: { bg: '#1e1e1e', sidebar: '#181818', accent: '#6366f1', text: '#d4d4d4' },
   },
-  // Popular VSCode themes
+  // VS Code themes
+  {
+    id: 'dark-plus',
+    name: 'Dark+ (Default)',
+    category: 'VS Code',
+    type: 'dark' as const,
+    path: 'dark-plus.json',
+    colors: { bg: '#1e1e1e', sidebar: '#252526', accent: '#0e639c', text: '#d4d4d4' },
+  },
+  {
+    id: 'light-plus',
+    name: 'Light+ (Default)',
+    category: 'VS Code',
+    type: 'light' as const,
+    path: 'light-plus.json',
+    colors: { bg: '#ffffff', sidebar: '#f3f3f3', accent: '#007acc', text: '#616161' },
+  },
   {
     id: 'one-dark-pro',
     name: 'One Dark Pro',
-    category: 'Popular',
+    category: 'VS Code',
     type: 'dark' as const,
     path: 'one-dark-pro.json',
-    colors: { bg: '#282c34', sidebar: '#21252b', accent: '#4d78cc', text: '#abb2bf' },
+    colors: { bg: '#282c34', sidebar: '#21252b', accent: '#61afef', text: '#abb2bf' },
   },
   {
     id: 'dracula',
     name: 'Dracula',
-    category: 'Popular',
+    category: 'VS Code',
     type: 'dark' as const,
     path: 'dracula.json',
     colors: { bg: '#282a36', sidebar: '#21222c', accent: '#bd93f9', text: '#f8f8f2' },
@@ -87,7 +111,7 @@ const BUILT_IN_THEMES = [
   {
     id: 'github-dark',
     name: 'GitHub Dark',
-    category: 'Popular',
+    category: 'VS Code',
     type: 'dark' as const,
     path: 'github-dark.json',
     colors: { bg: '#0d1117', sidebar: '#161b22', accent: '#238636', text: '#c9d1d9' },
@@ -95,7 +119,7 @@ const BUILT_IN_THEMES = [
   {
     id: 'night-owl',
     name: 'Night Owl',
-    category: 'Popular',
+    category: 'VS Code',
     type: 'dark' as const,
     path: 'night-owl.json',
     colors: { bg: '#011627', sidebar: '#011627', accent: '#7e57c2', text: '#d6deeb' },
@@ -103,7 +127,7 @@ const BUILT_IN_THEMES = [
   {
     id: 'monokai-pro',
     name: 'Monokai Pro',
-    category: 'Popular',
+    category: 'VS Code',
     type: 'dark' as const,
     path: 'monokai-pro.json',
     colors: { bg: '#2d2a2e', sidebar: '#221f22', accent: '#ffd866', text: '#fcfcfa' },
@@ -119,6 +143,11 @@ interface SettingsPanelProps {
 export const SettingsPanel = ({ themeMode, onThemeChange, onBack }: SettingsPanelProps) => {
   const [selectedTheme, setSelectedTheme] = useState<string>(themeMode)
   const [isSaving, setIsSaving] = useState(false)
+
+  // Sync selectedTheme with themeMode when it changes externally
+  useEffect(() => {
+    setSelectedTheme(themeMode)
+  }, [themeMode])
 
   const handleThemeSelect = async (themeId: string) => {
     if (isSaving) return
@@ -198,7 +227,7 @@ export const SettingsPanel = ({ themeMode, onThemeChange, onBack }: SettingsPane
                     title={theme.name}
                   >
                     <div
-                      className="theme-preview"
+                      className={`theme-preview ${theme.id === 'system' ? 'theme-preview-system' : ''}`}
                       style={{
                         background: theme.colors.bg,
                       }}

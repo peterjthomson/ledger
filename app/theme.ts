@@ -1,6 +1,6 @@
 // Theme management utility for the renderer process
 
-export type ThemeMode = 'light' | 'dark' | 'custom';
+export type ThemeMode = 'light' | 'dark' | 'system' | 'custom';
 
 export interface CustomTheme {
   name: string;
@@ -40,6 +40,27 @@ function setThemeClass(mode: 'light' | 'dark'): void {
   }
 }
 
+// Get the effective theme (resolves 'system' to actual light/dark)
+async function getEffectiveTheme(mode: ThemeMode): Promise<'light' | 'dark'> {
+  if (mode === 'system') {
+    return await window.electronAPI.getSystemTheme();
+  }
+  return mode === 'custom' ? 'dark' : mode;
+}
+
+// Listen for system theme changes
+function setupSystemThemeListener(): void {
+  const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
+  
+  mediaQuery.addEventListener('change', async () => {
+    const currentMode = await window.electronAPI.getThemeMode() as ThemeMode;
+    if (currentMode === 'system') {
+      const systemTheme = mediaQuery.matches ? 'dark' : 'light';
+      setThemeClass(systemTheme);
+    }
+  });
+}
+
 // Initialize theme on app startup
 export async function initializeTheme(): Promise<void> {
   try {
@@ -56,9 +77,15 @@ export async function initializeTheme(): Promise<void> {
         // Fall back to dark if custom theme not found
         setThemeClass('dark');
       }
+    } else if (mode === 'system') {
+      const effectiveTheme = await getEffectiveTheme(mode);
+      setThemeClass(effectiveTheme);
     } else {
       setThemeClass(mode);
     }
+    
+    // Set up listener for system theme changes
+    setupSystemThemeListener();
   } catch (error) {
     console.error('Failed to initialize theme:', error);
     // Default to light mode on error
@@ -90,6 +117,11 @@ export async function setThemeMode(mode: ThemeMode): Promise<void> {
       applyCSSVariables(themeData.cssVars);
       await window.electronAPI.setThemeMode('custom');
     }
+  } else if (mode === 'system') {
+    clearCustomCSSVariables();
+    const effectiveTheme = await getEffectiveTheme(mode);
+    setThemeClass(effectiveTheme);
+    await window.electronAPI.setThemeMode('system');
   } else {
     clearCustomCSSVariables();
     setThemeClass(mode);
