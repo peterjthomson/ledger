@@ -57,7 +57,7 @@ import {
   getPRReviewComments,
   getPRFileDiff,
   commentOnPR,
-  approvePR,
+  mergePR,
 } from './git-service'
 import {
   getLastRepoPath,
@@ -476,9 +476,9 @@ app.whenReady().then(() => {
     }
   })
 
-  ipcMain.handle('approve-pr', async (_, prNumber: number, body?: string) => {
+  ipcMain.handle('merge-pr', async (_, prNumber: number, mergeMethod: 'merge' | 'squash' | 'rebase' = 'merge') => {
     try {
-      return await approvePR(prNumber, body)
+      return await mergePR(prNumber, mergeMethod)
     } catch (error) {
       return { success: false, message: (error as Error).message }
     }

@@ -1044,22 +1044,19 @@ export async function commentOnPR(prNumber: number, body: string): Promise<{ suc
   }
 }
 
-// Approve a PR
-export async function approvePR(prNumber: number, body?: string): Promise<{ success: boolean; message: string }> {
+// Merge a PR
+export async function mergePR(prNumber: number, mergeMethod: 'merge' | 'squash' | 'rebase' = 'merge'): Promise<{ success: boolean; message: string }> {
   if (!repoPath) {
     return { success: false, message: 'No repository selected' }
   }
 
   try {
-    let cmd = `gh pr review ${prNumber} --approve`
-    if (body) {
-      const escapedBody = body.replace(/"/g, '\\"').replace(/`/g, '\\`').replace(/\$/g, '\\$')
-      cmd += ` --body "${escapedBody}"`
-    }
+    const methodFlag = mergeMethod === 'merge' ? '--merge' : mergeMethod === 'squash' ? '--squash' : '--rebase'
+    const cmd = `gh pr merge ${prNumber} ${methodFlag} --delete-branch`
 
     await execAsync(cmd, { cwd: repoPath })
 
-    return { success: true, message: 'PR approved' }
+    return { success: true, message: 'PR merged successfully' }
   } catch (error) {
     const errorMessage = (error as Error).message
 
@@ -1067,8 +1064,12 @@ export async function approvePR(prNumber: number, body?: string): Promise<{ succ
       return { success: false, message: 'Not logged into GitHub CLI. Run `gh auth login` in terminal.' }
     }
 
-    if (errorMessage.includes('already approved')) {
-      return { success: false, message: 'You have already approved this PR' }
+    if (errorMessage.includes('already been merged')) {
+      return { success: false, message: 'This PR has already been merged' }
+    }
+
+    if (errorMessage.includes('not mergeable')) {
+      return { success: false, message: 'PR is not mergeable. Check for conflicts or required checks.' }
     }
 
     return { success: false, message: errorMessage }

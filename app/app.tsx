@@ -2593,6 +2593,7 @@ export default function App() {
                   pr={sidebarFocus.data as PullRequest}
                   formatRelativeTime={formatRelativeTime}
                   onCheckout={handlePRCheckout}
+                  onPRMerged={refresh}
                   switching={switching}
                 />
               ) : sidebarFocus ? (
@@ -4108,6 +4109,7 @@ interface PRReviewPanelProps {
   pr: PullRequest
   formatRelativeTime: (date: string) => string
   onCheckout?: (pr: PullRequest) => void
+  onPRMerged?: () => void
   switching?: boolean
 }
 
@@ -4121,7 +4123,7 @@ function isAIAuthor(login: string): boolean {
   return AI_AUTHORS.some((ai) => lower.includes(ai)) || lower.endsWith('[bot]') || lower.endsWith('-bot')
 }
 
-function PRReviewPanel({ pr, formatRelativeTime, onCheckout, switching }: PRReviewPanelProps) {
+function PRReviewPanel({ pr, formatRelativeTime, onCheckout, onPRMerged, switching }: PRReviewPanelProps) {
   const [activeTab, setActiveTab] = useState<PRTab>('conversation')
   const [prDetail, setPrDetail] = useState<PRDetail | null>(null)
   const [reviewComments, setReviewComments] = useState<PRReviewComment[]>([])
@@ -4133,7 +4135,7 @@ function PRReviewPanel({ pr, formatRelativeTime, onCheckout, switching }: PRRevi
   const [commentText, setCommentText] = useState('')
   const [submittingComment, setSubmittingComment] = useState(false)
   const [commentStatus, setCommentStatus] = useState<{ type: 'success' | 'error'; message: string } | null>(null)
-  const [approvingPR, setApprovingPR] = useState(false)
+  const [mergingPR, setMergingPR] = useState(false)
 
   // Load full PR details
   const loadPRDetail = async () => {
@@ -4183,20 +4185,22 @@ function PRReviewPanel({ pr, formatRelativeTime, onCheckout, switching }: PRRevi
     }
   }
 
-  // Approve PR
-  const handleApprovePR = async () => {
-    if (approvingPR) return
+  // Merge PR
+  const handleMergePR = async () => {
+    if (mergingPR) return
 
-    setApprovingPR(true)
+    setMergingPR(true)
     setCommentStatus(null)
 
     try {
-      const result = await window.electronAPI.approvePR(pr.number)
+      const result = await window.electronAPI.mergePR(pr.number, 'squash')
 
       if (result.success) {
-        setCommentStatus({ type: 'success', message: 'PR approved!' })
-        // Reload PR details to show updated review status
+        setCommentStatus({ type: 'success', message: 'PR merged!' })
+        // Reload PR details to show updated status
         await loadPRDetail()
+        // Notify parent to refresh PR list
+        if (onPRMerged) onPRMerged()
         setTimeout(() => setCommentStatus(null), 3000)
       } else {
         setCommentStatus({ type: 'error', message: result.message })
@@ -4204,7 +4208,7 @@ function PRReviewPanel({ pr, formatRelativeTime, onCheckout, switching }: PRRevi
     } catch (error) {
       setCommentStatus({ type: 'error', message: (error as Error).message })
     } finally {
-      setApprovingPR(false)
+      setMergingPR(false)
     }
   }
 
@@ -4339,11 +4343,11 @@ function PRReviewPanel({ pr, formatRelativeTime, onCheckout, switching }: PRRevi
           View on GitHub
         </button>
         <button
-          className="btn btn-secondary"
-          onClick={handleApprovePR}
-          disabled={approvingPR || prDetail.reviewDecision === 'APPROVED'}
+          className="btn btn-primary"
+          onClick={handleMergePR}
+          disabled={mergingPR || prDetail.state === 'MERGED'}
         >
-          {approvingPR ? 'Approving...' : prDetail.reviewDecision === 'APPROVED' ? '✓ Approved' : 'Approve'}
+          {mergingPR ? 'Merging...' : prDetail.state === 'MERGED' ? '✓ Merged' : 'Merge PR'}
         </button>
       </div>
 

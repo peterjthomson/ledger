@@ -352,7 +352,7 @@ export interface ElectronAPI {
   getPRReviewComments: (prNumber: number) => Promise<PRReviewComment[]>
   getPRFileDiff: (prNumber: number, filePath: string) => Promise<string | null>
   commentOnPR: (prNumber: number, body: string) => Promise<{ success: boolean; message: string }>
-  approvePR: (prNumber: number, body?: string) => Promise<{ success: boolean; message: string }>
+  mergePR: (prNumber: number, mergeMethod?: 'merge' | 'squash' | 'rebase') => Promise<{ success: boolean; message: string }>
   // Theme operations
   getThemeMode: () => Promise<'light' | 'dark' | 'system' | 'custom'>
   setThemeMode: (mode: 'light' | 'dark' | 'system' | 'custom') => Promise<{ success: boolean }>
