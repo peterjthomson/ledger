@@ -314,7 +314,7 @@ export interface ElectronAPI {
   // Reset operations
   resetToCommit: (commitHash: string, mode: 'soft' | 'mixed' | 'hard') => Promise<CheckoutResult>
   // Focus mode APIs
-  getCommitGraphHistory: (limit?: number, skipStats?: boolean) => Promise<GraphCommit[]>
+  getCommitGraphHistory: (limit?: number, skipStats?: boolean, showCheckpoints?: boolean) => Promise<GraphCommit[]>
   getCommitDiff: (commitHash: string) => Promise<CommitDiff | null>
   getBranchDiff: (branchName: string) => Promise<BranchDiff | null>
   getStashes: () => Promise<StashEntry[]>

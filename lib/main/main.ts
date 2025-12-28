@@ -252,13 +252,16 @@ app.whenReady().then(() => {
   })
 
   // Focus mode APIs
-  ipcMain.handle('get-commit-graph-history', async (_, limit?: number, skipStats?: boolean) => {
-    try {
-      return await getCommitGraphHistory(limit, skipStats)
-    } catch (_error) {
-      return []
+  ipcMain.handle(
+    'get-commit-graph-history',
+    async (_, limit?: number, skipStats?: boolean, showCheckpoints?: boolean) => {
+      try {
+        return await getCommitGraphHistory(limit, skipStats, showCheckpoints)
+      } catch (_error) {
+        return []
+      }
     }
-  })
+  )
 
   ipcMain.handle('get-commit-diff', async (_, commitHash: string) => {
     try {

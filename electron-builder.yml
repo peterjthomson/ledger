@@ -21,16 +21,19 @@ nsis:
 mac:
   # Code sign with Developer ID Application certificate
   identity: "Peter Thomson (R4RRG93J68)"
+  hardenedRuntime: true
   # Build for Apple Silicon (arm64), Intel (x64), or both (universal)
   target:
-    - target: dmg
+    # ZIP only - DMGs have been rejected with "Team not configured" error
+    # DMG can be re-enabled once Apple account issue is resolved
+    # - target: dmg
+    #   arch:
+    #     - arm64
+    - target: zip
       arch:
         - arm64        # Apple Silicon only (smaller, faster)
         # - x64        # Intel only
         # - universal  # Both (larger file ~2x size)
-    - target: zip
-      arch:
-        - arm64
   category: public.app-category.developer-tools
   entitlements: resources/build/entitlements.mac.plist
   entitlementsInherit: resources/build/entitlements.mac.plist

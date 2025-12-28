@@ -332,6 +332,69 @@ body,
   margin-left: 2px;
 }
 
+/* Column filter panel */
+.column-filter-panel {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 16px;
+  padding: 8px 14px;
+  background: var(--bg-tertiary);
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.column-filter-option {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  cursor: pointer;
+  font-size: 11px;
+  color: var(--text-secondary);
+  user-select: none;
+}
+
+.column-filter-option:hover {
+  color: var(--text-primary);
+}
+
+.column-filter-option input[type='checkbox'] {
+  width: 13px;
+  height: 13px;
+  margin: 0;
+  cursor: pointer;
+  appearance: none;
+  -webkit-appearance: none;
+  border: 1px solid var(--border);
+  border-radius: 3px;
+  background: var(--bg-secondary);
+  position: relative;
+  transition: all 0.1s ease;
+}
+
+.column-filter-option input[type='checkbox']:hover {
+  border-color: var(--text-muted);
+}
+
+.column-filter-option input[type='checkbox']:checked {
+  background: var(--accent);
+  border-color: var(--accent);
+}
+
+.column-filter-option input[type='checkbox']:checked::after {
+  content: '';
+  position: absolute;
+  left: 3.5px;
+  top: 1px;
+  width: 4px;
+  height: 7px;
+  border: solid white;
+  border-width: 0 1.5px 1.5px 0;
+  transform: rotate(45deg);
+}
+
+.column-filter-option span {
+  font-weight: 500;
+}
+
 .header-chevron.open {
   transform: rotate(180deg);
 }
@@ -2066,6 +2129,91 @@ body,
   padding: 6px 0;
 }
 
+/* New Branch Fields */
+.new-branch-fields {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 8px 10px;
+  background: var(--bg-tertiary);
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border-subtle);
+}
+
+.branch-folder-row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.branch-folder-select {
+  padding: 4px 24px 4px 8px;
+  font-size: 12px;
+  background: var(--bg-primary);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--text-primary);
+  cursor: pointer;
+  appearance: none;
+  -webkit-appearance: none;
+  background-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="%23666" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg>');
+  background-repeat: no-repeat;
+  background-position: right 6px center;
+}
+
+.branch-folder-select:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+
+.branch-custom-folder {
+  width: 80px;
+  padding: 4px 8px;
+  font-size: 12px;
+  background: var(--bg-primary);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--text-primary);
+}
+
+.branch-custom-folder:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+
+.branch-separator {
+  color: var(--text-muted);
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.branch-name-input {
+  flex: 1;
+  padding: 4px 8px;
+  font-size: 12px;
+  background: var(--bg-primary);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--text-primary);
+  min-width: 0;
+}
+
+.branch-name-input:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+
+.branch-preview {
+  font-size: 11px;
+  color: var(--text-muted);
+  padding-left: 4px;
+}
+
+.branch-preview code {
+  color: var(--accent);
+  font-weight: 500;
+}
+
 .commit-option-checkbox input[type='checkbox'] {
   width: 14px;
   height: 14px;
@@ -2159,6 +2307,19 @@ body,
   padding: 10px 14px;
   background: var(--bg-secondary);
   border-bottom: 1px solid var(--border-subtle);
+  cursor: pointer;
+  user-select: none;
+  transition: background 0.15s ease;
+}
+
+.focus-main-header:hover {
+  background: var(--bg-tertiary);
+}
+
+.focus-main-header .column-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
 
 .focus-main-header h2 {
@@ -2170,6 +2331,112 @@ body,
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.03em;
+}
+
+/* Header filter button - appears on hover */
+.header-filter-btn {
+  width: 20px;
+  height: 20px;
+  border: none;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  transition: all 0.15s ease;
+  flex-shrink: 0;
+}
+
+.focus-main-header:hover .header-filter-btn {
+  opacity: 1;
+}
+
+.header-filter-btn:hover {
+  background: rgba(0, 0, 0, 0.1);
+  color: var(--text-primary);
+}
+
+.header-filter-btn.active {
+  opacity: 1;
+  color: var(--accent);
+  background: var(--accent-glow);
+}
+
+/* History Filter Panel */
+.history-filter-panel {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px 24px;
+  padding: 10px 14px;
+  background: var(--bg-tertiary);
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.history-filter-option {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+  font-size: 11px;
+  color: var(--text-secondary);
+  user-select: none;
+}
+
+.history-filter-option:hover {
+  color: var(--text-primary);
+}
+
+.history-filter-option input[type='checkbox'] {
+  width: 13px;
+  height: 13px;
+  margin: 0;
+  cursor: pointer;
+  appearance: none;
+  -webkit-appearance: none;
+  border: 1px solid var(--border);
+  border-radius: 3px;
+  background: var(--bg-secondary);
+  position: relative;
+  transition: all 0.1s ease;
+}
+
+.history-filter-option input[type='checkbox']:hover {
+  border-color: var(--text-muted);
+}
+
+.history-filter-option input[type='checkbox']:checked {
+  background: var(--accent);
+  border-color: var(--accent);
+}
+
+.history-filter-option input[type='checkbox']:checked::after {
+  content: '';
+  position: absolute;
+  left: 3.5px;
+  top: 1px;
+  width: 4px;
+  height: 7px;
+  border: solid white;
+  border-width: 0 1.5px 1.5px 0;
+  transform: rotate(45deg);
+}
+
+.history-filter-option span:first-of-type {
+  font-weight: 500;
+}
+
+.history-filter-hint {
+  font-size: 10px;
+  color: var(--text-muted);
+  font-weight: 400;
+}
+
+/* No graph mode - flat list */
+.git-graph.no-graph .git-graph-list {
+  padding-left: 12px;
 }
 
 .git-graph-container {

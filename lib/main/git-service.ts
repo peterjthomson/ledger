@@ -1794,7 +1794,12 @@ export interface GraphCommit {
 
 // Get commit history with parent info for git graph
 // skipStats=true makes this much faster for initial load (100x fewer git commands)
-export async function getCommitGraphHistory(limit: number = 100, skipStats: boolean = false): Promise<GraphCommit[]> {
+// showCheckpoints=false hides Conductor checkpoint commits (checkpoint:... messages)
+export async function getCommitGraphHistory(
+  limit: number = 100,
+  skipStats: boolean = false,
+  showCheckpoints: boolean = false
+): Promise<GraphCommit[]> {
   if (!git) throw new Error('No repository selected')
 
   try {
@@ -1813,6 +1818,12 @@ export async function getCommitGraphHistory(limit: number = 100, skipStats: bool
 
     for (const line of lines) {
       const [hash, shortHash, message, author, date, parentStr, refsStr] = line.split('|')
+
+      // Filter out checkpoint commits if showCheckpoints is false
+      if (!showCheckpoints && message.startsWith('checkpoint:')) {
+        continue
+      }
+
       const parents = parentStr ? parentStr.split(' ').filter(Boolean) : []
       const refs = refsStr
         ? refsStr

@@ -83,6 +83,13 @@ export default function App() {
   const [stashes, setStashes] = useState<StashEntry[]>([])
   const [loadingDiff, setLoadingDiff] = useState(false)
   const [sidebarFocus, setSidebarFocus] = useState<SidebarFocus | null>(null)
+  // History/Commits panel filters (shared between Radar and Focus modes)
+  const [historyFilterOpen, setHistoryFilterOpen] = useState(false) // Focus mode filter panel
+  const [radarCommitsFilterOpen, setRadarCommitsFilterOpen] = useState(false) // Radar mode filter panel
+  const [showCheckpoints, setShowCheckpoints] = useState(false) // Hide Conductor checkpoints by default
+  const [showGraphLines, setShowGraphLines] = useState(true) // Show git graph visualization (Focus mode only)
+  const [onlyBranchHeads, setOnlyBranchHeads] = useState(false) // Show only commits that are branch HEADs
+  const [onlyUnmergedBranches, setOnlyUnmergedBranches] = useState(false) // Show only commits from unmerged branches
 
   // Sidebar collapsed state
   const [sidebarSections, setSidebarSections] = useState({
@@ -331,7 +338,7 @@ export default function App() {
           window.electronAPI.getCommitHistory(15),
           window.electronAPI.getWorkingStatus(),
           window.electronAPI.getGitHubUrl(),
-          window.electronAPI.getCommitGraphHistory(100, true), // skipStats for fast load
+          window.electronAPI.getCommitGraphHistory(100, true, showCheckpoints), // skipStats for fast load
           window.electronAPI.getStashes(),
         ])
 
@@ -1108,6 +1115,47 @@ export default function App() {
     return filtered
   }, [pullRequests, prFilter, prSort, prSearch])
 
+  // Filter graph commits based on history panel filters
+  const filteredGraphCommits = useMemo(() => {
+    let filtered = graphCommits
+
+    // Filter to only branch heads (commits with refs that are branches)
+    if (onlyBranchHeads) {
+      filtered = filtered.filter((commit) => {
+        // Keep commits that have branch refs (not just tags)
+        return commit.refs.some((ref) => {
+          const cleanRef = ref.replace('HEAD -> ', '')
+          // It's a branch if it's not a tag and doesn't look like a tag (v1.0.0 etc)
+          return !cleanRef.startsWith('tag:') && !cleanRef.match(/^v?\d+\.\d+/)
+        })
+      })
+    }
+
+    // Filter to only unmerged branches
+    if (onlyUnmergedBranches) {
+      // Get list of unmerged branch names from the branches data
+      const unmergedBranchNames = new Set(
+        branches.filter((b) => !b.isMerged).map((b) => b.name.replace('remotes/origin/', '').replace('origin/', ''))
+      )
+      // Also add the branch without origin/ prefix
+      branches
+        .filter((b) => !b.isMerged)
+        .forEach((b) => {
+          unmergedBranchNames.add(b.name)
+        })
+
+      filtered = filtered.filter((commit) => {
+        // Keep commits that are on unmerged branches (via refs)
+        return commit.refs.some((ref) => {
+          const cleanRef = ref.replace('HEAD -> ', '').replace('origin/', '')
+          return unmergedBranchNames.has(cleanRef)
+        })
+      })
+    }
+
+    return filtered
+  }, [graphCommits, onlyBranchHeads, onlyUnmergedBranches, branches])
+
   const formatDate = (dateStr?: string) => {
     if (!dateStr) return ''
     const date = new Date(dateStr)
@@ -1596,14 +1644,53 @@ export default function App() {
             <div className="column-drag-handle" title="Drag to reorder">
               ⋮⋮
             </div>
-            <div className="column-header">
-              <h2>
-                <span className="column-icon">◉</span>
-                Commits
-                {currentBranch && <code className="commit-hash branch-badge">{currentBranch}</code>}
-              </h2>
-              <span className="count-badge">{commits.length}</span>
+            <div
+              className={`column-header clickable-header ${radarCommitsFilterOpen ? 'open' : ''}`}
+              onClick={() => setRadarCommitsFilterOpen(!radarCommitsFilterOpen)}
+            >
+              <div className="column-title">
+                <h2>
+                  <span className="column-icon">◉</span>
+                  Commits
+                  {currentBranch && <code className="commit-hash branch-badge">{currentBranch}</code>}
+                </h2>
+                <span className={`header-chevron ${radarCommitsFilterOpen ? 'open' : ''}`}>▾</span>
+              </div>
+              <span className="count-badge">{filteredGraphCommits.length}</span>
             </div>
+            {radarCommitsFilterOpen && (
+              <div className="column-filter-panel">
+                <label className="column-filter-option">
+                  <input
+                    type="checkbox"
+                    checked={showCheckpoints}
+                    onChange={async (e) => {
+                      const newValue = e.target.checked
+                      setShowCheckpoints(newValue)
+                      const graphResult = await window.electronAPI.getCommitGraphHistory(100, true, newValue)
+                      setGraphCommits(graphResult)
+                    }}
+                  />
+                  <span>Checkpoints</span>
+                </label>
+                <label className="column-filter-option">
+                  <input
+                    type="checkbox"
+                    checked={onlyBranchHeads}
+                    onChange={(e) => setOnlyBranchHeads(e.target.checked)}
+                  />
+                  <span>Branch heads only</span>
+                </label>
+                <label className="column-filter-option">
+                  <input
+                    type="checkbox"
+                    checked={onlyUnmergedBranches}
+                    onChange={(e) => setOnlyUnmergedBranches(e.target.checked)}
+                  />
+                  <span>Unmerged only</span>
+                </label>
+              </div>
+            )}
             <div className="column-content">
               {/* Uncommitted changes as virtual commit */}
               {workingStatus?.hasChanges && (
@@ -1633,10 +1720,10 @@ export default function App() {
                 </div>
               )}
               {/* Actual commits */}
-              {commits.length === 0 && !workingStatus?.hasChanges ? (
+              {filteredGraphCommits.length === 0 && !workingStatus?.hasChanges ? (
                 <div className="empty-column">No commits found</div>
               ) : (
-                commits.map((commit) => (
+                filteredGraphCommits.map((commit) => (
                   <div
                     key={commit.hash}
                     className={`commit-item ${commit.isMerge ? 'merge' : ''} ${switching ? 'disabled' : ''}`}
@@ -2274,19 +2361,92 @@ export default function App() {
           {/* Main Content: Git Graph + Commit List */}
           {mainVisible && (
             <div className="focus-main">
-              <div className="focus-main-header">
-                <h2>
-                  <span className="column-icon">◉</span>
-                  History
-                  {currentBranch && <code className="commit-hash branch-badge">{currentBranch}</code>}
-                </h2>
+              <div
+                className={`focus-main-header clickable-header ${historyFilterOpen ? 'open' : ''}`}
+                onClick={() => setHistoryFilterOpen(!historyFilterOpen)}
+              >
+                <div className="column-title">
+                  <h2>
+                    <span className="column-icon">◉</span>
+                    History
+                    {currentBranch && <code className="commit-hash branch-badge">{currentBranch}</code>}
+                  </h2>
+                  <button
+                    className={`header-filter-btn ${historyFilterOpen ? 'active' : ''}`}
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      setHistoryFilterOpen(!historyFilterOpen)
+                    }}
+                    title="Filter"
+                  >
+                    <svg
+                      width="12"
+                      height="12"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    >
+                      <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"></polygon>
+                    </svg>
+                  </button>
+                </div>
               </div>
+              {historyFilterOpen && (
+                <div className="history-filter-panel">
+                  <label className="history-filter-option">
+                    <input
+                      type="checkbox"
+                      checked={showCheckpoints}
+                      onChange={async (e) => {
+                        const newValue = e.target.checked
+                        setShowCheckpoints(newValue)
+                        // Reload commits with new filter
+                        const graphResult = await window.electronAPI.getCommitGraphHistory(100, true, newValue)
+                        setGraphCommits(graphResult)
+                      }}
+                    />
+                    <span>Checkpoints</span>
+                    <span className="history-filter-hint">Show agent checkpoint commits</span>
+                  </label>
+                  <label className="history-filter-option">
+                    <input
+                      type="checkbox"
+                      checked={showGraphLines}
+                      onChange={(e) => setShowGraphLines(e.target.checked)}
+                    />
+                    <span>Graph</span>
+                    <span className="history-filter-hint">Show branch/merge lines</span>
+                  </label>
+                  <label className="history-filter-option">
+                    <input
+                      type="checkbox"
+                      checked={onlyBranchHeads}
+                      onChange={(e) => setOnlyBranchHeads(e.target.checked)}
+                    />
+                    <span>Branch heads only</span>
+                    <span className="history-filter-hint">Latest commit per branch</span>
+                  </label>
+                  <label className="history-filter-option">
+                    <input
+                      type="checkbox"
+                      checked={onlyUnmergedBranches}
+                      onChange={(e) => setOnlyUnmergedBranches(e.target.checked)}
+                    />
+                    <span>Unmerged only</span>
+                    <span className="history-filter-hint">Commits from unmerged branches</span>
+                  </label>
+                </div>
+              )}
               <div className="git-graph-container">
                 <GitGraph
-                  commits={graphCommits}
+                  commits={filteredGraphCommits}
                   selectedCommit={selectedCommit}
                   onSelectCommit={handleSelectCommit}
                   formatRelativeTime={formatRelativeTime}
+                  showGraph={showGraphLines}
                 />
               </div>
             </div>
@@ -2360,6 +2520,7 @@ interface GitGraphProps {
   selectedCommit: GraphCommit | null
   onSelectCommit: (commit: GraphCommit) => void
   formatRelativeTime: (date: string) => string
+  showGraph?: boolean // Show graph lines/nodes, when false it's a flat list
 }
 
 // Lane colors for branches
@@ -2374,7 +2535,7 @@ const LANE_COLORS = [
   '#FF6699', // pink
 ]
 
-function GitGraph({ commits, selectedCommit, onSelectCommit, formatRelativeTime }: GitGraphProps) {
+function GitGraph({ commits, selectedCommit, onSelectCommit, formatRelativeTime, showGraph = true }: GitGraphProps) {
   // Calculate lane assignments for the graph
   const { lanes, maxLane } = useMemo(() => {
     const laneMap = new Map<string, number>()
@@ -2435,89 +2596,91 @@ function GitGraph({ commits, selectedCommit, onSelectCommit, formatRelativeTime 
   }, [commits])
 
   return (
-    <div className="git-graph">
-      <svg
-        className="git-graph-svg"
-        width={graphWidth}
-        height={commits.length * ROW_HEIGHT}
-        style={{ minWidth: graphWidth }}
-      >
-        {/* Draw connecting lines */}
-        {commits.map((commit, idx) => {
-          const lane = lanes.get(commit.hash) || 0
-          const x = 10 + lane * LANE_WIDTH
-          const y = idx * ROW_HEIGHT + ROW_HEIGHT / 2
-          const color = LANE_COLORS[lane % LANE_COLORS.length]
+    <div className={`git-graph ${!showGraph ? 'no-graph' : ''}`}>
+      {showGraph && (
+        <svg
+          className="git-graph-svg"
+          width={graphWidth}
+          height={commits.length * ROW_HEIGHT}
+          style={{ minWidth: graphWidth }}
+        >
+          {/* Draw connecting lines */}
+          {commits.map((commit, idx) => {
+            const lane = lanes.get(commit.hash) || 0
+            const x = 10 + lane * LANE_WIDTH
+            const y = idx * ROW_HEIGHT + ROW_HEIGHT / 2
+            const color = LANE_COLORS[lane % LANE_COLORS.length]
 
-          return commit.parents.map((parentHash, pIdx) => {
-            const parentIdx = commitIndexMap.get(parentHash)
-            if (parentIdx === undefined) return null
+            return commit.parents.map((parentHash, pIdx) => {
+              const parentIdx = commitIndexMap.get(parentHash)
+              if (parentIdx === undefined) return null
 
-            const parentLane = lanes.get(parentHash) || 0
-            const px = 10 + parentLane * LANE_WIDTH
-            const py = parentIdx * ROW_HEIGHT + ROW_HEIGHT / 2
-            const parentColor = LANE_COLORS[parentLane % LANE_COLORS.length]
+              const parentLane = lanes.get(parentHash) || 0
+              const px = 10 + parentLane * LANE_WIDTH
+              const py = parentIdx * ROW_HEIGHT + ROW_HEIGHT / 2
+              const parentColor = LANE_COLORS[parentLane % LANE_COLORS.length]
 
-            // Draw curved line
-            if (lane === parentLane) {
-              // Straight line
-              return (
-                <line
-                  key={`${commit.hash}-${parentHash}`}
-                  x1={x}
-                  y1={y}
-                  x2={px}
-                  y2={py}
+              // Draw curved line
+              if (lane === parentLane) {
+                // Straight line
+                return (
+                  <line
+                    key={`${commit.hash}-${parentHash}`}
+                    x1={x}
+                    y1={y}
+                    x2={px}
+                    y2={py}
+                    stroke={color}
+                    strokeWidth={2}
+                  />
+                )
+              } else {
+                // Curved line for merges/branches
+                const midY = (y + py) / 2
+                return (
+                  <path
+                    key={`${commit.hash}-${parentHash}-${pIdx}`}
+                    d={`M ${x} ${y} C ${x} ${midY}, ${px} ${midY}, ${px} ${py}`}
+                    stroke={pIdx === 0 ? color : parentColor}
+                    strokeWidth={2}
+                    fill="none"
+                  />
+                )
+              }
+            })
+          })}
+
+          {/* Draw commit nodes */}
+          {commits.map((commit, idx) => {
+            const lane = lanes.get(commit.hash) || 0
+            const x = 10 + lane * LANE_WIDTH
+            const y = idx * ROW_HEIGHT + ROW_HEIGHT / 2
+            const color = LANE_COLORS[lane % LANE_COLORS.length]
+            const isSelected = selectedCommit?.hash === commit.hash
+
+            return (
+              <g key={commit.hash}>
+                {/* Selection ring */}
+                {isSelected && (
+                  <circle cx={x} cy={y} r={NODE_RADIUS + 3} fill="none" stroke={color} strokeWidth={2} opacity={0.5} />
+                )}
+                {/* Node */}
+                <circle
+                  cx={x}
+                  cy={y}
+                  r={commit.isMerge ? NODE_RADIUS + 1 : NODE_RADIUS}
+                  fill={commit.isMerge ? 'var(--bg-primary)' : color}
                   stroke={color}
-                  strokeWidth={2}
+                  strokeWidth={commit.isMerge ? 2 : 0}
                 />
-              )
-            } else {
-              // Curved line for merges/branches
-              const midY = (y + py) / 2
-              return (
-                <path
-                  key={`${commit.hash}-${parentHash}-${pIdx}`}
-                  d={`M ${x} ${y} C ${x} ${midY}, ${px} ${midY}, ${px} ${py}`}
-                  stroke={pIdx === 0 ? color : parentColor}
-                  strokeWidth={2}
-                  fill="none"
-                />
-              )
-            }
-          })
-        })}
-
-        {/* Draw commit nodes */}
-        {commits.map((commit, idx) => {
-          const lane = lanes.get(commit.hash) || 0
-          const x = 10 + lane * LANE_WIDTH
-          const y = idx * ROW_HEIGHT + ROW_HEIGHT / 2
-          const color = LANE_COLORS[lane % LANE_COLORS.length]
-          const isSelected = selectedCommit?.hash === commit.hash
-
-          return (
-            <g key={commit.hash}>
-              {/* Selection ring */}
-              {isSelected && (
-                <circle cx={x} cy={y} r={NODE_RADIUS + 3} fill="none" stroke={color} strokeWidth={2} opacity={0.5} />
-              )}
-              {/* Node */}
-              <circle
-                cx={x}
-                cy={y}
-                r={commit.isMerge ? NODE_RADIUS + 1 : NODE_RADIUS}
-                fill={commit.isMerge ? 'var(--bg-primary)' : color}
-                stroke={color}
-                strokeWidth={commit.isMerge ? 2 : 0}
-              />
-            </g>
-          )
-        })}
-      </svg>
+              </g>
+            )
+          })}
+        </svg>
+      )}
 
       {/* Commit list */}
-      <div className="git-graph-list" style={{ marginLeft: graphWidth }}>
+      <div className="git-graph-list" style={{ marginLeft: showGraph ? graphWidth : 0 }}>
         {commits.map((commit) => (
           <div
             key={commit.hash}
@@ -3160,6 +3323,11 @@ function StagingPanel({ workingStatus, currentBranch, onRefresh, onStatusChange 
   const [pushAfterCommit, setPushAfterCommit] = useState(true)
   const [fileContextMenu, setFileContextMenu] = useState<{ x: number; y: number; file: UncommittedFile } | null>(null)
   const fileMenuRef = useRef<HTMLDivElement>(null)
+  // New branch creation
+  const [createNewBranch, setCreateNewBranch] = useState(false)
+  const [branchFolder, setBranchFolder] = useState<string>('feature')
+  const [customFolder, setCustomFolder] = useState('')
+  const [branchName, setBranchName] = useState('')
 
   const stagedFiles = workingStatus.files.filter((f) => f.staged)
   const unstagedFiles = workingStatus.files.filter((f) => !f.staged)
@@ -3276,34 +3444,58 @@ function StagingPanel({ workingStatus, currentBranch, onRefresh, onStatusChange 
     setFileContextMenu({ x: e.clientX, y: e.clientY, file })
   }
 
+  // Get the effective folder name (custom or preset)
+  const effectiveFolder = branchFolder === 'custom' ? customFolder.trim() : branchFolder
+  const fullBranchName = createNewBranch && branchName.trim() ? `${effectiveFolder}/${branchName.trim()}` : null
+
   // Commit with optional force to skip behind-check
   const handleCommit = async (force: boolean = false) => {
     if (!commitMessage.trim() || stagedFiles.length === 0) return
 
     setIsCommitting(true)
     try {
+      // If creating a new branch, do that first
+      if (fullBranchName) {
+        onStatusChange({ type: 'info', message: `Creating branch ${fullBranchName}...` })
+        const branchResult = await window.electronAPI.createBranch(fullBranchName, true)
+        if (!branchResult.success) {
+          onStatusChange({ type: 'error', message: `Failed to create branch: ${branchResult.message}` })
+          setIsCommitting(false)
+          return
+        }
+      }
+
       const result = await window.electronAPI.commitChanges(
         commitMessage.trim(),
         commitDescription.trim() || undefined,
         force
       )
       if (result.success) {
+        const targetBranch = fullBranchName || currentBranch
         // If push after commit is enabled, push the branch
-        if (pushAfterCommit && currentBranch) {
+        if (pushAfterCommit && targetBranch) {
           onStatusChange({ type: 'info', message: 'Pushing to remote...' })
-          const pushResult = await window.electronAPI.pushBranch(currentBranch, true)
+          const pushResult = await window.electronAPI.pushBranch(targetBranch, true)
           if (pushResult.success) {
-            onStatusChange({ type: 'success', message: `Committed and pushed to ${currentBranch}` })
+            onStatusChange({ type: 'success', message: `Committed and pushed to ${targetBranch}` })
           } else {
             // Commit succeeded but push failed
             onStatusChange({ type: 'error', message: `Committed, but push failed: ${pushResult.message}` })
           }
         } else {
-          onStatusChange({ type: 'success', message: result.message })
+          onStatusChange({
+            type: 'success',
+            message: fullBranchName ? `Created ${fullBranchName} and committed` : result.message,
+          })
         }
         setCommitMessage('')
         setCommitDescription('')
         setBehindPrompt(null)
+        // Reset branch creation fields
+        if (fullBranchName) {
+          setCreateNewBranch(false)
+          setBranchName('')
+        }
         await onRefresh()
       } else if (result.behindCount && result.behindCount > 0) {
         // Origin has moved ahead - prompt user
@@ -3562,11 +3754,60 @@ function StagingPanel({ workingStatus, currentBranch, onRefresh, onStatusChange 
           onChange={(e) => setCommitDescription(e.target.value)}
           rows={3}
         />
+        {/* New Branch Option */}
+        <div className="commit-options">
+          <label className="commit-option-checkbox">
+            <input
+              type="checkbox"
+              checked={createNewBranch}
+              onChange={(e) => setCreateNewBranch(e.target.checked)}
+            />
+            <span>Create new branch</span>
+          </label>
+        </div>
+        {createNewBranch && (
+          <div className="new-branch-fields">
+            <div className="branch-folder-row">
+              <select
+                className="branch-folder-select"
+                value={branchFolder}
+                onChange={(e) => setBranchFolder(e.target.value)}
+              >
+                <option value="feature">feature/</option>
+                <option value="bugfix">bugfix/</option>
+                <option value="hotfix">hotfix/</option>
+                <option value="custom">custom...</option>
+              </select>
+              {branchFolder === 'custom' && (
+                <input
+                  type="text"
+                  className="branch-custom-folder"
+                  placeholder="folder"
+                  value={customFolder}
+                  onChange={(e) => setCustomFolder(e.target.value.replace(/[^a-zA-Z0-9-_]/g, ''))}
+                />
+              )}
+              <span className="branch-separator">/</span>
+              <input
+                type="text"
+                className="branch-name-input"
+                placeholder="branch-name"
+                value={branchName}
+                onChange={(e) => setBranchName(e.target.value.replace(/[^a-zA-Z0-9-_]/g, ''))}
+              />
+            </div>
+            {fullBranchName && (
+              <div className="branch-preview">
+                → <code>{fullBranchName}</code>
+              </div>
+            )}
+          </div>
+        )}
         <div className="commit-options">
           <label className="commit-option-checkbox">
             <input type="checkbox" checked={pushAfterCommit} onChange={(e) => setPushAfterCommit(e.target.checked)} />
             <span>
-              Push to <code>{currentBranch || 'remote'}</code> after commit
+              Push to <code>{fullBranchName || currentBranch || 'remote'}</code> after commit
             </span>
           </label>
         </div>
@@ -3599,15 +3840,27 @@ function StagingPanel({ workingStatus, currentBranch, onRefresh, onStatusChange 
           <button
             className="btn btn-primary commit-btn"
             onClick={() => handleCommit()}
-            disabled={!commitMessage.trim() || stagedFiles.length === 0 || isCommitting}
+            disabled={
+              !commitMessage.trim() ||
+              stagedFiles.length === 0 ||
+              isCommitting ||
+              (createNewBranch && !branchName.trim()) ||
+              (createNewBranch && branchFolder === 'custom' && !customFolder.trim())
+            }
           >
             {isCommitting
-              ? pushAfterCommit
-                ? 'Committing & Pushing...'
-                : 'Committing...'
-              : pushAfterCommit
-                ? `Commit & Push ${stagedFiles.length} file${stagedFiles.length !== 1 ? 's' : ''}`
-                : `Commit ${stagedFiles.length} file${stagedFiles.length !== 1 ? 's' : ''}`}
+              ? fullBranchName
+                ? 'Creating branch...'
+                : pushAfterCommit
+                  ? 'Committing & Pushing...'
+                  : 'Committing...'
+              : fullBranchName
+                ? pushAfterCommit
+                  ? `Create Branch & Commit & Push`
+                  : `Create Branch & Commit`
+                : pushAfterCommit
+                  ? `Commit & Push ${stagedFiles.length} file${stagedFiles.length !== 1 ? 's' : ''}`
+                  : `Commit ${stagedFiles.length} file${stagedFiles.length !== 1 ? 's' : ''}`}
           </button>
         )}
       </div>

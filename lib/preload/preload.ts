@@ -37,8 +37,8 @@ const electronAPI = {
   resetToCommit: (commitHash: string, mode: 'soft' | 'mixed' | 'hard') =>
     ipcRenderer.invoke('reset-to-commit', commitHash, mode),
   // Focus mode APIs
-  getCommitGraphHistory: (limit?: number, skipStats?: boolean) =>
-    ipcRenderer.invoke('get-commit-graph-history', limit, skipStats),
+  getCommitGraphHistory: (limit?: number, skipStats?: boolean, showCheckpoints?: boolean) =>
+    ipcRenderer.invoke('get-commit-graph-history', limit, skipStats, showCheckpoints),
   getCommitDiff: (commitHash: string) => ipcRenderer.invoke('get-commit-diff', commitHash),
   getBranchDiff: (branchName: string) => ipcRenderer.invoke('get-branch-diff', branchName),
   getStashes: () => ipcRenderer.invoke('get-stashes'),
