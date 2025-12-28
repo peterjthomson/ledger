@@ -397,6 +397,31 @@ export interface ElectronAPI {
     cssVars: Record<string, string>
   } | null>
   clearCustomTheme: () => Promise<{ success: boolean }>
+  // Canvas operations
+  getCanvases: () => Promise<CanvasConfig[]>
+  saveCanvases: (canvases: CanvasConfig[]) => Promise<{ success: boolean }>
+  getActiveCanvasId: () => Promise<string>
+  saveActiveCanvasId: (canvasId: string) => Promise<{ success: boolean }>
+  addCanvas: (canvas: CanvasConfig) => Promise<{ success: boolean }>
+  removeCanvas: (canvasId: string) => Promise<{ success: boolean }>
+  updateCanvas: (canvasId: string, updates: Partial<CanvasConfig>) => Promise<{ success: boolean }>
+}
+
+// Canvas configuration types for persistence
+interface CanvasColumnConfig {
+  id: string
+  slotType: 'list' | 'editor' | 'viz'
+  panel: string
+  width: number | 'flex'
+  minWidth?: number
+  config?: Record<string, unknown>
+}
+
+interface CanvasConfig {
+  id: string
+  name: string
+  columns: CanvasColumnConfig[]
+  isPreset?: boolean
 }
 
 declare global {

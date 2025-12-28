@@ -33,3 +33,7 @@ export type { CanvasSwitcherProps } from './CanvasSwitcher'
 // Navigation hook
 export { useCanvasNavigation } from './useCanvasNavigation'
 export type { UseCanvasNavigationOptions, CanvasNavigationResult } from './useCanvasNavigation'
+
+// Persistence hook
+export { useCanvasPersistence } from './useCanvasPersistence'
+export type { UseCanvasPersistenceOptions } from './useCanvasPersistence'

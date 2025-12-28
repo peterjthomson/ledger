@@ -83,6 +83,14 @@ const electronAPI = {
   loadVSCodeTheme: () => ipcRenderer.invoke('load-vscode-theme'),
   loadBuiltInTheme: (themeFileName: string) => ipcRenderer.invoke('load-built-in-theme', themeFileName),
   clearCustomTheme: () => ipcRenderer.invoke('clear-custom-theme'),
+  // Canvas operations
+  getCanvases: () => ipcRenderer.invoke('get-canvases'),
+  saveCanvases: (canvases: unknown[]) => ipcRenderer.invoke('save-canvases', canvases),
+  getActiveCanvasId: () => ipcRenderer.invoke('get-active-canvas-id'),
+  saveActiveCanvasId: (canvasId: string) => ipcRenderer.invoke('save-active-canvas-id', canvasId),
+  addCanvas: (canvas: unknown) => ipcRenderer.invoke('add-canvas', canvas),
+  removeCanvas: (canvasId: string) => ipcRenderer.invoke('remove-canvas', canvasId),
+  updateCanvas: (canvasId: string, updates: unknown) => ipcRenderer.invoke('update-canvas', canvasId, updates),
 }
 
 // Use `contextBridge` APIs to expose APIs to

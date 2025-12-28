@@ -11,11 +11,34 @@ interface VSCodeTheme {
   colors: Record<string, string>;
 }
 
+// Canvas types (mirrored from app/types/app-types.ts for main process)
+type SlotType = 'list' | 'editor' | 'viz';
+type PanelType = string; // Simplified for settings
+
+interface CanvasColumn {
+  id: string;
+  slotType: SlotType;
+  panel: PanelType;
+  width: number | 'flex';
+  minWidth?: number;
+  config?: Record<string, unknown>;
+}
+
+interface CanvasConfig {
+  id: string;
+  name: string;
+  columns: CanvasColumn[];
+  isPreset?: boolean;
+}
+
 interface Settings {
   lastRepoPath?: string;
   viewMode?: ViewMode;
   themeMode?: ThemeMode;
   customTheme?: VSCodeTheme;
+  // Canvas settings
+  canvases?: CanvasConfig[];
+  activeCanvasId?: string;
 }
 
 const settingsPath = path.join(app.getPath('userData'), 'ledger-settings.json');
@@ -169,5 +192,57 @@ export function mapVSCodeThemeToCSS(theme: VSCodeTheme): Record<string, string> 
     '--scrollbar': colors['scrollbarSlider.background'] || '#64646466',
     '--scrollbar-hover': colors['scrollbarSlider.hoverBackground'] || '#646464b3',
   };
+}
+
+// Canvas persistence functions
+export function getCanvases(): CanvasConfig[] {
+  const settings = loadSettings();
+  return settings.canvases || [];
+}
+
+export function saveCanvases(canvases: CanvasConfig[]): void {
+  const settings = loadSettings();
+  // Only save non-preset canvases (presets are defined in code)
+  settings.canvases = canvases.filter(c => !c.isPreset);
+  saveSettings(settings);
+}
+
+export function getActiveCanvasId(): string {
+  const settings = loadSettings();
+  return settings.activeCanvasId || 'focus';
+}
+
+export function saveActiveCanvasId(canvasId: string): void {
+  const settings = loadSettings();
+  settings.activeCanvasId = canvasId;
+  saveSettings(settings);
+}
+
+export function addCanvas(canvas: CanvasConfig): void {
+  const settings = loadSettings();
+  const canvases = settings.canvases || [];
+  // Don't add if already exists
+  if (canvases.some(c => c.id === canvas.id)) return;
+  canvases.push(canvas);
+  settings.canvases = canvases;
+  saveSettings(settings);
+}
+
+export function removeCanvas(canvasId: string): void {
+  const settings = loadSettings();
+  settings.canvases = (settings.canvases || []).filter(c => c.id !== canvasId);
+  // If we removed the active canvas, reset to focus
+  if (settings.activeCanvasId === canvasId) {
+    settings.activeCanvasId = 'focus';
+  }
+  saveSettings(settings);
+}
+
+export function updateCanvas(canvasId: string, updates: Partial<CanvasConfig>): void {
+  const settings = loadSettings();
+  settings.canvases = (settings.canvases || []).map(c => 
+    c.id === canvasId ? { ...c, ...updates } : c
+  );
+  saveSettings(settings);
 }
 

@@ -70,6 +70,14 @@ import {
   loadBuiltInTheme,
   clearCustomTheme,
   mapVSCodeThemeToCSS,
+  // Canvas functions
+  getCanvases,
+  saveCanvases,
+  getActiveCanvasId,
+  saveActiveCanvasId,
+  addCanvas,
+  removeCanvas,
+  updateCanvas,
 } from './settings-service'
 
 // Check for --repo command line argument (for testing)
@@ -557,6 +565,40 @@ app.whenReady().then(() => {
       }
     }
     return null
+  })
+
+  // Canvas handlers
+  ipcMain.handle('get-canvases', () => {
+    return getCanvases()
+  })
+
+  ipcMain.handle('save-canvases', (_event, canvases: unknown[]) => {
+    saveCanvases(canvases as any)
+    return { success: true }
+  })
+
+  ipcMain.handle('get-active-canvas-id', () => {
+    return getActiveCanvasId()
+  })
+
+  ipcMain.handle('save-active-canvas-id', (_event, canvasId: string) => {
+    saveActiveCanvasId(canvasId)
+    return { success: true }
+  })
+
+  ipcMain.handle('add-canvas', (_event, canvas: unknown) => {
+    addCanvas(canvas as any)
+    return { success: true }
+  })
+
+  ipcMain.handle('remove-canvas', (_event, canvasId: string) => {
+    removeCanvas(canvasId)
+    return { success: true }
+  })
+
+  ipcMain.handle('update-canvas', (_event, canvasId: string, updates: unknown) => {
+    updateCanvas(canvasId, updates as any)
+    return { success: true }
   })
 
   // Set app user model id for windows
