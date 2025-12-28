@@ -2446,8 +2446,8 @@ export default function App() {
                           className={`sidebar-item ${sidebarFocus?.type === 'stash' && (sidebarFocus.data as StashEntry).index === stash.index ? 'selected' : ''}`}
                           onClick={() => handleSidebarFocus('stash', stash)}
                         >
-                          <span className="sidebar-item-name" title={stash.message}>
-                            stash@{`{${stash.index}}`}: {stash.message}
+                          <span className="sidebar-item-name" title={`stash@{${stash.index}}: ${stash.message}`}>
+                            {stash.message || `Stash ${stash.index}`}
                           </span>
                         </li>
                       ))
@@ -3446,9 +3446,15 @@ function StagingPanel({ workingStatus, currentBranch, onRefresh, onStatusChange 
   const [branchFolder, setBranchFolder] = useState<string>('feature')
   const [customFolder, setCustomFolder] = useState('')
   const [branchName, setBranchName] = useState('')
+  // PR creation option (inline with commit flow)
+  const [createPR, setCreatePR] = useState(false)
+  const [prTitle, setPrTitle] = useState('')
+  const [prBody, setPrBody] = useState('')
+  const [prDraft, setPrDraft] = useState(false)
 
   const stagedFiles = workingStatus.files.filter((f) => f.staged)
   const unstagedFiles = workingStatus.files.filter((f) => !f.staged)
+
 
   // Close file context menu when clicking outside
   useEffect(() => {
@@ -3590,22 +3596,66 @@ function StagingPanel({ workingStatus, currentBranch, onRefresh, onStatusChange 
       )
       if (result.success) {
         const targetBranch = fullBranchName || currentBranch
+        let finalMessage = fullBranchName ? `Created ${fullBranchName} and committed` : result.message
+
         // If push after commit is enabled, push the branch
         if (pushAfterCommit && targetBranch) {
           onStatusChange({ type: 'info', message: 'Pushing to remote...' })
           const pushResult = await window.electronAPI.pushBranch(targetBranch, true)
           if (pushResult.success) {
-            onStatusChange({ type: 'success', message: `Committed and pushed to ${targetBranch}` })
+            finalMessage = `Committed and pushed to ${targetBranch}`
+
+            // If create PR is enabled, create the PR
+            if (createPR) {
+              onStatusChange({ type: 'info', message: 'Creating pull request...' })
+              const prTitleToUse = prTitle.trim() || generatePRTitle(targetBranch)
+              const prResult = await window.electronAPI.createPullRequest({
+                title: prTitleToUse,
+                body: prBody.trim() || undefined,
+                headBranch: targetBranch,
+                draft: prDraft,
+                web: false,
+              })
+              if (prResult.success) {
+                finalMessage = `Committed, pushed, and created PR for ${targetBranch}`
+              } else {
+                // PR creation failed but commit+push succeeded
+                onStatusChange({
+                  type: 'error',
+                  message: `Committed and pushed, but PR creation failed: ${prResult.message}`,
+                })
+                // Reset form state anyway since commit+push worked
+                setCommitMessage('')
+                setCommitDescription('')
+                setBehindPrompt(null)
+                if (fullBranchName) {
+                  setCreateNewBranch(false)
+                  setBranchName('')
+                }
+                setCreatePR(false)
+                setPrTitle('')
+                setPrBody('')
+                setPrDraft(false)
+                await onRefresh()
+                return
+              }
+            }
           } else {
             // Commit succeeded but push failed
             onStatusChange({ type: 'error', message: `Committed, but push failed: ${pushResult.message}` })
+            setCommitMessage('')
+            setCommitDescription('')
+            setBehindPrompt(null)
+            if (fullBranchName) {
+              setCreateNewBranch(false)
+              setBranchName('')
+            }
+            await onRefresh()
+            return
           }
-        } else {
-          onStatusChange({
-            type: 'success',
-            message: fullBranchName ? `Created ${fullBranchName} and committed` : result.message,
-          })
         }
+
+        onStatusChange({ type: 'success', message: finalMessage })
         setCommitMessage('')
         setCommitDescription('')
         setBehindPrompt(null)
@@ -3613,6 +3663,13 @@ function StagingPanel({ workingStatus, currentBranch, onRefresh, onStatusChange 
         if (fullBranchName) {
           setCreateNewBranch(false)
           setBranchName('')
+        }
+        // Reset PR creation fields
+        if (createPR) {
+          setCreatePR(false)
+          setPrTitle('')
+          setPrBody('')
+          setPrDraft(false)
         }
         await onRefresh()
       } else if (result.behindCount && result.behindCount > 0) {
@@ -3665,6 +3722,14 @@ function StagingPanel({ workingStatus, currentBranch, onRefresh, onStatusChange 
   const handleCommitAnyway = async () => {
     setBehindPrompt(null)
     await handleCommit(true)
+  }
+
+  // Auto-generate PR title from branch name
+  const generatePRTitle = (branch: string) => {
+    return branch
+      .replace(/^(feature|bugfix|hotfix)\//, '')
+      .replace(/[-_]/g, ' ')
+      .replace(/\b\w/g, (c) => c.toUpperCase())
   }
 
   // File status helpers
@@ -3937,6 +4002,41 @@ function StagingPanel({ workingStatus, currentBranch, onRefresh, onStatusChange 
             </span>
           </label>
         </div>
+
+        {/* Create PR Option - only show when pushing and not on main/master */}
+        {pushAfterCommit && !['main', 'master'].includes(fullBranchName || currentBranch) && (
+          <>
+            <div className="commit-options">
+              <label className="commit-option-checkbox">
+                <input type="checkbox" checked={createPR} onChange={(e) => setCreatePR(e.target.checked)} />
+                <span>Create Pull Request after push</span>
+              </label>
+            </div>
+            {createPR && (
+              <div className="pr-inline-fields">
+                <input
+                  type="text"
+                  className="pr-inline-title"
+                  value={prTitle}
+                  onChange={(e) => setPrTitle(e.target.value)}
+                  placeholder={`PR title (default: ${generatePRTitle(fullBranchName || currentBranch)})`}
+                />
+                <textarea
+                  className="pr-inline-body"
+                  value={prBody}
+                  onChange={(e) => setPrBody(e.target.value)}
+                  placeholder="Description (optional)"
+                  rows={2}
+                />
+                <label className="commit-option-checkbox pr-draft-checkbox">
+                  <input type="checkbox" checked={prDraft} onChange={(e) => setPrDraft(e.target.checked)} />
+                  <span>Create as draft</span>
+                </label>
+              </div>
+            )}
+          </>
+        )}
+
         {/* Behind Origin Prompt */}
         {behindPrompt && (
           <div className="behind-prompt">
@@ -3975,17 +4075,23 @@ function StagingPanel({ workingStatus, currentBranch, onRefresh, onStatusChange 
             }
           >
             {isCommitting
-              ? fullBranchName
-                ? 'Creating branch...'
-                : pushAfterCommit
-                  ? 'Committing & Pushing...'
-                  : 'Committing...'
+              ? createPR
+                ? 'Creating PR...'
+                : fullBranchName
+                  ? 'Creating branch...'
+                  : pushAfterCommit
+                    ? 'Committing & Pushing...'
+                    : 'Committing...'
               : fullBranchName
                 ? pushAfterCommit
-                  ? `Create Branch & Commit & Push`
-                  : `Create Branch & Commit`
+                  ? createPR
+                    ? 'Branch → Commit → Push → PR'
+                    : 'Create Branch & Commit & Push'
+                  : 'Create Branch & Commit'
                 : pushAfterCommit
-                  ? `Commit & Push ${stagedFiles.length} file${stagedFiles.length !== 1 ? 's' : ''}`
+                  ? createPR
+                    ? 'Commit → Push → Create PR'
+                    : `Commit & Push ${stagedFiles.length} file${stagedFiles.length !== 1 ? 's' : ''}`
                   : `Commit ${stagedFiles.length} file${stagedFiles.length !== 1 ? 's' : ''}`}
           </button>
         )}
@@ -4913,8 +5019,7 @@ function StashDetailPanel({
       {/* Header */}
       <div className="stash-header">
         <div className="detail-type-badge">Stash</div>
-        <h3 className="stash-title">stash@{`{${stash.index}}`}</h3>
-        <p className="stash-message">{stash.message}</p>
+        <h3 className="stash-title">{stash.message || `Stash ${stash.index}`}</h3>
         <div className="stash-meta">
           {stash.branch && <code className="stash-branch">{stash.branch}</code>}
           <span className="stash-date">{formatRelativeTime(stash.date)}</span>

@@ -2453,6 +2453,71 @@ body,
   color: var(--text-primary);
 }
 
+/* Inline PR Creation Fields */
+.pr-inline-fields {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px;
+  background: var(--bg-tertiary);
+  border-radius: var(--radius-sm);
+  margin-top: 4px;
+}
+
+.pr-inline-title {
+  width: 100%;
+  padding: 8px 10px;
+  font-size: 12px;
+  font-family: inherit;
+  background: var(--bg-primary);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--text-primary);
+}
+
+.pr-inline-title:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px var(--accent-glow);
+}
+
+.pr-inline-title::placeholder {
+  color: var(--text-muted);
+  font-size: 11px;
+}
+
+.pr-inline-body {
+  width: 100%;
+  padding: 8px 10px;
+  font-size: 12px;
+  font-family: inherit;
+  background: var(--bg-primary);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--text-primary);
+  resize: vertical;
+  min-height: 48px;
+}
+
+.pr-inline-body:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px var(--accent-glow);
+}
+
+.pr-inline-body::placeholder {
+  color: var(--text-muted);
+}
+
+.pr-draft-checkbox {
+  margin-top: 0;
+}
+
+.pr-draft-checkbox span {
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
 /* Main Area */
 .focus-main {
   flex: 1;
