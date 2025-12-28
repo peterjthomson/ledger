@@ -2453,79 +2453,69 @@ body,
   color: var(--text-primary);
 }
 
-/* PR Creation Prompt */
-.pr-prompt {
-  background: color-mix(in srgb, var(--success, #22c55e) 10%, transparent);
-  border: 1px solid var(--success, #22c55e);
-  border-radius: var(--radius-sm);
-  padding: 12px;
+/* Inline PR Creation Fields */
+.pr-inline-fields {
   display: flex;
   flex-direction: column;
-  gap: 10px;
-}
-
-.pr-prompt-message {
-  font-size: 12px;
-  font-weight: 500;
-  color: var(--text-primary);
-}
-
-.pr-prompt-message code {
-  font-family: var(--font-mono);
-  font-size: 11px;
-  background: var(--bg-tertiary);
-  padding: 1px 4px;
-  border-radius: 3px;
-}
-
-.pr-prompt-actions {
-  display: flex;
   gap: 8px;
+  padding: 10px;
+  background: var(--bg-tertiary);
+  border-radius: var(--radius-sm);
+  margin-top: 4px;
 }
 
-.pr-prompt-actions .btn {
-  flex: 1;
-  font-size: 11px;
-  padding: 8px 12px;
-}
-
-.pr-prompt-actions .btn-ghost {
-  flex: 0 0 auto;
-  background: transparent;
-  border: 1px solid var(--border);
-  color: var(--text-muted);
-}
-
-.pr-prompt-actions .btn-ghost:hover {
-  background: var(--bg-secondary);
-  color: var(--text-primary);
-}
-
-/* Staging PR Form */
-.staging-pr-form {
-  margin-top: 0;
-  padding: 12px;
-  background: var(--bg-secondary);
+.pr-inline-title {
+  width: 100%;
+  padding: 8px 10px;
+  font-size: 12px;
+  font-family: inherit;
+  background: var(--bg-primary);
   border: 1px solid var(--border);
   border-radius: var(--radius-sm);
+  color: var(--text-primary);
 }
 
-.pr-form-branch-info {
+.pr-inline-title:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px var(--accent-glow);
+}
+
+.pr-inline-title::placeholder {
+  color: var(--text-muted);
+  font-size: 11px;
+}
+
+.pr-inline-body {
+  width: 100%;
+  padding: 8px 10px;
+  font-size: 12px;
+  font-family: inherit;
+  background: var(--bg-primary);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--text-primary);
+  resize: vertical;
+  min-height: 48px;
+}
+
+.pr-inline-body:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px var(--accent-glow);
+}
+
+.pr-inline-body::placeholder {
+  color: var(--text-muted);
+}
+
+.pr-draft-checkbox {
+  margin-top: 0;
+}
+
+.pr-draft-checkbox span {
   font-size: 11px;
   color: var(--text-muted);
-  margin-bottom: 12px;
-  display: flex;
-  align-items: center;
-  gap: 6px;
-}
-
-.pr-form-branch-info code {
-  font-family: var(--font-mono);
-  font-size: 11px;
-  background: var(--bg-tertiary);
-  padding: 2px 6px;
-  border-radius: 3px;
-  color: var(--text-primary);
 }
 
 /* Main Area */

@@ -3446,14 +3446,11 @@ function StagingPanel({ workingStatus, currentBranch, onRefresh, onStatusChange 
   const [branchFolder, setBranchFolder] = useState<string>('feature')
   const [customFolder, setCustomFolder] = useState('')
   const [branchName, setBranchName] = useState('')
-  // PR creation after commit+push
-  const [showPRPrompt, setShowPRPrompt] = useState(false)
-  const [showPRForm, setShowPRForm] = useState(false)
+  // PR creation option (inline with commit flow)
+  const [createPR, setCreatePR] = useState(false)
   const [prTitle, setPrTitle] = useState('')
   const [prBody, setPrBody] = useState('')
   const [prDraft, setPrDraft] = useState(false)
-  const [creatingPR, setCreatingPR] = useState(false)
-  const [pushedBranch, setPushedBranch] = useState<string | null>(null)
 
   const stagedFiles = workingStatus.files.filter((f) => f.staged)
   const unstagedFiles = workingStatus.files.filter((f) => !f.staged)
@@ -3599,34 +3596,66 @@ function StagingPanel({ workingStatus, currentBranch, onRefresh, onStatusChange 
       )
       if (result.success) {
         const targetBranch = fullBranchName || currentBranch
+        let finalMessage = fullBranchName ? `Created ${fullBranchName} and committed` : result.message
+
         // If push after commit is enabled, push the branch
         if (pushAfterCommit && targetBranch) {
           onStatusChange({ type: 'info', message: 'Pushing to remote...' })
           const pushResult = await window.electronAPI.pushBranch(targetBranch, true)
           if (pushResult.success) {
-            onStatusChange({ type: 'success', message: `Committed and pushed to ${targetBranch}` })
-            // Show PR prompt if not on main/master
-            const targetIsMainOrMaster = ['main', 'master'].includes(targetBranch)
-            if (!targetIsMainOrMaster) {
-              setPushedBranch(targetBranch)
-              setShowPRPrompt(true)
-              // Auto-generate PR title from branch name
-              const generatedTitle = targetBranch
-                .replace(/^(feature|bugfix|hotfix)\//, '')
-                .replace(/[-_]/g, ' ')
-                .replace(/\b\w/g, (c) => c.toUpperCase())
-              setPrTitle(generatedTitle)
+            finalMessage = `Committed and pushed to ${targetBranch}`
+
+            // If create PR is enabled, create the PR
+            if (createPR) {
+              onStatusChange({ type: 'info', message: 'Creating pull request...' })
+              const prTitleToUse = prTitle.trim() || generatePRTitle(targetBranch)
+              const prResult = await window.electronAPI.createPullRequest({
+                title: prTitleToUse,
+                body: prBody.trim() || undefined,
+                headBranch: targetBranch,
+                draft: prDraft,
+                web: false,
+              })
+              if (prResult.success) {
+                finalMessage = `Committed, pushed, and created PR for ${targetBranch}`
+              } else {
+                // PR creation failed but commit+push succeeded
+                onStatusChange({
+                  type: 'error',
+                  message: `Committed and pushed, but PR creation failed: ${prResult.message}`,
+                })
+                // Reset form state anyway since commit+push worked
+                setCommitMessage('')
+                setCommitDescription('')
+                setBehindPrompt(null)
+                if (fullBranchName) {
+                  setCreateNewBranch(false)
+                  setBranchName('')
+                }
+                setCreatePR(false)
+                setPrTitle('')
+                setPrBody('')
+                setPrDraft(false)
+                await onRefresh()
+                return
+              }
             }
           } else {
             // Commit succeeded but push failed
             onStatusChange({ type: 'error', message: `Committed, but push failed: ${pushResult.message}` })
+            setCommitMessage('')
+            setCommitDescription('')
+            setBehindPrompt(null)
+            if (fullBranchName) {
+              setCreateNewBranch(false)
+              setBranchName('')
+            }
+            await onRefresh()
+            return
           }
-        } else {
-          onStatusChange({
-            type: 'success',
-            message: fullBranchName ? `Created ${fullBranchName} and committed` : result.message,
-          })
         }
+
+        onStatusChange({ type: 'success', message: finalMessage })
         setCommitMessage('')
         setCommitDescription('')
         setBehindPrompt(null)
@@ -3634,6 +3663,13 @@ function StagingPanel({ workingStatus, currentBranch, onRefresh, onStatusChange 
         if (fullBranchName) {
           setCreateNewBranch(false)
           setBranchName('')
+        }
+        // Reset PR creation fields
+        if (createPR) {
+          setCreatePR(false)
+          setPrTitle('')
+          setPrBody('')
+          setPrDraft(false)
         }
         await onRefresh()
       } else if (result.behindCount && result.behindCount > 0) {
@@ -3688,58 +3724,12 @@ function StagingPanel({ workingStatus, currentBranch, onRefresh, onStatusChange 
     await handleCommit(true)
   }
 
-  // PR creation handlers
-  const handleDismissPRPrompt = () => {
-    setShowPRPrompt(false)
-    setPushedBranch(null)
-    setPrTitle('')
-    setPrBody('')
-  }
-
-  const handleStartPRCreation = () => {
-    setShowPRPrompt(false)
-    setShowPRForm(true)
-  }
-
-  const handleCancelPRCreation = () => {
-    setShowPRForm(false)
-    setPushedBranch(null)
-    setPrTitle('')
-    setPrBody('')
-    setPrDraft(false)
-  }
-
-  const handleSubmitPR = async () => {
-    if (!prTitle.trim() || !pushedBranch) return
-
-    setCreatingPR(true)
-    onStatusChange({ type: 'info', message: `Creating pull request for ${pushedBranch}...` })
-
-    try {
-      const result = await window.electronAPI.createPullRequest({
-        title: prTitle.trim(),
-        body: prBody.trim() || undefined,
-        headBranch: pushedBranch,
-        draft: prDraft,
-        web: false,
-      })
-
-      if (result.success) {
-        onStatusChange({ type: 'success', message: result.message })
-        setShowPRForm(false)
-        setPushedBranch(null)
-        setPrTitle('')
-        setPrBody('')
-        setPrDraft(false)
-        await onRefresh()
-      } else {
-        onStatusChange({ type: 'error', message: result.message })
-      }
-    } catch (error) {
-      onStatusChange({ type: 'error', message: (error as Error).message })
-    } finally {
-      setCreatingPR(false)
-    }
+  // Auto-generate PR title from branch name
+  const generatePRTitle = (branch: string) => {
+    return branch
+      .replace(/^(feature|bugfix|hotfix)\//, '')
+      .replace(/[-_]/g, ' ')
+      .replace(/\b\w/g, (c) => c.toUpperCase())
   }
 
   // File status helpers
@@ -4012,6 +4002,41 @@ function StagingPanel({ workingStatus, currentBranch, onRefresh, onStatusChange 
             </span>
           </label>
         </div>
+
+        {/* Create PR Option - only show when pushing and not on main/master */}
+        {pushAfterCommit && !['main', 'master'].includes(fullBranchName || currentBranch) && (
+          <>
+            <div className="commit-options">
+              <label className="commit-option-checkbox">
+                <input type="checkbox" checked={createPR} onChange={(e) => setCreatePR(e.target.checked)} />
+                <span>Create Pull Request after push</span>
+              </label>
+            </div>
+            {createPR && (
+              <div className="pr-inline-fields">
+                <input
+                  type="text"
+                  className="pr-inline-title"
+                  value={prTitle}
+                  onChange={(e) => setPrTitle(e.target.value)}
+                  placeholder={`PR title (default: ${generatePRTitle(fullBranchName || currentBranch)})`}
+                />
+                <textarea
+                  className="pr-inline-body"
+                  value={prBody}
+                  onChange={(e) => setPrBody(e.target.value)}
+                  placeholder="Description (optional)"
+                  rows={2}
+                />
+                <label className="commit-option-checkbox pr-draft-checkbox">
+                  <input type="checkbox" checked={prDraft} onChange={(e) => setPrDraft(e.target.checked)} />
+                  <span>Create as draft</span>
+                </label>
+              </div>
+            )}
+          </>
+        )}
+
         {/* Behind Origin Prompt */}
         {behindPrompt && (
           <div className="behind-prompt">
@@ -4037,7 +4062,7 @@ function StagingPanel({ workingStatus, currentBranch, onRefresh, onStatusChange 
           </div>
         )}
 
-        {!behindPrompt && !showPRPrompt && !showPRForm && (
+        {!behindPrompt && (
           <button
             className="btn btn-primary commit-btn"
             onClick={() => handleCommit()}
@@ -4050,86 +4075,25 @@ function StagingPanel({ workingStatus, currentBranch, onRefresh, onStatusChange 
             }
           >
             {isCommitting
-              ? fullBranchName
-                ? 'Creating branch...'
-                : pushAfterCommit
-                  ? 'Committing & Pushing...'
-                  : 'Committing...'
+              ? createPR
+                ? 'Creating PR...'
+                : fullBranchName
+                  ? 'Creating branch...'
+                  : pushAfterCommit
+                    ? 'Committing & Pushing...'
+                    : 'Committing...'
               : fullBranchName
                 ? pushAfterCommit
-                  ? `Create Branch & Commit & Push`
-                  : `Create Branch & Commit`
+                  ? createPR
+                    ? 'Branch → Commit → Push → PR'
+                    : 'Create Branch & Commit & Push'
+                  : 'Create Branch & Commit'
                 : pushAfterCommit
-                  ? `Commit & Push ${stagedFiles.length} file${stagedFiles.length !== 1 ? 's' : ''}`
+                  ? createPR
+                    ? 'Commit → Push → Create PR'
+                    : `Commit & Push ${stagedFiles.length} file${stagedFiles.length !== 1 ? 's' : ''}`
                   : `Commit ${stagedFiles.length} file${stagedFiles.length !== 1 ? 's' : ''}`}
           </button>
-        )}
-
-        {/* PR Creation Prompt - shown after successful push */}
-        {showPRPrompt && pushedBranch && (
-          <div className="pr-prompt">
-            <div className="pr-prompt-message">
-              ✓ Pushed to <code>{pushedBranch}</code>
-            </div>
-            <div className="pr-prompt-actions">
-              <button className="btn btn-primary" onClick={handleStartPRCreation}>
-                Create Pull Request
-              </button>
-              <button className="btn btn-ghost" onClick={handleDismissPRPrompt}>
-                Dismiss
-              </button>
-            </div>
-          </div>
-        )}
-
-        {/* PR Creation Form */}
-        {showPRForm && pushedBranch && (
-          <div className="pr-create-form staging-pr-form">
-            <div className="pr-form-header">
-              <span className="pr-form-title">Create Pull Request</span>
-              <button className="pr-form-close" onClick={handleCancelPRCreation} title="Cancel">
-                ×
-              </button>
-            </div>
-            <div className="pr-form-branch-info">
-              <code>{pushedBranch}</code> → <code>main</code>
-            </div>
-            <div className="pr-form-field">
-              <label className="pr-form-label">Title</label>
-              <input
-                type="text"
-                className="pr-form-input"
-                value={prTitle}
-                onChange={(e) => setPrTitle(e.target.value)}
-                placeholder="Pull request title"
-                autoFocus
-              />
-            </div>
-            <div className="pr-form-field">
-              <label className="pr-form-label">Description</label>
-              <textarea
-                className="pr-form-textarea"
-                value={prBody}
-                onChange={(e) => setPrBody(e.target.value)}
-                placeholder="Describe your changes (optional)"
-                rows={4}
-              />
-            </div>
-            <div className="pr-form-checkbox">
-              <label>
-                <input type="checkbox" checked={prDraft} onChange={(e) => setPrDraft(e.target.checked)} />
-                <span>Create as draft</span>
-              </label>
-            </div>
-            <div className="pr-form-actions">
-              <button className="btn btn-secondary" onClick={handleCancelPRCreation} disabled={creatingPR}>
-                Cancel
-              </button>
-              <button className="btn btn-primary" onClick={handleSubmitPR} disabled={creatingPR || !prTitle.trim()}>
-                {creatingPR ? 'Creating...' : 'Create PR'}
-              </button>
-            </div>
-          </div>
         )}
       </div>
     </div>
