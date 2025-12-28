@@ -7,3 +7,6 @@
 
 export { DiffPanel } from './DiffPanel'
 export type { DiffPanelProps } from './DiffPanel'
+
+export { StagingPanel } from './StagingPanel'
+export type { StagingPanelProps } from './StagingPanel'
