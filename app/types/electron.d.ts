@@ -341,6 +341,23 @@ export interface ElectronAPI {
   removeWorktree: (worktreePath: string, force?: boolean) => Promise<{ success: boolean; message: string }>
   createWorktree: (options: CreateWorktreeOptions) => Promise<{ success: boolean; message: string; path?: string }>
   selectWorktreeFolder: () => Promise<string | null>
+  // Worktree-specific staging & commit operations
+  getWorktreeWorkingStatus: (worktreePath: string) => Promise<WorkingStatus>
+  stageFileInWorktree: (worktreePath: string, filePath: string) => Promise<{ success: boolean; message: string }>
+  unstageFileInWorktree: (worktreePath: string, filePath: string) => Promise<{ success: boolean; message: string }>
+  stageAllInWorktree: (worktreePath: string) => Promise<{ success: boolean; message: string }>
+  unstageAllInWorktree: (worktreePath: string) => Promise<{ success: boolean; message: string }>
+  getFileDiffInWorktree: (
+    worktreePath: string,
+    filePath: string,
+    staged: boolean
+  ) => Promise<StagingFileDiff | null>
+  commitInWorktree: (
+    worktreePath: string,
+    message: string,
+    description?: string
+  ) => Promise<{ success: boolean; message: string }>
+  pushWorktreeBranch: (worktreePath: string) => Promise<{ success: boolean; message: string }>
   // Staging & commit operations
   stageFile: (filePath: string) => Promise<{ success: boolean; message: string }>
   unstageFile: (filePath: string) => Promise<{ success: boolean; message: string }>
