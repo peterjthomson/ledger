@@ -4692,3 +4692,139 @@ body,
 .theme-card-custom .theme-name {
   font-size: 12px;
 }
+
+/* ========================================
+   Canvas Architecture Styles
+   ======================================== */
+
+.canvas-layout {
+  flex: 1;
+  display: flex;
+  overflow: hidden;
+  background: var(--bg-primary);
+}
+
+.canvas-column {
+  display: flex;
+  flex-direction: column;
+  border-right: 1px solid var(--border);
+  overflow: hidden;
+  position: relative;
+  background: var(--bg-primary);
+}
+
+.canvas-column:last-child {
+  border-right: none;
+}
+
+.canvas-column-content {
+  flex: 1;
+  overflow: auto;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Slot type styling */
+.canvas-column[data-slot="list"] {
+  background: var(--bg-secondary);
+}
+
+.canvas-column[data-slot="editor"] {
+  background: var(--bg-primary);
+}
+
+.canvas-column[data-slot="viz"] {
+  background: var(--bg-primary);
+}
+
+/* Resize handle */
+.canvas-resize-handle {
+  position: absolute;
+  top: 0;
+  right: -3px;
+  width: 6px;
+  height: 100%;
+  cursor: col-resize;
+  z-index: 10;
+  background: transparent;
+  transition: background 0.15s ease;
+}
+
+.canvas-resize-handle:hover,
+.canvas-resize-handle:active {
+  background: var(--accent);
+  opacity: 0.5;
+}
+
+/* Editor slot navigation */
+.editor-slot {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+.editor-nav {
+  display: flex;
+  gap: 4px;
+  padding: 8px;
+  border-bottom: 1px solid var(--border);
+  background: var(--bg-secondary);
+}
+
+.editor-nav-btn {
+  width: 28px;
+  height: 28px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  font-size: 14px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.15s ease;
+}
+
+.editor-nav-btn:hover:not(:disabled) {
+  background: var(--bg-hover);
+  border-color: var(--accent);
+}
+
+.editor-nav-btn:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+}
+
+.editor-slot-content {
+  flex: 1;
+  overflow: auto;
+}
+
+/* Editor empty state */
+.editor-slot-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  padding: 40px;
+  text-align: center;
+  color: var(--text-muted);
+}
+
+.editor-slot-empty-icon {
+  font-size: 48px;
+  margin-bottom: 16px;
+  opacity: 0.5;
+}
+
+.editor-slot-empty p {
+  margin: 0 0 8px;
+  font-size: 14px;
+}
+
+.editor-slot-empty-hint {
+  font-size: 12px;
+  opacity: 0.7;
+}
