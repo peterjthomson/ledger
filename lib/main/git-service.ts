@@ -2371,11 +2371,14 @@ export async function getStashFiles(stashIndex: number): Promise<StashFile[]> {
 }
 
 // Get diff for a specific file in a stash
+// Note: git stash show doesn't support -- filepath syntax, so we use git diff instead
 export async function getStashFileDiff(stashIndex: number, filePath: string): Promise<string | null> {
   if (!git) throw new Error('No repository selected')
 
   try {
-    const output = await git.raw(['stash', 'show', '-p', `stash@{${stashIndex}}`, '--', filePath])
+    // Compare the stash's parent commit with the stash itself for the specific file
+    const stashRef = `stash@{${stashIndex}}`
+    const output = await git.raw(['diff', `${stashRef}^`, stashRef, '--', filePath])
     return output || null
   } catch {
     return null

@@ -2446,8 +2446,8 @@ export default function App() {
                           className={`sidebar-item ${sidebarFocus?.type === 'stash' && (sidebarFocus.data as StashEntry).index === stash.index ? 'selected' : ''}`}
                           onClick={() => handleSidebarFocus('stash', stash)}
                         >
-                          <span className="sidebar-item-name" title={stash.message}>
-                            stash@{`{${stash.index}}`}: {stash.message}
+                          <span className="sidebar-item-name" title={`stash@{${stash.index}}: ${stash.message}`}>
+                            {stash.message || `Stash ${stash.index}`}
                           </span>
                         </li>
                       ))
@@ -3446,9 +3446,18 @@ function StagingPanel({ workingStatus, currentBranch, onRefresh, onStatusChange 
   const [branchFolder, setBranchFolder] = useState<string>('feature')
   const [customFolder, setCustomFolder] = useState('')
   const [branchName, setBranchName] = useState('')
+  // PR creation after commit+push
+  const [showPRPrompt, setShowPRPrompt] = useState(false)
+  const [showPRForm, setShowPRForm] = useState(false)
+  const [prTitle, setPrTitle] = useState('')
+  const [prBody, setPrBody] = useState('')
+  const [prDraft, setPrDraft] = useState(false)
+  const [creatingPR, setCreatingPR] = useState(false)
+  const [pushedBranch, setPushedBranch] = useState<string | null>(null)
 
   const stagedFiles = workingStatus.files.filter((f) => f.staged)
   const unstagedFiles = workingStatus.files.filter((f) => !f.staged)
+
 
   // Close file context menu when clicking outside
   useEffect(() => {
@@ -3596,6 +3605,18 @@ function StagingPanel({ workingStatus, currentBranch, onRefresh, onStatusChange 
           const pushResult = await window.electronAPI.pushBranch(targetBranch, true)
           if (pushResult.success) {
             onStatusChange({ type: 'success', message: `Committed and pushed to ${targetBranch}` })
+            // Show PR prompt if not on main/master
+            const targetIsMainOrMaster = ['main', 'master'].includes(targetBranch)
+            if (!targetIsMainOrMaster) {
+              setPushedBranch(targetBranch)
+              setShowPRPrompt(true)
+              // Auto-generate PR title from branch name
+              const generatedTitle = targetBranch
+                .replace(/^(feature|bugfix|hotfix)\//, '')
+                .replace(/[-_]/g, ' ')
+                .replace(/\b\w/g, (c) => c.toUpperCase())
+              setPrTitle(generatedTitle)
+            }
           } else {
             // Commit succeeded but push failed
             onStatusChange({ type: 'error', message: `Committed, but push failed: ${pushResult.message}` })
@@ -3665,6 +3686,60 @@ function StagingPanel({ workingStatus, currentBranch, onRefresh, onStatusChange 
   const handleCommitAnyway = async () => {
     setBehindPrompt(null)
     await handleCommit(true)
+  }
+
+  // PR creation handlers
+  const handleDismissPRPrompt = () => {
+    setShowPRPrompt(false)
+    setPushedBranch(null)
+    setPrTitle('')
+    setPrBody('')
+  }
+
+  const handleStartPRCreation = () => {
+    setShowPRPrompt(false)
+    setShowPRForm(true)
+  }
+
+  const handleCancelPRCreation = () => {
+    setShowPRForm(false)
+    setPushedBranch(null)
+    setPrTitle('')
+    setPrBody('')
+    setPrDraft(false)
+  }
+
+  const handleSubmitPR = async () => {
+    if (!prTitle.trim() || !pushedBranch) return
+
+    setCreatingPR(true)
+    onStatusChange({ type: 'info', message: `Creating pull request for ${pushedBranch}...` })
+
+    try {
+      const result = await window.electronAPI.createPullRequest({
+        title: prTitle.trim(),
+        body: prBody.trim() || undefined,
+        headBranch: pushedBranch,
+        draft: prDraft,
+        web: false,
+      })
+
+      if (result.success) {
+        onStatusChange({ type: 'success', message: result.message })
+        setShowPRForm(false)
+        setPushedBranch(null)
+        setPrTitle('')
+        setPrBody('')
+        setPrDraft(false)
+        await onRefresh()
+      } else {
+        onStatusChange({ type: 'error', message: result.message })
+      }
+    } catch (error) {
+      onStatusChange({ type: 'error', message: (error as Error).message })
+    } finally {
+      setCreatingPR(false)
+    }
   }
 
   // File status helpers
@@ -3962,7 +4037,7 @@ function StagingPanel({ workingStatus, currentBranch, onRefresh, onStatusChange 
           </div>
         )}
 
-        {!behindPrompt && (
+        {!behindPrompt && !showPRPrompt && !showPRForm && (
           <button
             className="btn btn-primary commit-btn"
             onClick={() => handleCommit()}
@@ -3988,6 +4063,73 @@ function StagingPanel({ workingStatus, currentBranch, onRefresh, onStatusChange 
                   ? `Commit & Push ${stagedFiles.length} file${stagedFiles.length !== 1 ? 's' : ''}`
                   : `Commit ${stagedFiles.length} file${stagedFiles.length !== 1 ? 's' : ''}`}
           </button>
+        )}
+
+        {/* PR Creation Prompt - shown after successful push */}
+        {showPRPrompt && pushedBranch && (
+          <div className="pr-prompt">
+            <div className="pr-prompt-message">
+              ✓ Pushed to <code>{pushedBranch}</code>
+            </div>
+            <div className="pr-prompt-actions">
+              <button className="btn btn-primary" onClick={handleStartPRCreation}>
+                Create Pull Request
+              </button>
+              <button className="btn btn-ghost" onClick={handleDismissPRPrompt}>
+                Dismiss
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* PR Creation Form */}
+        {showPRForm && pushedBranch && (
+          <div className="pr-create-form staging-pr-form">
+            <div className="pr-form-header">
+              <span className="pr-form-title">Create Pull Request</span>
+              <button className="pr-form-close" onClick={handleCancelPRCreation} title="Cancel">
+                ×
+              </button>
+            </div>
+            <div className="pr-form-branch-info">
+              <code>{pushedBranch}</code> → <code>main</code>
+            </div>
+            <div className="pr-form-field">
+              <label className="pr-form-label">Title</label>
+              <input
+                type="text"
+                className="pr-form-input"
+                value={prTitle}
+                onChange={(e) => setPrTitle(e.target.value)}
+                placeholder="Pull request title"
+                autoFocus
+              />
+            </div>
+            <div className="pr-form-field">
+              <label className="pr-form-label">Description</label>
+              <textarea
+                className="pr-form-textarea"
+                value={prBody}
+                onChange={(e) => setPrBody(e.target.value)}
+                placeholder="Describe your changes (optional)"
+                rows={4}
+              />
+            </div>
+            <div className="pr-form-checkbox">
+              <label>
+                <input type="checkbox" checked={prDraft} onChange={(e) => setPrDraft(e.target.checked)} />
+                <span>Create as draft</span>
+              </label>
+            </div>
+            <div className="pr-form-actions">
+              <button className="btn btn-secondary" onClick={handleCancelPRCreation} disabled={creatingPR}>
+                Cancel
+              </button>
+              <button className="btn btn-primary" onClick={handleSubmitPR} disabled={creatingPR || !prTitle.trim()}>
+                {creatingPR ? 'Creating...' : 'Create PR'}
+              </button>
+            </div>
+          </div>
         )}
       </div>
     </div>
@@ -4913,8 +5055,7 @@ function StashDetailPanel({
       {/* Header */}
       <div className="stash-header">
         <div className="detail-type-badge">Stash</div>
-        <h3 className="stash-title">stash@{`{${stash.index}}`}</h3>
-        <p className="stash-message">{stash.message}</p>
+        <h3 className="stash-title">{stash.message || `Stash ${stash.index}`}</h3>
         <div className="stash-meta">
           {stash.branch && <code className="stash-branch">{stash.branch}</code>}
           <span className="stash-date">{formatRelativeTime(stash.date)}</span>
