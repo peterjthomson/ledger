@@ -2,7 +2,11 @@
   "permissions": {
     "allow": [
       "Bash(npm run build:mac:arm64:*)",
-      "Bash(npm run dev:*)"
+      "Bash(npm run dev:*)",
+      "Bash(npm run typecheck:*)",
+      "Bash(npx tsc:*)",
+      "Bash(cat:*)",
+      "Bash(npm run lint:*)"
     ]
   }
 }

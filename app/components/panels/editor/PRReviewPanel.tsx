@@ -4,7 +4,7 @@
  * Shows PR details, allows commenting, merging, and viewing file diffs.
  */
 
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect, useMemo, useCallback } from 'react'
 import type { PullRequest, PRDetail, PRReviewComment } from '../../../types/electron'
 
 export interface PRReviewPanelProps {
@@ -40,7 +40,7 @@ export function PRReviewPanel({ pr, formatRelativeTime, onCheckout, onPRMerged, 
   const [mergingPR, setMergingPR] = useState(false)
 
   // Load full PR details
-  const loadPRDetail = async () => {
+  const loadPRDetail = useCallback(async () => {
     setLoading(true)
     try {
       const [detail, comments] = await Promise.all([
@@ -54,11 +54,11 @@ export function PRReviewPanel({ pr, formatRelativeTime, onCheckout, onPRMerged, 
     } finally {
       setLoading(false)
     }
-  }
+  }, [pr.number])
 
   useEffect(() => {
     loadPRDetail()
-  }, [pr.number])
+  }, [loadPRDetail])
 
   // Submit a comment
   const handleSubmitComment = async () => {
