@@ -169,7 +169,44 @@ export function clearCustomTheme(): void {
   saveSettings(settings);
 }
 
-// Parse and load a VSCode theme file
+// Load a built-in theme from resources/themes
+export function loadBuiltInTheme(themeFileName: string): CustomTheme | null {
+  // Determine the resources path based on whether we're in dev or production
+  const isDev = process.env.NODE_ENV === 'development' || !app.isPackaged;
+  let themePath: string;
+  
+  if (isDev) {
+    themePath = path.join(process.cwd(), 'resources', 'themes', themeFileName);
+  } else {
+    themePath = path.join(process.resourcesPath, 'themes', themeFileName);
+  }
+
+  try {
+    const content = fs.readFileSync(themePath, 'utf-8');
+    const themeData = JSON.parse(content);
+
+    const colors: VSCodeThemeColors = themeData.colors || {};
+    const themeType: 'light' | 'dark' = themeData.type === 'light' ? 'light' : 'dark';
+    const themeName = themeData.name || path.basename(themePath, '.json');
+
+    const customTheme: CustomTheme = {
+      name: themeName,
+      path: themePath,
+      type: themeType,
+      colors
+    };
+
+    // Save the theme as the current custom theme
+    saveCustomTheme(customTheme);
+
+    return customTheme;
+  } catch (error) {
+    console.error('Failed to load built-in theme:', error);
+    return null;
+  }
+}
+
+// Parse and load a VSCode theme file (user-selected)
 export async function loadVSCodeThemeFile(): Promise<CustomTheme | null> {
   const result = await dialog.showOpenDialog({
     properties: ['openFile'],

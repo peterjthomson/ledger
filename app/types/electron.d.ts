@@ -373,6 +373,15 @@ export interface ElectronAPI {
     }
     cssVars: Record<string, string>
   } | null>
+  loadBuiltInTheme: (themeFileName: string) => Promise<{
+    theme: {
+      name: string
+      path: string
+      type: 'light' | 'dark'
+      colors: Record<string, string>
+    }
+    cssVars: Record<string, string>
+  } | null>
   clearCustomTheme: () => Promise<{ success: boolean }>
 }
 

@@ -76,6 +76,7 @@ const electronAPI = {
   setThemeMode: (mode: 'light' | 'dark' | 'custom') => ipcRenderer.invoke('set-theme-mode', mode),
   getCustomTheme: () => ipcRenderer.invoke('get-custom-theme'),
   loadVSCodeTheme: () => ipcRenderer.invoke('load-vscode-theme'),
+  loadBuiltInTheme: (themeFileName: string) => ipcRenderer.invoke('load-built-in-theme', themeFileName),
   clearCustomTheme: () => ipcRenderer.invoke('clear-custom-theme'),
 }
 

@@ -1661,11 +1661,16 @@ export default function App() {
                         onContextMenu={(e) => handleContextMenu(e, 'worktree', wt)}
                       >
                         <div className="item-main">
-                          <span className="item-name">{wt.displayName}</span>
+                          <span className="item-name">
+                            {wt.branch || wt.displayName}
+                          </span>
                           {!isWorkingFolder && wt.branch === currentBranch && (
                             <span className="current-indicator">●</span>
                           )}
                         </div>
+                        {wt.branch && (
+                          <div className="item-agent-hint">{wt.displayName}</div>
+                        )}
                         <div className="item-path" title={wt.path}>
                           {wt.path.replace(/^\/Users\/[^/]+/, '~')}
                         </div>
@@ -4534,18 +4539,21 @@ function WorktreeDetailPanel({
   return (
     <div className="sidebar-detail-panel">
       <div className="detail-type-badge">Worktree</div>
-      <h3 className="detail-title">{worktree.displayName}</h3>
+      <h3 className="detail-title">{worktree.branch || worktree.displayName}</h3>
+      {worktree.branch && (
+        <div className="detail-subtitle">{worktree.displayName}</div>
+      )}
       <div className="detail-meta-grid">
-        <div className="detail-meta-item full-width">
-          <span className="meta-label">Path</span>
-          <code className="meta-value path">{worktree.path}</code>
-        </div>
         {worktree.branch && (
-          <div className="detail-meta-item">
+          <div className="detail-meta-item full-width">
             <span className="meta-label">Branch</span>
             <code className="meta-value">{worktree.branch}</code>
           </div>
         )}
+        <div className="detail-meta-item full-width">
+          <span className="meta-label">Path</span>
+          <code className="meta-value path">{worktree.path}</code>
+        </div>
         <div className="detail-meta-item">
           <span className="meta-label">Status</span>
           <span className="meta-value">{isCurrent ? 'Current' : 'Not checked out'}</span>

@@ -65,6 +65,7 @@ import {
   saveThemeMode,
   getCustomTheme,
   loadVSCodeThemeFile,
+  loadBuiltInTheme,
   clearCustomTheme,
   mapVSCodeThemeToCSS,
 } from './settings-service'
@@ -509,6 +510,17 @@ app.whenReady().then(() => {
   ipcMain.handle('clear-custom-theme', () => {
     clearCustomTheme()
     return { success: true }
+  })
+
+  ipcMain.handle('load-built-in-theme', (_event, themeFileName: string) => {
+    const theme = loadBuiltInTheme(themeFileName)
+    if (theme) {
+      return {
+        theme,
+        cssVars: mapVSCodeThemeToCSS(theme)
+      }
+    }
+    return null
   })
 
   // Set app user model id for windows

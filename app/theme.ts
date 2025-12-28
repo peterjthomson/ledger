@@ -97,7 +97,7 @@ export async function setThemeMode(mode: ThemeMode): Promise<void> {
   }
 }
 
-// Load a VSCode theme file
+// Load a VSCode theme file (user-selected)
 export async function loadVSCodeTheme(): Promise<CustomTheme | null> {
   try {
     const result = await window.electronAPI.loadVSCodeTheme() as ThemeData | null;
@@ -112,6 +112,25 @@ export async function loadVSCodeTheme(): Promise<CustomTheme | null> {
     return null;
   } catch (error) {
     console.error('Failed to load VSCode theme:', error);
+    return null;
+  }
+}
+
+// Load a built-in theme from resources/themes
+export async function loadBuiltInTheme(themeFileName: string): Promise<CustomTheme | null> {
+  try {
+    const result = await window.electronAPI.loadBuiltInTheme(themeFileName) as ThemeData | null;
+
+    if (result) {
+      // Apply the theme
+      setThemeClass(result.theme.type);
+      applyCSSVariables(result.cssVars);
+      return result.theme;
+    }
+
+    return null;
+  } catch (error) {
+    console.error('Failed to load built-in theme:', error);
     return null;
   }
 }
