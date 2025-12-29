@@ -112,7 +112,7 @@ export async function getUnmergedBranches(baseBranch: string = 'origin/master'):
     const result = await git.raw(['branch', '-a', '--no-merged', targetBranch])
     return result
       .split('\n')
-      .map((b) => b.trim().replace(/^\* /, ''))
+      .map((b) => b.trim().replace(/^[*+]\s*/, '')) // Strip * (current) or + (checked out in worktree) markers
       .filter((b) => b && !b.includes('HEAD'))
   } catch {
     return []
