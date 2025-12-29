@@ -93,7 +93,7 @@ git --version
 ```
 
 **How to install it:**
-- **macOS**: It's included with Xcode Command Line Tools. Run `xcode-selec --install`
+- **macOS**: It's included with Xcode Command Line Tools. Run `xcode-select --install`
 - **Windows**: Download from [git-scm.com](https://git-scm.com/)
 - **Linux**: `sudo apt install git` (Debian/Ubuntu) or `sudo dnf install git` (Fedora)
 
@@ -910,4 +910,3 @@ scripts/build/
 ## License
 
 These build scripts are part of the Ledger project and are licensed under the MIT License.
-t

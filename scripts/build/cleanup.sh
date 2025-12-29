@@ -378,4 +378,4 @@ main() {
     echo ""
 }
 
-main "$@"f
+main "$@"

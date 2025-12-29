@@ -94,7 +94,7 @@ show_help() {
 
 # Parse macOS-specific command-line arguments
 parse_mac_args() {
-    for arg in"$@"; do
+    for arg in "$@"; do
         case $arg in
             --arm64)
                 BUILD_ARCH="arm64"
