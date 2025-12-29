@@ -1753,6 +1753,16 @@ body,
   color: var(--accent-dim);
 }
 
+/* Sidebar keyboard navigation focus */
+.focus-sidebar:focus {
+  outline: none;
+}
+
+.focus-sidebar:focus-visible .sidebar-item.selected {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
+
 /* Uncommitted sidebar item */
 .sidebar-item.uncommitted {
   border-bottom: 1px solid var(--border-subtle);
@@ -1802,6 +1812,8 @@ body,
   font-weight: 600;
   color: var(--text-primary);
   line-height: 1.3;
+  user-select: text;
+  cursor: text;
 }
 
 /* When followed by subtitle, reduce title margin */
@@ -1842,6 +1854,8 @@ body,
 .detail-meta-item .meta-value {
   font-size: 12px;
   color: var(--text-primary);
+  user-select: text;
+  cursor: text;
 }
 
 .detail-meta-item .meta-value.path {
@@ -1852,6 +1866,27 @@ body,
 .detail-meta-item code.meta-value {
   font-family: 'JetBrains Mono', 'SF Mono', Monaco, monospace;
   font-size: 11px;
+  user-select: text;
+  cursor: text;
+}
+
+/* Copyable text in various places */
+.copyable-text {
+  user-select: text;
+  cursor: text;
+}
+
+.pr-review-title,
+.pr-commit-message,
+.pr-commit-hash,
+.pr-file-path,
+.stash-title,
+.stash-file-path,
+.diff-file-path,
+.commit-message,
+.commit-hash {
+  user-select: text;
+  cursor: text;
 }
 
 .detail-actions {
@@ -2125,6 +2160,12 @@ body,
   gap: 10px;
 }
 
+.staging-keyboard-hint {
+  font-size: 10px;
+  color: var(--text-muted);
+  margin-top: 6px;
+}
+
 .staging-stats {
   font-size: 11px;
 }
@@ -2203,6 +2244,20 @@ body,
 
 .staging-file-item.selected {
   background: var(--accent-glow);
+}
+
+.staging-file-item.focused {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
+
+.staging-files:focus {
+  outline: none;
+}
+
+.staging-files:focus-visible .staging-file-item.focused {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
 }
 
 .staging-file-item .file-status-icon {
@@ -2521,6 +2576,36 @@ body,
 .branch-preview code {
   color: var(--accent);
   font-weight: 500;
+}
+
+/* Branch name suggestion button */
+.branch-suggest-btn {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 6px 10px;
+  font-size: 11px;
+  color: var(--accent);
+  background: var(--accent-glow);
+  border: 1px solid var(--accent);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: all 0.15s ease;
+  width: 100%;
+  text-align: left;
+}
+
+.branch-suggest-btn:hover {
+  background: var(--accent);
+  color: white;
+}
+
+.branch-suggest-btn code {
+  font-family: 'JetBrains Mono', 'SF Mono', Monaco, monospace;
+  font-size: 10px;
+  padding: 1px 4px;
+  background: rgba(255, 255, 255, 0.2);
+  border-radius: 2px;
 }
 
 .commit-option-checkbox input[type='checkbox'] {
@@ -3530,6 +3615,18 @@ body,
   line-height: 1.5;
   white-space: pre-wrap;
   word-break: break-word;
+}
+
+/* Clickable links in PR comments */
+.pr-comment-link {
+  color: var(--accent);
+  text-decoration: none;
+  cursor: pointer;
+  word-break: break-all;
+}
+
+.pr-comment-link:hover {
+  text-decoration: underline;
 }
 
 .pr-empty {
@@ -4984,4 +5081,83 @@ body,
 
 .canvas-switcher.compact .canvas-tab-name {
   display: none;
+}
+
+/* ========================================
+   Responsive / Narrow Window Styles
+   ======================================== */
+
+@media (max-width: 600px) {
+  /* Hide count badges in narrow view */
+  .count-badge {
+    display: none;
+  }
+
+  /* Compact header */
+  .ledger-header {
+    padding: 8px 12px;
+  }
+
+  .repo-path {
+    max-width: 150px;
+  }
+
+  /* Stack radar columns vertically in very narrow view */
+  .ledger-content {
+    flex-direction: column;
+    overflow-y: auto;
+  }
+
+  .ledger-content .column {
+    min-height: 200px;
+    border-bottom: 1px solid var(--border);
+    border-right: none;
+  }
+
+  /* Focus mode - hide panels below threshold */
+  .focus-sidebar {
+    min-width: 150px !important;
+  }
+
+  /* Smaller padding in panels */
+  .sidebar-detail-panel {
+    padding: 12px;
+  }
+
+  .detail-meta-grid {
+    grid-template-columns: 1fr;
+  }
+
+  /* Compact staging panel */
+  .staging-commit {
+    padding: 8px 12px;
+  }
+
+  .staging-keyboard-hint {
+    display: none;
+  }
+}
+
+@media (max-width: 400px) {
+  /* Ultra-narrow - single column mode */
+  .focus-mode-layout {
+    flex-direction: column;
+  }
+
+  .focus-sidebar {
+    width: 100% !important;
+    max-height: 200px;
+    border-right: none;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .focus-detail {
+    border-left: none;
+    border-top: 1px solid var(--border);
+  }
+
+  /* Hide resize handles in narrow view */
+  .resize-handle {
+    display: none;
+  }
 }

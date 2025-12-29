@@ -4,7 +4,7 @@
  * Shows PR details, allows commenting, merging, and viewing file diffs.
  */
 
-import { useState, useEffect, useMemo, useCallback } from 'react'
+import React, { useState, useEffect, useMemo, useCallback } from 'react'
 import type { PullRequest, PRDetail, PRReviewComment } from '../../../types/electron'
 
 export interface PRReviewPanelProps {
@@ -23,6 +23,35 @@ const AI_AUTHORS = ['copilot', 'github-actions', 'dependabot', 'renovate', 'code
 function isAIAuthor(login: string): boolean {
   const lower = login.toLowerCase()
   return AI_AUTHORS.some((ai) => lower.includes(ai)) || lower.endsWith('[bot]') || lower.endsWith('-bot')
+}
+
+// Helper to render text with clickable links
+function renderTextWithLinks(text: string): React.ReactNode {
+  // URL regex pattern
+  const urlPattern = /(https?:\/\/[^\s<>[\](){}'"]+)/g
+  const parts = text.split(urlPattern)
+  
+  return parts.map((part, index) => {
+    if (urlPattern.test(part)) {
+      // Reset the regex lastIndex after test
+      urlPattern.lastIndex = 0
+      return (
+        <a
+          key={index}
+          href={part}
+          className="pr-comment-link"
+          onClick={(e) => {
+            e.preventDefault()
+            window.electronAPI.openPullRequest(part)
+          }}
+          title={part}
+        >
+          {part}
+        </a>
+      )
+    }
+    return part
+  })
 }
 
 export function PRReviewPanel({ pr, formatRelativeTime, onCheckout, onPRMerged, switching }: PRReviewPanelProps) {
@@ -296,7 +325,7 @@ export function PRReviewPanel({ pr, formatRelativeTime, onCheckout, onPRMerged, 
                   <span className="pr-comment-author">@{prDetail.author.login}</span>
                   <span className="pr-comment-time">{formatRelativeTime(prDetail.createdAt)}</span>
                 </div>
-                <div className="pr-comment-body">{prDetail.body}</div>
+                <div className="pr-comment-body">{renderTextWithLinks(prDetail.body)}</div>
               </div>
             )}
 
@@ -322,7 +351,7 @@ export function PRReviewPanel({ pr, formatRelativeTime, onCheckout, onPRMerged, 
                       {isReview && getReviewStateBadge((item as any).state)}
                       <span className="pr-comment-time">{formatRelativeTime(date)}</span>
                     </div>
-                    {item.body && <div className="pr-comment-body">{item.body}</div>}
+                    {item.body && <div className="pr-comment-body">{renderTextWithLinks(item.body)}</div>}
                   </div>
                 )
               })}
@@ -430,7 +459,7 @@ export function PRReviewPanel({ pr, formatRelativeTime, onCheckout, onPRMerged, 
                           {comment.line && <span className="pr-comment-line">Line {comment.line}</span>}
                           <span className="pr-comment-time">{formatRelativeTime(comment.createdAt)}</span>
                         </div>
-                        <div className="pr-inline-comment-body">{comment.body}</div>
+                        <div className="pr-inline-comment-body">{renderTextWithLinks(comment.body)}</div>
                       </div>
                     ))}
                   </div>

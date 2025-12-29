@@ -124,6 +124,10 @@ export default function App() {
   const [detailVisible, setDetailVisible] = useState(true)
   const [isResizingSidebar, setIsResizingSidebar] = useState(false)
   const [isResizingDetail, setIsResizingDetail] = useState(false)
+  
+  // Sidebar keyboard navigation
+  const [sidebarFocusedIndex, setSidebarFocusedIndex] = useState(-1)
+  const sidebarRef = useRef<HTMLElement>(null)
 
   // Radar view column order (drag-and-drop)
   const [radarColumnOrder, setRadarColumnOrder] = useState<string[]>([
@@ -1200,6 +1204,121 @@ export default function App() {
     return filtered
   }, [pullRequests, prFilter, prSort, prSearch])
 
+  // Build flat list of sidebar items for keyboard navigation
+  const sidebarItems = useMemo(() => {
+    const items: Array<{ type: SidebarFocusType; data: PullRequest | Branch | Worktree | StashEntry | WorkingStatus; action?: () => void }> = []
+    
+    // PRs
+    if (sidebarSections.prs && !prError) {
+      filteredPRs.forEach((pr) => items.push({ type: 'pr', data: pr, action: () => handlePRDoubleClick(pr) }))
+    }
+    
+    // Uncommitted changes
+    if (sidebarSections.branches && workingStatus?.hasChanges) {
+      items.push({ type: 'uncommitted', data: workingStatus })
+    }
+    
+    // Branches
+    if (sidebarSections.branches) {
+      localBranches.forEach((branch) => items.push({ type: 'branch', data: branch, action: () => handleBranchDoubleClick(branch) }))
+    }
+    
+    // Remotes
+    if (sidebarSections.remotes) {
+      remoteBranches.forEach((branch) => items.push({ type: 'remote', data: branch, action: () => handleRemoteBranchDoubleClick(branch) }))
+    }
+    
+    // Worktrees (including working folder pseudo-worktree)
+    if (sidebarSections.worktrees) {
+      // Working folder first
+      const workingFolder = filteredWorktrees.find((wt) => wt.agent === 'working-folder')
+      if (workingFolder) {
+        items.push({ type: 'worktree', data: workingFolder })
+      }
+      // Then other worktrees
+      filteredWorktrees
+        .filter((wt) => wt.agent !== 'working-folder' && wt.path !== repoPath)
+        .forEach((wt) => items.push({ type: 'worktree', data: wt, action: () => handleWorktreeDoubleClick(wt) }))
+    }
+    
+    // Stashes
+    if (sidebarSections.stashes) {
+      stashes.forEach((stash) => items.push({ type: 'stash', data: stash }))
+    }
+    
+    return items
+  }, [sidebarSections, filteredPRs, prError, workingStatus, localBranches, remoteBranches, filteredWorktrees, repoPath, stashes])
+
+  // Sidebar keyboard navigation handler
+  const handleSidebarKeyDown = useCallback((e: React.KeyboardEvent) => {
+    if (sidebarItems.length === 0) return
+
+    switch (e.key) {
+      case 'ArrowDown':
+        e.preventDefault()
+        setSidebarFocusedIndex((prev) => {
+          const next = prev + 1
+          if (next >= sidebarItems.length) return sidebarItems.length - 1
+          const item = sidebarItems[next]
+          handleSidebarFocus(item.type, item.data)
+          return next
+        })
+        break
+      case 'ArrowUp':
+        e.preventDefault()
+        setSidebarFocusedIndex((prev) => {
+          const next = prev - 1
+          if (next < 0) return 0
+          const item = sidebarItems[next]
+          handleSidebarFocus(item.type, item.data)
+          return next
+        })
+        break
+      case 'Enter':
+        e.preventDefault()
+        if (sidebarFocusedIndex >= 0 && sidebarFocusedIndex < sidebarItems.length) {
+          const item = sidebarItems[sidebarFocusedIndex]
+          if (item.action) {
+            item.action()
+          }
+        }
+        break
+      case 'Home':
+        e.preventDefault()
+        if (sidebarItems.length > 0) {
+          setSidebarFocusedIndex(0)
+          handleSidebarFocus(sidebarItems[0].type, sidebarItems[0].data)
+        }
+        break
+      case 'End':
+        e.preventDefault()
+        if (sidebarItems.length > 0) {
+          const lastIdx = sidebarItems.length - 1
+          setSidebarFocusedIndex(lastIdx)
+          handleSidebarFocus(sidebarItems[lastIdx].type, sidebarItems[lastIdx].data)
+        }
+        break
+    }
+  }, [sidebarItems, sidebarFocusedIndex, handleSidebarFocus])
+
+  // Sync sidebar focused index with sidebar focus state
+  useEffect(() => {
+    if (!sidebarFocus) {
+      setSidebarFocusedIndex(-1)
+      return
+    }
+    const idx = sidebarItems.findIndex((item) => {
+      if (item.type !== sidebarFocus.type) return false
+      if (item.type === 'pr') return (item.data as PullRequest).number === (sidebarFocus.data as PullRequest).number
+      if (item.type === 'branch' || item.type === 'remote') return (item.data as Branch).name === (sidebarFocus.data as Branch).name
+      if (item.type === 'worktree') return (item.data as Worktree).path === (sidebarFocus.data as Worktree).path
+      if (item.type === 'stash') return (item.data as StashEntry).index === (sidebarFocus.data as StashEntry).index
+      if (item.type === 'uncommitted') return true
+      return false
+    })
+    if (idx !== -1) setSidebarFocusedIndex(idx)
+  }, [sidebarFocus, sidebarItems])
+
   // Filter graph commits based on history panel filters
   const filteredGraphCommits = useMemo(() => {
     let filtered = graphCommits
@@ -2068,7 +2187,13 @@ export default function App() {
         <main className="focus-mode-layout">
           {/* Sidebar */}
           {sidebarVisible && (
-            <aside className="focus-sidebar" style={{ width: sidebarWidth, minWidth: sidebarWidth }}>
+            <aside 
+              className="focus-sidebar" 
+              style={{ width: sidebarWidth, minWidth: sidebarWidth }}
+              ref={sidebarRef}
+              tabIndex={0}
+              onKeyDown={handleSidebarKeyDown}
+            >
               {/* PRs Section */}
               <div className="sidebar-section">
                 <div className="sidebar-section-header">
