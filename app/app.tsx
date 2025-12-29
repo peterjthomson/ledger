@@ -525,7 +525,7 @@ export default function App() {
     setStatus({ type: 'info', message: `Checking out ${pr.branch}...` })
 
     try {
-      const result = await window.electronAPI.checkoutPRBranch(pr.branch)
+      const result = await window.electronAPI.checkoutPRBranch(pr.number)
       if (result.success) {
         setStatus({ type: 'success', message: result.message, stashed: result.stashed })
         await refresh()

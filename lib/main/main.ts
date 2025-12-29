@@ -252,8 +252,8 @@ app.whenReady().then(() => {
     return await pullBranch(remoteBranch)
   })
 
-  ipcMain.handle('checkout-pr-branch', async (_, branchName: string) => {
-    return await checkoutPRBranch(branchName)
+  ipcMain.handle('checkout-pr-branch', async (_, prNumber: number) => {
+    return await checkoutPRBranch(prNumber)
   })
 
   ipcMain.handle('get-commit-history', async (_, limit?: number) => {

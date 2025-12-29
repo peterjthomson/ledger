@@ -313,7 +313,7 @@ export interface ElectronAPI {
     draft?: boolean
     web?: boolean
   }) => Promise<{ success: boolean; message: string; url?: string }>
-  checkoutPRBranch: (branchName: string) => Promise<CheckoutResult>
+  checkoutPRBranch: (prNumber: number) => Promise<CheckoutResult>
   // Remote operations
   getGitHubUrl: () => Promise<string | null>
   openBranchInGitHub: (branchName: string) => Promise<{ success: boolean; message: string }>

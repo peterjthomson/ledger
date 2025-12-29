@@ -1932,33 +1932,27 @@ export async function createWorktree(
   }
 }
 
-// Checkout a PR branch (by branch name)
+// Checkout a PR branch (by PR number)
+// Uses `gh pr checkout` which handles fork PRs automatically by:
+// - Adding the fork as a remote if needed
+// - Fetching from the correct fork
+// - Creating a local tracking branch
 export async function checkoutPRBranch(
-  branchName: string
+  prNumber: number
 ): Promise<{ success: boolean; message: string; stashed?: string }> {
-  if (!git) throw new Error('No repository selected')
+  if (!git || !repoPath) throw new Error('No repository selected')
 
   try {
-    // First fetch to ensure we have the latest
-    await git.fetch('origin', branchName)
-
-    // Stash any uncommitted changes
+    // Stash any uncommitted changes first
     const stashResult = await stashChanges()
 
-    // Check if local branch exists
-    const branches = await git.branchLocal()
-    if (branches.all.includes(branchName)) {
-      // Checkout (allow even if checked out in worktree) and pull
-      await git.checkout(['--ignore-other-worktrees', branchName])
-      await git.pull('origin', branchName)
-    } else {
-      // Create tracking branch (--ignore-other-worktrees for the checkout part)
-      await git.checkout(['--ignore-other-worktrees', '-b', branchName, '--track', `origin/${branchName}`])
-    }
+    // Use gh pr checkout which handles fork PRs automatically
+    // This is the key insight: gh knows how to fetch from the contributor's fork
+    await execAsync(`gh pr checkout ${prNumber}`, { cwd: repoPath })
 
     return {
       success: true,
-      message: `Checked out '${branchName}'`,
+      message: `Checked out PR #${prNumber}`,
       stashed: stashResult.stashed ? stashResult.message : undefined,
     }
   } catch (error) {

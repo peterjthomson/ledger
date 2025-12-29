@@ -23,7 +23,7 @@ const electronAPI = {
   openPullRequest: (url: string) => ipcRenderer.invoke('open-pull-request', url),
   createPullRequest: (options: { title: string; body?: string; baseBranch?: string; draft?: boolean; web?: boolean }) =>
     ipcRenderer.invoke('create-pull-request', options),
-  checkoutPRBranch: (branchName: string) => ipcRenderer.invoke('checkout-pr-branch', branchName),
+  checkoutPRBranch: (prNumber: number) => ipcRenderer.invoke('checkout-pr-branch', prNumber),
   // Remote operations
   getGitHubUrl: () => ipcRenderer.invoke('get-github-url'),
   openBranchInGitHub: (branchName: string) => ipcRenderer.invoke('open-branch-in-github', branchName),

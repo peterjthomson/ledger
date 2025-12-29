@@ -111,7 +111,7 @@ Run with `npm test` (builds first) or `npm run test:headed`.
 | List PRs | `getPullRequests()` | Via `gh pr list` |
 | Switch branch | `checkoutBranch()` | Auto-stashes first |
 | Checkout remote | `checkoutRemoteBranch()` | Creates tracking branch |
-| Checkout PR | `checkoutPRBranch()` | Fetches and checkouts |
+| Checkout PR | `checkoutPRBranch()` | Uses `gh pr checkout`, handles forks |
 | Open in browser | `openBranchInGitHub()` | GitHub URL |
 | Fetch | `pullBranch()` | git fetch remote branch |
 | Stage/Unstage | `stageFile()`, `unstageFile()` | Individual files |
