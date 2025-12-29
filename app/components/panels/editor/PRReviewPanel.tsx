@@ -95,7 +95,7 @@ export function PRReviewPanel({ pr, formatRelativeTime, onCheckout, onPRMerged, 
     setCommentStatus(null)
 
     try {
-      const result = await window.electronAPI.mergePR(pr.number, 'squash')
+      const result = await window.electronAPI.mergePR(pr.number, 'merge')
 
       if (result.success) {
         setCommentStatus({ type: 'success', message: 'PR merged!' })
