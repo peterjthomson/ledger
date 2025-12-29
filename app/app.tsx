@@ -337,7 +337,7 @@ export default function App() {
   }, [])
 
   const selectRepo = async () => {
-    const path = await window.electronAPI.selectRepo()
+    const path = await window.conveyor.repo.selectRepo()
     if (path) {
       // Clear state before switching to prevent stale data mixing with new repo
       setWorktrees([])
@@ -361,14 +361,14 @@ export default function App() {
       // Uses getCommitGraphHistory with skipStats=true (saves 100 git commands)
       const [branchResult, worktreeResult, prResult, commitResult, statusResult, ghUrl, graphResult, stashResult] =
         await Promise.all([
-          window.electronAPI.getBranchesBasic(),
-          window.electronAPI.getWorktrees(),
-          window.electronAPI.getPullRequests(),
-          window.electronAPI.getCommitHistory(15),
-          window.electronAPI.getWorkingStatus(),
-          window.electronAPI.getGitHubUrl(),
-          window.electronAPI.getCommitGraphHistory(100, true, showCheckpoints), // skipStats for fast load
-          window.electronAPI.getStashes(),
+          window.conveyor.branch.getBranchesBasic(),
+          window.conveyor.worktree.getWorktrees(),
+          window.conveyor.pr.getPullRequests(),
+          window.conveyor.commit.getCommitHistory(15),
+          window.conveyor.commit.getWorkingStatus(),
+          window.conveyor.pr.getGitHubUrl(),
+          window.conveyor.commit.getCommitGraphHistory(100, true, showCheckpoints), // skipStats for fast load
+          window.conveyor.stash.getStashes(),
         ])
 
       setGithubUrl(ghUrl)
@@ -408,7 +408,7 @@ export default function App() {
 
       // Phase 2: Deferred metadata loading in background
       // This loads detailed branch metadata (commit counts, dates) after initial render
-      window.electronAPI
+      window.conveyor.branch
         .getBranchesWithMetadata()
         .then((metaResult) => {
           if (!('error' in metaResult)) {
@@ -431,7 +431,7 @@ export default function App() {
     setSelectedCommit(commit)
     setLoadingDiff(true)
     try {
-      const diff = await window.electronAPI.getCommitDiff(commit.hash)
+      const diff = await window.conveyor.commit.getCommitDiff(commit.hash)
       setCommitDiff(diff)
     } catch (_err) {
       setCommitDiff(null)
@@ -535,7 +535,7 @@ export default function App() {
     setStatus({ type: 'info', message: `Checking out ${pr.branch}...` })
 
     try {
-      const result = await window.electronAPI.checkoutPRBranch(pr.branch)
+      const result = await window.conveyor.pr.checkoutPRBranch(pr.branch)
       if (result.success) {
         setStatus({ type: 'success', message: result.message, stashed: result.stashed })
         await refresh()
@@ -552,7 +552,7 @@ export default function App() {
   const handlePRViewRemote = async (pr: PullRequest) => {
     closeContextMenu()
     try {
-      const result = await window.electronAPI.openPullRequest(pr.url)
+      const result = await window.conveyor.pr.openPullRequest(pr.url)
       if (result.success) {
         setStatus({ type: 'success', message: `Opened PR #${pr.number} in browser` })
       } else {
@@ -567,7 +567,7 @@ export default function App() {
   const handleWorktreeOpen = async (wt: Worktree) => {
     closeContextMenu()
     try {
-      const result = await window.electronAPI.openWorktree(wt.path)
+      const result = await window.conveyor.worktree.openWorktree(wt.path)
       if (result.success) {
         setStatus({ type: 'success', message: `Opened ${wt.path} in Finder` })
       } else {
@@ -587,7 +587,7 @@ export default function App() {
     setStatus({ type: 'info', message: `Converting ${folderName} to branch...` })
 
     try {
-      const result = await window.electronAPI.convertWorktreeToBranch(wt.path)
+      const result = await window.conveyor.worktree.convertWorktreeToBranch(wt.path)
       if (result.success) {
         setStatus({ type: 'success', message: result.message })
         await refresh()
@@ -610,7 +610,7 @@ export default function App() {
     setStatus({ type: 'info', message: `Switching to ${branch.name}...` })
 
     try {
-      const result: CheckoutResult = await window.electronAPI.checkoutBranch(branch.name)
+      const result: CheckoutResult = await window.conveyor.branch.checkoutBranch(branch.name)
       if (result.success) {
         setStatus({ type: 'success', message: result.message, stashed: result.stashed })
         await refresh()
@@ -630,7 +630,7 @@ export default function App() {
     setStatus({ type: 'info', message: `Pushing ${branch.name} to remote...` })
 
     try {
-      const result = await window.electronAPI.pushBranch(branch.name, true)
+      const result = await window.conveyor.branch.pushBranch(branch.name, true)
       if (result.success) {
         setStatus({ type: 'success', message: result.message })
         await refresh()
@@ -650,7 +650,7 @@ export default function App() {
     try {
       // Construct the remote branch path (assumes origin as default remote)
       const remoteBranch = `origin/${branch.name}`
-      const result = await window.electronAPI.pullBranch(remoteBranch)
+      const result = await window.conveyor.branch.pullBranch(remoteBranch)
       if (result.success) {
         setStatus({ type: 'success', message: result.message })
         await refresh()
@@ -668,7 +668,7 @@ export default function App() {
     setStatus({ type: 'info', message: `Fetching ${branch.name.replace('remotes/', '')}...` })
 
     try {
-      const result = await window.electronAPI.pullBranch(branch.name)
+      const result = await window.conveyor.branch.pullBranch(branch.name)
       if (result.success) {
         setStatus({ type: 'success', message: result.message })
         await refresh()
@@ -683,7 +683,7 @@ export default function App() {
   const handleRemoteBranchViewGitHub = async (branch: Branch) => {
     closeContextMenu()
     try {
-      const result = await window.electronAPI.openBranchInGitHub(branch.name)
+      const result = await window.conveyor.pr.openBranchInGitHub(branch.name)
       if (result.success) {
         setStatus({ type: 'success', message: result.message })
       } else {
@@ -703,7 +703,7 @@ export default function App() {
     setStatus({ type: 'info', message: `Resetting to ${commit.shortHash}...` })
 
     try {
-      const result = await window.electronAPI.resetToCommit(commit.hash, 'hard')
+      const result = await window.conveyor.commit.resetToCommit(commit.hash, 'hard')
       if (result.success) {
         setStatus({ type: 'success', message: result.message, stashed: result.stashed })
         await refresh()
@@ -867,7 +867,7 @@ export default function App() {
     setStatus({ type: 'info', message: `Creating branch '${newBranchName}'...` })
 
     try {
-      const result = await window.electronAPI.createBranch(newBranchName.trim(), true)
+      const result = await window.conveyor.branch.createBranch(newBranchName.trim(), true)
       if (result.success) {
         setStatus({ type: 'success', message: result.message })
         setShowNewBranchModal(false)
@@ -892,7 +892,7 @@ export default function App() {
       setStatus({ type: 'info', message: `Checking out ${displayName}...` })
 
       try {
-        const result: CheckoutResult = await window.electronAPI.checkoutRemoteBranch(branch.name)
+        const result: CheckoutResult = await window.conveyor.branch.checkoutRemoteBranch(branch.name)
         if (result.success) {
           setStatus({ type: 'success', message: result.message, stashed: result.stashed })
           await refresh()
@@ -916,7 +916,7 @@ export default function App() {
       setStatus({ type: 'info', message: `Checking out worktree ${worktree.displayName}...` })
 
       try {
-        const result: CheckoutResult = await window.electronAPI.checkoutBranch(worktree.branch)
+        const result: CheckoutResult = await window.conveyor.branch.checkoutBranch(worktree.branch)
         if (result.success) {
           setStatus({ type: 'success', message: result.message, stashed: result.stashed })
           await refresh()
@@ -944,7 +944,7 @@ export default function App() {
       setStatus({ type: 'info', message: `Checking out ${commit.shortHash}...` })
 
       try {
-        const result: CheckoutResult = await window.electronAPI.checkoutBranch(commit.hash)
+        const result: CheckoutResult = await window.conveyor.branch.checkoutBranch(commit.hash)
         if (result.success) {
           setStatus({ type: 'success', message: `Checked out commit ${commit.shortHash}`, stashed: result.stashed })
           await refresh()
@@ -961,9 +961,9 @@ export default function App() {
   )
 
   useEffect(() => {
-    if (!window.electronAPI) return
+    if (!window.conveyor) return
     // Try to load the saved repo from last session
-    window.electronAPI.loadSavedRepo().then((path) => {
+    window.conveyor.repo.loadSavedRepo().then((path) => {
       if (path) {
         setRepoPath(path)
         refresh()
@@ -973,7 +973,7 @@ export default function App() {
 
   // Initialize theme on app mount
   useEffect(() => {
-    if (!window.electronAPI) return
+    if (!window.conveyor) return
     initializeTheme().catch(console.error)
     getCurrentThemeMode().then(setThemeMode).catch(console.error)
   }, [])
@@ -1380,13 +1380,13 @@ export default function App() {
               title={githubUrl || repoPath}
               onClick={async () => {
                 if (githubUrl) {
-                  await window.electronAPI.openPullRequest(githubUrl)
+                  await window.conveyor.pr.openPullRequest(githubUrl)
                 } else {
                   // Try to get GitHub URL fresh
-                  const url = await window.electronAPI.getGitHubUrl()
+                  const url = await window.conveyor.pr.getGitHubUrl()
                   if (url) {
                     setGithubUrl(url)
-                    await window.electronAPI.openPullRequest(url)
+                    await window.conveyor.pr.openPullRequest(url)
                   } else {
                     setStatus({ type: 'error', message: 'No GitHub URL found for this repo' })
                   }
@@ -1767,7 +1767,7 @@ export default function App() {
                     onChange={async (e) => {
                       const newValue = e.target.checked
                       setShowCheckpoints(newValue)
-                      const graphResult = await window.electronAPI.getCommitGraphHistory(100, true, newValue)
+                      const graphResult = await window.conveyor.commit.getCommitGraphHistory(100, true, newValue)
                       setGraphCommits(graphResult)
                     }}
                   />
@@ -2522,7 +2522,7 @@ export default function App() {
                             const newValue = e.target.checked
                             setShowCheckpoints(newValue)
                             // Reload commits with new filter
-                            const graphResult = await window.electronAPI.getCommitGraphHistory(100, true, newValue)
+                            const graphResult = await window.conveyor.commit.getCommitGraphHistory(100, true, newValue)
                             setGraphCommits(graphResult)
                           }}
                         />

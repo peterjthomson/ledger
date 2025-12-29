@@ -3,6 +3,12 @@ import { windowIpcSchema } from './window-schema'
 import { appIpcSchema } from './app-schema'
 import { repoIpcSchema } from './repo-schema'
 import { branchIpcSchema } from './branch-schema'
+import { worktreeIpcSchema } from './worktree-schema'
+import { prIpcSchema } from './pr-schema'
+import { commitIpcSchema } from './commit-schema'
+import { stashIpcSchema } from './stash-schema'
+import { stagingIpcSchema } from './staging-schema'
+import { themeIpcSchema } from './theme-schema'
 
 // Define all IPC channel schemas in one place
 export const ipcSchemas = {
@@ -10,6 +16,12 @@ export const ipcSchemas = {
   ...appIpcSchema,
   ...repoIpcSchema,
   ...branchIpcSchema,
+  ...worktreeIpcSchema,
+  ...prIpcSchema,
+  ...commitIpcSchema,
+  ...stashIpcSchema,
+  ...stagingIpcSchema,
+  ...themeIpcSchema,
 } as const
 
 // Extract types from Zod schemas

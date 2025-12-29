@@ -38,7 +38,7 @@ export function StashDetailPanel({
     onStatusChange?.({ type: 'info', message: `Applying stash@{${stash.index}}...` })
 
     try {
-      const result = await window.electronAPI.applyStash(stash.index)
+      const result = await window.conveyor.stash.applyStash(stash.index)
       if (result.success) {
         onStatusChange?.({ type: 'success', message: result.message })
         await onRefresh?.()
@@ -60,7 +60,7 @@ export function StashDetailPanel({
     onStatusChange?.({ type: 'info', message: `Dropping stash@{${stash.index}}...` })
 
     try {
-      const result = await window.electronAPI.dropStash(stash.index)
+      const result = await window.conveyor.stash.dropStash(stash.index)
       if (result.success) {
         onStatusChange?.({ type: 'success', message: result.message })
         onClearFocus?.()
@@ -83,7 +83,7 @@ export function StashDetailPanel({
     onStatusChange?.({ type: 'info', message: `Creating branch '${branchName}' from stash...` })
 
     try {
-      const result = await window.electronAPI.stashToBranch(stash.index, branchName.trim())
+      const result = await window.conveyor.stash.stashToBranch(stash.index, branchName.trim())
       if (result.success) {
         onStatusChange?.({ type: 'success', message: result.message })
         setShowBranchModal(false)
@@ -105,7 +105,7 @@ export function StashDetailPanel({
     const loadFiles = async () => {
       setLoading(true)
       try {
-        const stashFiles = await window.electronAPI.getStashFiles(stash.index)
+        const stashFiles = await window.conveyor.stash.getStashFiles(stash.index)
         setFiles(stashFiles)
       } catch (error) {
         console.error('Error loading stash files:', error)
@@ -130,7 +130,7 @@ export function StashDetailPanel({
     const loadDiff = async () => {
       setLoadingDiff(true)
       try {
-        const diff = await window.electronAPI.getStashFileDiff(stash.index, selectedFile)
+        const diff = await window.conveyor.stash.getStashFileDiff(stash.index, selectedFile)
         setFileDiff(diff)
       } catch (_error) {
         setFileDiff(null)

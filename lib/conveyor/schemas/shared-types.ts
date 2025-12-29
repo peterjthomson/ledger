@@ -1,9 +1,6 @@
 import { z } from 'zod'
 
-// ============================================
-// Common Result Schemas
-// ============================================
-
+// Common result schema used by many handlers
 export const SuccessResultSchema = z.object({
   success: z.boolean(),
   message: z.string(),
@@ -15,10 +12,7 @@ export const CheckoutResultSchema = z.object({
   stashed: z.string().optional(),
 })
 
-// ============================================
-// Branch Schemas
-// ============================================
-
+// Branch schema
 export const BranchSchema = z.object({
   name: z.string(),
   current: z.boolean(),
@@ -38,20 +32,23 @@ export const BranchesResultSchema = z.object({
   error: z.string().optional(),
 })
 
-// ============================================
-// Worktree Schemas
-// ============================================
+// Stash schemas
+export const StashEntrySchema = z.object({
+  index: z.number(),
+  message: z.string(),
+  branch: z.string(),
+  date: z.string(),
+})
 
-export const WorktreeAgentSchema = z.enum([
-  'cursor',
-  'claude',
-  'conductor',
-  'gemini',
-  'junie',
-  'unknown',
-  'working-folder',
-])
+export const StashFileSchema = z.object({
+  path: z.string(),
+  status: z.enum(['added', 'modified', 'deleted', 'renamed']),
+  additions: z.number(),
+  deletions: z.number(),
+})
 
+// Worktree schemas
+export const WorktreeAgentSchema = z.enum(['cursor', 'claude', 'conductor', 'gemini', 'junie', 'unknown', 'working-folder'])
 export const WorktreeActivityStatusSchema = z.enum(['active', 'recent', 'stale', 'unknown'])
 
 export const WorktreeSchema = z.object({
@@ -71,6 +68,11 @@ export const WorktreeSchema = z.object({
   agentTaskHint: z.string().nullable(),
 })
 
+export const WorktreeResultSchema = z.union([
+  z.array(WorktreeSchema),
+  z.object({ error: z.string() }),
+])
+
 export const CreateWorktreeOptionsSchema = z.object({
   branchName: z.string(),
   isNewBranch: z.boolean(),
@@ -89,10 +91,7 @@ export const ConvertWorktreeResultSchema = z.object({
   branchName: z.string().optional(),
 })
 
-// ============================================
-// Pull Request Schemas
-// ============================================
-
+// Pull request schemas
 export const PullRequestSchema = z.object({
   number: z.number(),
   title: z.string(),
@@ -115,21 +114,126 @@ export const PullRequestsResultSchema = z.object({
   error: z.string().optional(),
 })
 
-export const CreatePROptionsSchema = z.object({
-  title: z.string(),
-  body: z.string().optional(),
-  headBranch: z.string().optional(),
-  baseBranch: z.string().optional(),
-  draft: z.boolean().optional(),
-  web: z.boolean().optional(),
-})
-
-export const CreatePRResultSchema = z.object({
-  success: z.boolean(),
+// Commit schemas
+export const CommitSchema = z.object({
+  hash: z.string(),
+  shortHash: z.string(),
   message: z.string(),
-  url: z.string().optional(),
+  author: z.string(),
+  date: z.string(),
+  isMerge: z.boolean(),
+  filesChanged: z.number().optional(),
+  additions: z.number().optional(),
+  deletions: z.number().optional(),
 })
 
+export const GraphCommitSchema = z.object({
+  hash: z.string(),
+  shortHash: z.string(),
+  message: z.string(),
+  author: z.string(),
+  date: z.string(),
+  parents: z.array(z.string()),
+  refs: z.array(z.string()),
+  isMerge: z.boolean(),
+  filesChanged: z.number().optional(),
+  additions: z.number().optional(),
+  deletions: z.number().optional(),
+})
+
+// Diff schemas
+export const DiffFileSchema = z.object({
+  path: z.string(),
+  status: z.enum(['added', 'modified', 'deleted', 'renamed']),
+  additions: z.number(),
+  deletions: z.number(),
+  oldPath: z.string().optional(),
+})
+
+export const DiffLineSchema = z.object({
+  type: z.enum(['context', 'add', 'delete', 'header']),
+  content: z.string(),
+  oldLineNumber: z.number().optional(),
+  newLineNumber: z.number().optional(),
+})
+
+export const DiffHunkSchema = z.object({
+  oldStart: z.number(),
+  oldLines: z.number(),
+  newStart: z.number(),
+  newLines: z.number(),
+  lines: z.array(DiffLineSchema),
+})
+
+export const FileDiffSchema = z.object({
+  file: DiffFileSchema,
+  hunks: z.array(DiffHunkSchema),
+  isBinary: z.boolean(),
+})
+
+export const CommitDiffSchema = z.object({
+  hash: z.string(),
+  message: z.string(),
+  author: z.string(),
+  date: z.string(),
+  files: z.array(FileDiffSchema),
+  totalAdditions: z.number(),
+  totalDeletions: z.number(),
+})
+
+export const BranchDiffSchema = z.object({
+  branchName: z.string(),
+  baseBranch: z.string(),
+  files: z.array(FileDiffSchema),
+  totalAdditions: z.number(),
+  totalDeletions: z.number(),
+  commitCount: z.number(),
+})
+
+// Working status schemas
+export const UncommittedFileSchema = z.object({
+  path: z.string(),
+  status: z.enum(['modified', 'added', 'deleted', 'renamed', 'untracked']),
+  staged: z.boolean(),
+})
+
+export const WorkingStatusSchema = z.object({
+  hasChanges: z.boolean(),
+  files: z.array(UncommittedFileSchema),
+  stagedCount: z.number(),
+  unstagedCount: z.number(),
+  additions: z.number(),
+  deletions: z.number(),
+})
+
+// Staging diff schemas
+export const StagingDiffLineSchema = z.object({
+  type: z.enum(['context', 'add', 'delete']),
+  content: z.string(),
+  oldLineNumber: z.number().optional(),
+  newLineNumber: z.number().optional(),
+})
+
+export const StagingDiffHunkSchema = z.object({
+  header: z.string(),
+  oldStart: z.number(),
+  oldLines: z.number(),
+  newStart: z.number(),
+  newLines: z.number(),
+  lines: z.array(StagingDiffLineSchema),
+})
+
+export const StagingFileDiffSchema = z.object({
+  filePath: z.string(),
+  oldPath: z.string().optional(),
+  status: z.enum(['added', 'modified', 'deleted', 'renamed', 'untracked']),
+  hunks: z.array(StagingDiffHunkSchema),
+  isBinary: z.boolean(),
+  additions: z.number(),
+  deletions: z.number(),
+})
+
+// PR Review schemas
 export const PRCommentSchema = z.object({
   id: z.string(),
   author: z.object({ login: z.string() }),
@@ -198,88 +302,7 @@ export const PRDetailSchema = z.object({
   reviewComments: z.array(PRReviewCommentSchema).optional(),
 })
 
-export const MergeMethodSchema = z.enum(['merge', 'squash', 'rebase'])
-
-// ============================================
-// Commit Schemas
-// ============================================
-
-export const CommitSchema = z.object({
-  hash: z.string(),
-  shortHash: z.string(),
-  message: z.string(),
-  author: z.string(),
-  date: z.string(),
-  isMerge: z.boolean(),
-  filesChanged: z.number().optional(),
-  additions: z.number().optional(),
-  deletions: z.number().optional(),
-})
-
-export const GraphCommitSchema = z.object({
-  hash: z.string(),
-  shortHash: z.string(),
-  message: z.string(),
-  author: z.string(),
-  date: z.string(),
-  parents: z.array(z.string()),
-  refs: z.array(z.string()),
-  isMerge: z.boolean(),
-  filesChanged: z.number().optional(),
-  additions: z.number().optional(),
-  deletions: z.number().optional(),
-})
-
-export const DiffFileSchema = z.object({
-  path: z.string(),
-  status: z.enum(['added', 'modified', 'deleted', 'renamed']),
-  additions: z.number(),
-  deletions: z.number(),
-  oldPath: z.string().optional(),
-})
-
-export const DiffLineSchema = z.object({
-  type: z.enum(['context', 'add', 'delete', 'header']),
-  content: z.string(),
-  oldLineNumber: z.number().optional(),
-  newLineNumber: z.number().optional(),
-})
-
-export const DiffHunkSchema = z.object({
-  oldStart: z.number(),
-  oldLines: z.number(),
-  newStart: z.number(),
-  newLines: z.number(),
-  lines: z.array(DiffLineSchema),
-})
-
-export const FileDiffSchema = z.object({
-  file: DiffFileSchema,
-  hunks: z.array(DiffHunkSchema),
-  isBinary: z.boolean(),
-})
-
-export const CommitDiffSchema = z.object({
-  hash: z.string(),
-  message: z.string(),
-  author: z.string(),
-  date: z.string(),
-  files: z.array(FileDiffSchema),
-  totalAdditions: z.number(),
-  totalDeletions: z.number(),
-})
-
-export const BranchDiffSchema = z.object({
-  branchName: z.string(),
-  baseBranch: z.string(),
-  files: z.array(FileDiffSchema),
-  totalAdditions: z.number(),
-  totalDeletions: z.number(),
-  commitCount: z.number(),
-})
-
-export const ResetModeSchema = z.enum(['soft', 'mixed', 'hard'])
-
+// Commit result schemas
 export const CommitResultSchema = z.object({
   success: z.boolean(),
   message: z.string(),
@@ -293,135 +316,56 @@ export const PullResultSchema = z.object({
   autoStashed: z.boolean().optional(),
 })
 
-// ============================================
-// Stash Schemas
-// ============================================
+// PR creation options
+export const CreatePROptionsSchema = z.object({
+  title: z.string(),
+  body: z.string().optional(),
+  headBranch: z.string().optional(),
+  baseBranch: z.string().optional(),
+  draft: z.boolean().optional(),
+  web: z.boolean().optional(),
+})
 
-export const StashEntrySchema = z.object({
-  index: z.number(),
+export const CreatePRResultSchema = z.object({
+  success: z.boolean(),
   message: z.string(),
-  branch: z.string(),
-  date: z.string(),
+  url: z.string().optional(),
 })
 
-export const StashFileSchema = z.object({
-  path: z.string(),
-  status: z.enum(['added', 'modified', 'deleted', 'renamed']),
-  additions: z.number(),
-  deletions: z.number(),
-})
-
-// ============================================
-// Staging Schemas
-// ============================================
-
-export const UncommittedFileSchema = z.object({
-  path: z.string(),
-  status: z.enum(['modified', 'added', 'deleted', 'renamed', 'untracked']),
-  staged: z.boolean(),
-})
-
-export const WorkingStatusSchema = z.object({
-  hasChanges: z.boolean(),
-  files: z.array(UncommittedFileSchema),
-  stagedCount: z.number(),
-  unstagedCount: z.number(),
-  additions: z.number(),
-  deletions: z.number(),
-})
-
-export const StagingDiffLineSchema = z.object({
-  type: z.enum(['context', 'add', 'delete']),
-  content: z.string(),
-  oldLineNumber: z.number().optional(),
-  newLineNumber: z.number().optional(),
-})
-
-export const StagingDiffHunkSchema = z.object({
-  header: z.string(),
-  oldStart: z.number(),
-  oldLines: z.number(),
-  newStart: z.number(),
-  newLines: z.number(),
-  lines: z.array(StagingDiffLineSchema),
-})
-
-export const StagingFileDiffSchema = z.object({
-  filePath: z.string(),
-  oldPath: z.string().optional(),
-  status: z.enum(['added', 'modified', 'deleted', 'renamed', 'untracked']),
-  hunks: z.array(StagingDiffHunkSchema),
-  isBinary: z.boolean(),
-  additions: z.number(),
-  deletions: z.number(),
-})
-
-// ============================================
-// Theme Schemas
-// ============================================
-
+// Theme schemas
 export const ThemeModeSchema = z.enum(['light', 'dark', 'system', 'custom'])
-
 export const SystemThemeSchema = z.enum(['light', 'dark'])
 
-export const ThemeObjectSchema = z.object({
+export const CustomThemeSchema = z.object({
   name: z.string(),
   path: z.string(),
   type: z.enum(['light', 'dark']),
   colors: z.record(z.string(), z.string()),
 })
 
-export const CustomThemeResultSchema = z
-  .object({
-    theme: ThemeObjectSchema,
-    cssVars: z.record(z.string(), z.string()),
-  })
-  .nullable()
+export const ThemeDataSchema = z.object({
+  theme: CustomThemeSchema,
+  cssVars: z.record(z.string(), z.string()),
+})
 
-// ============================================
-// Type Exports (inferred from schemas)
-// ============================================
-
+// Type exports
 export type SuccessResult = z.infer<typeof SuccessResultSchema>
 export type CheckoutResult = z.infer<typeof CheckoutResultSchema>
 export type Branch = z.infer<typeof BranchSchema>
 export type BranchesResult = z.infer<typeof BranchesResultSchema>
-export type WorktreeAgent = z.infer<typeof WorktreeAgentSchema>
-export type WorktreeActivityStatus = z.infer<typeof WorktreeActivityStatusSchema>
-export type Worktree = z.infer<typeof WorktreeSchema>
-export type CreateWorktreeOptions = z.infer<typeof CreateWorktreeOptionsSchema>
-export type CreateWorktreeResult = z.infer<typeof CreateWorktreeResultSchema>
-export type ConvertWorktreeResult = z.infer<typeof ConvertWorktreeResultSchema>
-export type PullRequest = z.infer<typeof PullRequestSchema>
-export type PullRequestsResult = z.infer<typeof PullRequestsResultSchema>
-export type CreatePROptions = z.infer<typeof CreatePROptionsSchema>
-export type CreatePRResult = z.infer<typeof CreatePRResultSchema>
-export type PRComment = z.infer<typeof PRCommentSchema>
-export type PRReview = z.infer<typeof PRReviewSchema>
-export type PRFile = z.infer<typeof PRFileSchema>
-export type PRCommit = z.infer<typeof PRCommitSchema>
-export type PRReviewComment = z.infer<typeof PRReviewCommentSchema>
-export type PRDetail = z.infer<typeof PRDetailSchema>
-export type MergeMethod = z.infer<typeof MergeMethodSchema>
-export type Commit = z.infer<typeof CommitSchema>
-export type GraphCommit = z.infer<typeof GraphCommitSchema>
-export type DiffFile = z.infer<typeof DiffFileSchema>
-export type DiffLine = z.infer<typeof DiffLineSchema>
-export type DiffHunk = z.infer<typeof DiffHunkSchema>
-export type FileDiff = z.infer<typeof FileDiffSchema>
-export type CommitDiff = z.infer<typeof CommitDiffSchema>
-export type BranchDiff = z.infer<typeof BranchDiffSchema>
-export type ResetMode = z.infer<typeof ResetModeSchema>
-export type CommitResult = z.infer<typeof CommitResultSchema>
-export type PullResult = z.infer<typeof PullResultSchema>
 export type StashEntry = z.infer<typeof StashEntrySchema>
 export type StashFile = z.infer<typeof StashFileSchema>
-export type UncommittedFile = z.infer<typeof UncommittedFileSchema>
+export type Worktree = z.infer<typeof WorktreeSchema>
+export type CreateWorktreeOptions = z.infer<typeof CreateWorktreeOptionsSchema>
+export type PullRequest = z.infer<typeof PullRequestSchema>
+export type Commit = z.infer<typeof CommitSchema>
+export type GraphCommit = z.infer<typeof GraphCommitSchema>
+export type CommitDiff = z.infer<typeof CommitDiffSchema>
+export type BranchDiff = z.infer<typeof BranchDiffSchema>
 export type WorkingStatus = z.infer<typeof WorkingStatusSchema>
-export type StagingDiffLine = z.infer<typeof StagingDiffLineSchema>
-export type StagingDiffHunk = z.infer<typeof StagingDiffHunkSchema>
 export type StagingFileDiff = z.infer<typeof StagingFileDiffSchema>
+export type PRDetail = z.infer<typeof PRDetailSchema>
+export type PRReviewComment = z.infer<typeof PRReviewCommentSchema>
 export type ThemeMode = z.infer<typeof ThemeModeSchema>
-export type SystemTheme = z.infer<typeof SystemThemeSchema>
-export type ThemeObject = z.infer<typeof ThemeObjectSchema>
-export type CustomThemeResult = z.infer<typeof CustomThemeResultSchema>
+export type CustomTheme = z.infer<typeof CustomThemeSchema>
+export type ThemeData = z.infer<typeof ThemeDataSchema>

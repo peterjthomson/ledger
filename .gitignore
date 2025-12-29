@@ -10,3 +10,4 @@ playwright-report/
 docs/wip
 # Build artifacts WIP folder (for in-progress notarization)
 wip/
+tickets/

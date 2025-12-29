@@ -47,7 +47,7 @@ export function BranchDetailPanel({
     let cancelled = false
     setLoadingDiff(true)
 
-    window.electronAPI.getBranchDiff(branch.name).then((diff) => {
+    window.conveyor.commit.getBranchDiff(branch.name).then((diff) => {
       if (!cancelled) {
         setBranchDiff(diff)
         // Expand first 3 files by default
@@ -86,7 +86,7 @@ export function BranchDetailPanel({
     onStatusChange?.({ type: 'info', message: `Creating pull request for ${branch.name}...` })
 
     try {
-      const result = await window.electronAPI.createPullRequest({
+      const result = await window.conveyor.pr.createPullRequest({
         title: prTitle.trim(),
         body: prBody.trim() || undefined,
         headBranch: branch.name,
@@ -115,7 +115,7 @@ export function BranchDetailPanel({
     onStatusChange?.({ type: 'info', message: `Pushing ${branch.name} to origin...` })
 
     try {
-      const result = await window.electronAPI.pushBranch(branch.name, true)
+      const result = await window.conveyor.branch.pushBranch(branch.name, true)
 
       if (result.success) {
         onStatusChange?.({ type: 'success', message: result.message })
@@ -246,7 +246,7 @@ export function BranchDetailPanel({
               Create Pull Request
             </button>
           )}
-          <button className="btn btn-secondary" onClick={() => window.electronAPI.openBranchInGitHub(branch.name)}>
+          <button className="btn btn-secondary" onClick={() => window.conveyor.pr.openBranchInGitHub(branch.name)}>
             View on GitHub
           </button>
         </div>

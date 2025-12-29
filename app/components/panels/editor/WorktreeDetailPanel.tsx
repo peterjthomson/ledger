@@ -43,7 +43,7 @@ export function WorktreeDetailPanel({
     onStatusChange?.({ type: 'info', message: `Applying changes from ${worktree.displayName}...` })
 
     try {
-      const result = await window.electronAPI.applyWorktreeChanges(worktree.path)
+      const result = await window.conveyor.worktree.applyWorktreeChanges(worktree.path)
       if (result.success) {
         onStatusChange?.({ type: 'success', message: result.message })
         await onRefresh?.()
@@ -67,7 +67,7 @@ export function WorktreeDetailPanel({
     onStatusChange?.({ type: 'info', message: `Creating branch from ${worktree.displayName}...` })
 
     try {
-      const result = await window.electronAPI.convertWorktreeToBranch(worktree.path)
+      const result = await window.conveyor.worktree.convertWorktreeToBranch(worktree.path)
       if (result.success) {
         onStatusChange?.({ type: 'success', message: result.message })
         await onRefresh?.()
@@ -82,7 +82,7 @@ export function WorktreeDetailPanel({
   }
 
   const handleOpenInFinder = async () => {
-    await window.electronAPI.openWorktree(worktree.path)
+    await window.conveyor.worktree.openWorktree(worktree.path)
   }
 
   const handleRemove = async (force: boolean = false) => {
@@ -95,7 +95,7 @@ export function WorktreeDetailPanel({
     onStatusChange?.({ type: 'info', message: `Removing worktree...` })
 
     try {
-      const result = await window.electronAPI.removeWorktree(worktree.path, force)
+      const result = await window.conveyor.worktree.removeWorktree(worktree.path, force)
       if (result.success) {
         onStatusChange?.({ type: 'success', message: result.message })
         onClearFocus?.()

@@ -44,8 +44,8 @@ export function PRReviewPanel({ pr, formatRelativeTime, onCheckout, onPRMerged, 
     setLoading(true)
     try {
       const [detail, comments] = await Promise.all([
-        window.electronAPI.getPRDetail(pr.number),
-        window.electronAPI.getPRReviewComments(pr.number),
+        window.conveyor.pr.getPRDetail(pr.number),
+        window.conveyor.pr.getPRReviewComments(pr.number),
       ])
       setPrDetail(detail)
       setReviewComments(comments)
@@ -68,7 +68,7 @@ export function PRReviewPanel({ pr, formatRelativeTime, onCheckout, onPRMerged, 
     setCommentStatus(null)
 
     try {
-      const result = await window.electronAPI.commentOnPR(pr.number, commentText.trim())
+      const result = await window.conveyor.pr.commentOnPR(pr.number, commentText.trim())
 
       if (result.success) {
         setCommentText('')
@@ -95,7 +95,7 @@ export function PRReviewPanel({ pr, formatRelativeTime, onCheckout, onPRMerged, 
     setCommentStatus(null)
 
     try {
-      const result = await window.electronAPI.mergePR(pr.number, 'squash')
+      const result = await window.conveyor.pr.mergePR(pr.number, 'squash')
 
       if (result.success) {
         setCommentStatus({ type: 'success', message: 'PR merged!' })
@@ -124,7 +124,7 @@ export function PRReviewPanel({ pr, formatRelativeTime, onCheckout, onPRMerged, 
     const loadDiff = async () => {
       setLoadingDiff(true)
       try {
-        const diff = await window.electronAPI.getPRFileDiff(pr.number, selectedFile)
+        const diff = await window.conveyor.pr.getPRFileDiff(pr.number, selectedFile)
         setFileDiff(diff)
       } catch (_error) {
         setFileDiff(null)
@@ -240,7 +240,7 @@ export function PRReviewPanel({ pr, formatRelativeTime, onCheckout, onPRMerged, 
         )}
         <button
           className="btn btn-secondary"
-          onClick={() => window.electronAPI.openPullRequest(pr.url)}
+          onClick={() => window.conveyor.pr.openPullRequest(pr.url)}
         >
           View on GitHub
         </button>
@@ -394,7 +394,7 @@ export function PRReviewPanel({ pr, formatRelativeTime, onCheckout, onPRMerged, 
                     href={`${pr.url}/files#diff-${selectedFile.replace(/[^a-zA-Z0-9]/g, '')}`}
                     onClick={(e) => {
                       e.preventDefault()
-                      window.electronAPI.openPullRequest(`${pr.url}/files`)
+                      window.conveyor.pr.openPullRequest(`${pr.url}/files`)
                     }}
                     className="pr-view-on-github"
                   >

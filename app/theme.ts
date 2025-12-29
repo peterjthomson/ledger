@@ -43,7 +43,7 @@ function setThemeClass(mode: 'light' | 'dark'): void {
 // Get the effective theme (resolves 'system' to actual light/dark)
 async function getEffectiveTheme(mode: ThemeMode): Promise<'light' | 'dark'> {
   if (mode === 'system') {
-    return await window.electronAPI.getSystemTheme();
+    return await window.conveyor.theme.getSystemTheme();
   }
   return mode === 'custom' ? 'dark' : mode;
 }
@@ -53,7 +53,7 @@ function setupSystemThemeListener(): void {
   const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
   
   mediaQuery.addEventListener('change', async () => {
-    const currentMode = await window.electronAPI.getThemeMode() as ThemeMode;
+    const currentMode = await window.conveyor.theme.getThemeMode() as ThemeMode;
     if (currentMode === 'system') {
       const systemTheme = mediaQuery.matches ? 'dark' : 'light';
       setThemeClass(systemTheme);
@@ -64,10 +64,10 @@ function setupSystemThemeListener(): void {
 // Initialize theme on app startup
 export async function initializeTheme(): Promise<void> {
   try {
-    const mode = await window.electronAPI.getThemeMode() as ThemeMode;
+    const mode = await window.conveyor.theme.getThemeMode() as ThemeMode;
 
     if (mode === 'custom') {
-      const themeData = await window.electronAPI.getCustomTheme() as ThemeData | null;
+      const themeData = await window.conveyor.theme.getCustomTheme() as ThemeData | null;
       if (themeData) {
         // Apply the base mode (light/dark) from the custom theme
         setThemeClass(themeData.theme.type);
@@ -95,7 +95,7 @@ export async function initializeTheme(): Promise<void> {
 
 // Toggle between light and dark mode
 export async function toggleTheme(): Promise<void> {
-  const currentMode = await window.electronAPI.getThemeMode() as ThemeMode;
+  const currentMode = await window.conveyor.theme.getThemeMode() as ThemeMode;
 
   // Clear any custom theme variables first
   clearCustomCSSVariables();
@@ -104,35 +104,35 @@ export async function toggleTheme(): Promise<void> {
   const newMode: ThemeMode = currentMode === 'dark' ? 'light' : 'dark';
 
   setThemeClass(newMode);
-  await window.electronAPI.setThemeMode(newMode);
+  await window.conveyor.theme.setThemeMode(newMode);
 }
 
 // Set specific theme mode
 export async function setThemeMode(mode: ThemeMode): Promise<void> {
   if (mode === 'custom') {
     // For custom, we need to load the custom theme
-    const themeData = await window.electronAPI.getCustomTheme() as ThemeData | null;
+    const themeData = await window.conveyor.theme.getCustomTheme() as ThemeData | null;
     if (themeData) {
       setThemeClass(themeData.theme.type);
       applyCSSVariables(themeData.cssVars);
-      await window.electronAPI.setThemeMode('custom');
+      await window.conveyor.theme.setThemeMode('custom');
     }
   } else if (mode === 'system') {
     clearCustomCSSVariables();
     const effectiveTheme = await getEffectiveTheme(mode);
     setThemeClass(effectiveTheme);
-    await window.electronAPI.setThemeMode('system');
+    await window.conveyor.theme.setThemeMode('system');
   } else {
     clearCustomCSSVariables();
     setThemeClass(mode);
-    await window.electronAPI.setThemeMode(mode);
+    await window.conveyor.theme.setThemeMode(mode);
   }
 }
 
 // Load a VSCode theme file (user-selected)
 export async function loadVSCodeTheme(): Promise<CustomTheme | null> {
   try {
-    const result = await window.electronAPI.loadVSCodeTheme() as ThemeData | null;
+    const result = await window.conveyor.theme.loadVSCodeTheme() as ThemeData | null;
 
     if (result) {
       // Apply the theme
@@ -151,7 +151,7 @@ export async function loadVSCodeTheme(): Promise<CustomTheme | null> {
 // Load a built-in theme from resources/themes
 export async function loadBuiltInTheme(themeFileName: string): Promise<CustomTheme | null> {
   try {
-    const result = await window.electronAPI.loadBuiltInTheme(themeFileName) as ThemeData | null;
+    const result = await window.conveyor.theme.loadBuiltInTheme(themeFileName) as ThemeData | null;
 
     if (result) {
       // Apply the theme
@@ -170,13 +170,13 @@ export async function loadBuiltInTheme(themeFileName: string): Promise<CustomThe
 // Clear custom theme and revert to dark mode
 export async function clearCustomTheme(): Promise<void> {
   clearCustomCSSVariables();
-  await window.electronAPI.clearCustomTheme();
+  await window.conveyor.theme.clearCustomTheme();
   setThemeClass('dark');
 }
 
 // Get current theme mode
 export async function getCurrentThemeMode(): Promise<ThemeMode> {
-  return await window.electronAPI.getThemeMode() as ThemeMode;
+  return await window.conveyor.theme.getThemeMode() as ThemeMode;
 }
 
 // Check if dark mode is currently active

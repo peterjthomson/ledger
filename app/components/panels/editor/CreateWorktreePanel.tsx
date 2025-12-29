@@ -53,7 +53,7 @@ export function CreateWorktreePanel({
   }, [defaultFolderPath, folderManuallyEdited])
 
   const handleBrowse = async () => {
-    const selected = await window.electronAPI.selectWorktreeFolder()
+    const selected = await window.conveyor.worktree.selectWorktreeFolder()
     if (selected) {
       setFolderPath(selected)
       setFolderManuallyEdited(true)
@@ -77,7 +77,7 @@ export function CreateWorktreePanel({
     onStatusChange?.({ type: 'info', message: `Creating worktree...` })
 
     try {
-      const result = await window.electronAPI.createWorktree({
+      const result = await window.conveyor.worktree.createWorktree({
         branchName: targetBranch,
         isNewBranch: branchMode === 'new',
         folderPath: folderPath.trim(),

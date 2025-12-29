@@ -78,7 +78,7 @@ export function StagingPanel({ workingStatus, currentBranch, onRefresh, onStatus
     const loadDiff = async () => {
       setLoadingDiff(true)
       try {
-        const diff = await window.electronAPI.getFileDiff(selectedFile.path, selectedFile.staged)
+        const diff = await window.conveyor.staging.getFileDiff(selectedFile.path, selectedFile.staged)
         setFileDiff(diff)
       } catch (_error) {
         setFileDiff(null)
@@ -92,7 +92,7 @@ export function StagingPanel({ workingStatus, currentBranch, onRefresh, onStatus
 
   // Stage a file
   const handleStageFile = async (file: UncommittedFile) => {
-    const result = await window.electronAPI.stageFile(file.path)
+    const result = await window.conveyor.staging.stageFile(file.path)
     if (result.success) {
       onStatusChange({ type: 'success', message: result.message })
       await onRefresh()
@@ -103,7 +103,7 @@ export function StagingPanel({ workingStatus, currentBranch, onRefresh, onStatus
 
   // Unstage a file
   const handleUnstageFile = async (file: UncommittedFile) => {
-    const result = await window.electronAPI.unstageFile(file.path)
+    const result = await window.conveyor.staging.unstageFile(file.path)
     if (result.success) {
       onStatusChange({ type: 'success', message: result.message })
       await onRefresh()
@@ -114,7 +114,7 @@ export function StagingPanel({ workingStatus, currentBranch, onRefresh, onStatus
 
   // Stage all files
   const handleStageAll = async () => {
-    const result = await window.electronAPI.stageAll()
+    const result = await window.conveyor.staging.stageAll()
     if (result.success) {
       onStatusChange({ type: 'success', message: result.message })
       await onRefresh()
@@ -125,7 +125,7 @@ export function StagingPanel({ workingStatus, currentBranch, onRefresh, onStatus
 
   // Unstage all files
   const handleUnstageAll = async () => {
-    const result = await window.electronAPI.unstageAll()
+    const result = await window.conveyor.staging.unstageAll()
     if (result.success) {
       onStatusChange({ type: 'success', message: result.message })
       await onRefresh()
@@ -137,7 +137,7 @@ export function StagingPanel({ workingStatus, currentBranch, onRefresh, onStatus
   // Discard changes in a file
   const handleDiscardFile = async (file: UncommittedFile) => {
     setFileContextMenu(null)
-    const result = await window.electronAPI.discardFileChanges(file.path)
+    const result = await window.conveyor.staging.discardFileChanges(file.path)
     if (result.success) {
       onStatusChange({ type: 'success', message: result.message })
       if (selectedFile?.path === file.path) {
@@ -168,7 +168,7 @@ export function StagingPanel({ workingStatus, currentBranch, onRefresh, onStatus
       // If creating a new branch, do that first
       if (fullBranchName) {
         onStatusChange({ type: 'info', message: `Creating branch ${fullBranchName}...` })
-        const branchResult = await window.electronAPI.createBranch(fullBranchName, true)
+        const branchResult = await window.conveyor.branch.createBranch(fullBranchName, true)
         if (!branchResult.success) {
           onStatusChange({ type: 'error', message: `Failed to create branch: ${branchResult.message}` })
           setIsCommitting(false)
@@ -176,7 +176,7 @@ export function StagingPanel({ workingStatus, currentBranch, onRefresh, onStatus
         }
       }
 
-      const result = await window.electronAPI.commitChanges(
+      const result = await window.conveyor.commit.commitChanges(
         commitMessage.trim(),
         commitDescription.trim() || undefined,
         force
@@ -188,7 +188,7 @@ export function StagingPanel({ workingStatus, currentBranch, onRefresh, onStatus
         // If push after commit is enabled, push the branch
         if (pushAfterCommit && targetBranch) {
           onStatusChange({ type: 'info', message: 'Pushing to remote...' })
-          const pushResult = await window.electronAPI.pushBranch(targetBranch, true)
+          const pushResult = await window.conveyor.branch.pushBranch(targetBranch, true)
           if (pushResult.success) {
             finalMessage = `Committed and pushed to ${targetBranch}`
 
@@ -196,7 +196,7 @@ export function StagingPanel({ workingStatus, currentBranch, onRefresh, onStatus
             if (createPR) {
               onStatusChange({ type: 'info', message: 'Creating pull request...' })
               const prTitleToUse = prTitle.trim() || generatePRTitle(targetBranch)
-              const prResult = await window.electronAPI.createPullRequest({
+              const prResult = await window.conveyor.pr.createPullRequest({
                 title: prTitleToUse,
                 body: prBody.trim() || undefined,
                 headBranch: targetBranch,
@@ -278,7 +278,7 @@ export function StagingPanel({ workingStatus, currentBranch, onRefresh, onStatus
     onStatusChange({ type: 'info', message: 'Pulling latest changes...' })
 
     try {
-      const pullResult = await window.electronAPI.pullCurrentBranch()
+      const pullResult = await window.conveyor.commit.pullCurrentBranch()
       if (pullResult.success && !pullResult.hadConflicts) {
         onStatusChange({ type: 'success', message: pullResult.message })
         setBehindPrompt(null)

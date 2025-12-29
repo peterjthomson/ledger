@@ -109,7 +109,7 @@ export function EditorRouter({
                 {switching ? 'Checking out...' : 'Checkout'}
               </button>
             )}
-            <button className="btn btn-secondary" onClick={() => window.electronAPI.openBranchInGitHub(branch.name)}>
+            <button className="btn btn-secondary" onClick={() => window.conveyor.pr.openBranchInGitHub(branch.name)}>
               View on GitHub
             </button>
           </div>
@@ -142,7 +142,7 @@ export function EditorRouter({
           onClearFocus={onClearFocus}
           onWorktreeCreated={onFocusWorktree ? (path) => {
             // Fetch fresh worktrees and find the new one
-            window.electronAPI.getWorktrees().then((result) => {
+            window.conveyor.worktree.getWorktrees().then((result) => {
               if (!('error' in result)) {
                 const newWorktree = result.find((wt) => wt.path === path)
                 if (newWorktree) {
