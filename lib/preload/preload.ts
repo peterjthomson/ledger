@@ -59,6 +59,19 @@ const electronAPI = {
   createWorktree: (options: { branchName: string; isNewBranch: boolean; folderPath: string }) =>
     ipcRenderer.invoke('create-worktree', options),
   selectWorktreeFolder: () => ipcRenderer.invoke('select-worktree-folder'),
+  // Worktree-specific staging & commit operations
+  getWorktreeWorkingStatus: (worktreePath: string) => ipcRenderer.invoke('get-worktree-working-status', worktreePath),
+  stageFileInWorktree: (worktreePath: string, filePath: string) =>
+    ipcRenderer.invoke('stage-file-in-worktree', worktreePath, filePath),
+  unstageFileInWorktree: (worktreePath: string, filePath: string) =>
+    ipcRenderer.invoke('unstage-file-in-worktree', worktreePath, filePath),
+  stageAllInWorktree: (worktreePath: string) => ipcRenderer.invoke('stage-all-in-worktree', worktreePath),
+  unstageAllInWorktree: (worktreePath: string) => ipcRenderer.invoke('unstage-all-in-worktree', worktreePath),
+  getFileDiffInWorktree: (worktreePath: string, filePath: string, staged: boolean) =>
+    ipcRenderer.invoke('get-file-diff-in-worktree', worktreePath, filePath, staged),
+  commitInWorktree: (worktreePath: string, message: string, description?: string) =>
+    ipcRenderer.invoke('commit-in-worktree', worktreePath, message, description),
+  pushWorktreeBranch: (worktreePath: string) => ipcRenderer.invoke('push-worktree-branch', worktreePath),
   // Staging & commit operations
   stageFile: (filePath: string) => ipcRenderer.invoke('stage-file', filePath),
   unstageFile: (filePath: string) => ipcRenderer.invoke('unstage-file', filePath),

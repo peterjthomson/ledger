@@ -53,6 +53,15 @@ import {
   getFileDiff,
   commitChanges,
   pullCurrentBranch,
+  // Worktree-specific staging & commit APIs
+  getWorktreeWorkingStatus,
+  stageFileInWorktree,
+  unstageFileInWorktree,
+  stageAllInWorktree,
+  unstageAllInWorktree,
+  getFileDiffInWorktree,
+  commitInWorktree,
+  pushWorktreeBranch,
   // PR Review APIs
   getPRDetail,
   getPRReviewComments,
@@ -326,6 +335,71 @@ app.whenReady().then(() => {
   ipcMain.handle('create-worktree', async (_, options: { branchName: string; isNewBranch: boolean; folderPath: string }) => {
     try {
       return await createWorktree(options)
+    } catch (error) {
+      return { success: false, message: (error as Error).message }
+    }
+  })
+
+  // Worktree-specific staging & commit handlers
+  ipcMain.handle('get-worktree-working-status', async (_, worktreePath: string) => {
+    try {
+      return await getWorktreeWorkingStatus(worktreePath)
+    } catch (_error) {
+      return { hasChanges: false, files: [], stagedCount: 0, unstagedCount: 0, additions: 0, deletions: 0 }
+    }
+  })
+
+  ipcMain.handle('stage-file-in-worktree', async (_, worktreePath: string, filePath: string) => {
+    try {
+      return await stageFileInWorktree(worktreePath, filePath)
+    } catch (error) {
+      return { success: false, message: (error as Error).message }
+    }
+  })
+
+  ipcMain.handle('unstage-file-in-worktree', async (_, worktreePath: string, filePath: string) => {
+    try {
+      return await unstageFileInWorktree(worktreePath, filePath)
+    } catch (error) {
+      return { success: false, message: (error as Error).message }
+    }
+  })
+
+  ipcMain.handle('stage-all-in-worktree', async (_, worktreePath: string) => {
+    try {
+      return await stageAllInWorktree(worktreePath)
+    } catch (error) {
+      return { success: false, message: (error as Error).message }
+    }
+  })
+
+  ipcMain.handle('unstage-all-in-worktree', async (_, worktreePath: string) => {
+    try {
+      return await unstageAllInWorktree(worktreePath)
+    } catch (error) {
+      return { success: false, message: (error as Error).message }
+    }
+  })
+
+  ipcMain.handle('get-file-diff-in-worktree', async (_, worktreePath: string, filePath: string, staged: boolean) => {
+    try {
+      return await getFileDiffInWorktree(worktreePath, filePath, staged)
+    } catch (_error) {
+      return null
+    }
+  })
+
+  ipcMain.handle('commit-in-worktree', async (_, worktreePath: string, message: string, description?: string) => {
+    try {
+      return await commitInWorktree(worktreePath, message, description)
+    } catch (error) {
+      return { success: false, message: (error as Error).message }
+    }
+  })
+
+  ipcMain.handle('push-worktree-branch', async (_, worktreePath: string) => {
+    try {
+      return await pushWorktreeBranch(worktreePath)
     } catch (error) {
       return { success: false, message: (error as Error).message }
     }

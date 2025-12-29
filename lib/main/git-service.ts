@@ -772,7 +772,7 @@ export async function createPullRequest(options: {
   draft?: boolean
   web?: boolean
 }): Promise<{ success: boolean; message: string; url?: string }> {
-  if (!repoPath) {
+  if (!repoPath || !git) {
     return { success: false, message: 'No repository selected' }
   }
 
@@ -2863,6 +2863,253 @@ function parseDiff(diffOutput: string, filePath: string): StagingFileDiff {
     isBinary,
     additions,
     deletions,
+  }
+}
+
+// ========================================
+// Worktree-Specific Staging & Commit Functions
+// ========================================
+
+// Get working status for a specific worktree
+export async function getWorktreeWorkingStatus(worktreePath: string): Promise<WorkingStatus> {
+  try {
+    const worktreeGit = simpleGit(worktreePath)
+    const status = await worktreeGit.status()
+
+    const files: UncommittedFile[] = []
+    const addedPaths = new Set<string>()
+
+    for (const file of status.files) {
+      const filePath = file.path
+
+      if (addedPaths.has(filePath)) continue
+
+      const indexStatus = file.index
+      const workingStatus = file.working_dir
+
+      // Staged changes
+      if (indexStatus && indexStatus !== ' ' && indexStatus !== '?') {
+        let fileStatus: UncommittedFile['status'] = 'modified'
+        if (indexStatus === 'A') fileStatus = 'added'
+        else if (indexStatus === 'D') fileStatus = 'deleted'
+        else if (indexStatus === 'R') fileStatus = 'renamed'
+        else if (indexStatus === 'M') fileStatus = 'modified'
+
+        files.push({ path: filePath, status: fileStatus, staged: true })
+        addedPaths.add(filePath + ':staged')
+      }
+
+      // Unstaged changes
+      if (workingStatus && workingStatus !== ' ') {
+        let fileStatus: UncommittedFile['status'] = 'modified'
+        if (workingStatus === '?') fileStatus = 'untracked'
+        else if (workingStatus === 'A') fileStatus = 'added'
+        else if (workingStatus === 'D') fileStatus = 'deleted'
+        else if (workingStatus === 'M') fileStatus = 'modified'
+
+        files.push({ path: filePath, status: fileStatus, staged: false })
+        addedPaths.add(filePath + ':unstaged')
+      }
+
+      addedPaths.add(filePath)
+    }
+
+    // Get line change stats
+    let additions = 0
+    let deletions = 0
+    try {
+      const unstagedDiff = await worktreeGit.diff(['--stat'])
+      if (unstagedDiff.trim()) {
+        const lines = unstagedDiff.trim().split('\n')
+        const summaryLine = lines[lines.length - 1]
+        const addMatch = summaryLine.match(/(\d+) insertions?\(\+\)/)
+        const delMatch = summaryLine.match(/(\d+) deletions?\(-\)/)
+        additions += addMatch ? parseInt(addMatch[1]) : 0
+        deletions += delMatch ? parseInt(delMatch[1]) : 0
+      }
+
+      const stagedDiff = await worktreeGit.diff(['--cached', '--stat'])
+      if (stagedDiff.trim()) {
+        const lines = stagedDiff.trim().split('\n')
+        const summaryLine = lines[lines.length - 1]
+        const addMatch = summaryLine.match(/(\d+) insertions?\(\+\)/)
+        const delMatch = summaryLine.match(/(\d+) deletions?\(-\)/)
+        additions += addMatch ? parseInt(addMatch[1]) : 0
+        deletions += delMatch ? parseInt(delMatch[1]) : 0
+      }
+    } catch {
+      // Ignore diff errors
+    }
+
+    return {
+      hasChanges: files.length > 0,
+      files,
+      stagedCount: files.filter((f) => f.staged).length,
+      unstagedCount: files.filter((f) => !f.staged).length,
+      additions,
+      deletions,
+    }
+  } catch (error) {
+    console.error('Error getting worktree working status:', error)
+    return { hasChanges: false, files: [], stagedCount: 0, unstagedCount: 0, additions: 0, deletions: 0 }
+  }
+}
+
+// Stage a file in a worktree
+export async function stageFileInWorktree(
+  worktreePath: string,
+  filePath: string
+): Promise<{ success: boolean; message: string }> {
+  try {
+    const worktreeGit = simpleGit(worktreePath)
+    await worktreeGit.add(filePath)
+    return { success: true, message: `Staged ${filePath}` }
+  } catch (error) {
+    return { success: false, message: (error as Error).message }
+  }
+}
+
+// Unstage a file in a worktree
+export async function unstageFileInWorktree(
+  worktreePath: string,
+  filePath: string
+): Promise<{ success: boolean; message: string }> {
+  try {
+    const worktreeGit = simpleGit(worktreePath)
+    await worktreeGit.raw(['restore', '--staged', filePath])
+    return { success: true, message: `Unstaged ${filePath}` }
+  } catch (error) {
+    return { success: false, message: (error as Error).message }
+  }
+}
+
+// Stage all changes in a worktree
+export async function stageAllInWorktree(worktreePath: string): Promise<{ success: boolean; message: string }> {
+  try {
+    const worktreeGit = simpleGit(worktreePath)
+    await worktreeGit.add('-A')
+    return { success: true, message: 'Staged all changes' }
+  } catch (error) {
+    return { success: false, message: (error as Error).message }
+  }
+}
+
+// Unstage all changes in a worktree
+export async function unstageAllInWorktree(worktreePath: string): Promise<{ success: boolean; message: string }> {
+  try {
+    const worktreeGit = simpleGit(worktreePath)
+    await worktreeGit.raw(['restore', '--staged', '.'])
+    return { success: true, message: 'Unstaged all changes' }
+  } catch (error) {
+    return { success: false, message: (error as Error).message }
+  }
+}
+
+// Get file diff in a worktree
+export async function getFileDiffInWorktree(
+  worktreePath: string,
+  filePath: string,
+  staged: boolean
+): Promise<StagingFileDiff | null> {
+  try {
+    const worktreeGit = simpleGit(worktreePath)
+    const args = staged ? ['diff', '--staged', '--', filePath] : ['diff', '--', filePath]
+    const diffOutput = await worktreeGit.raw(args)
+
+    if (!diffOutput.trim()) {
+      // Check if it's an untracked file
+      const status = await worktreeGit.status()
+      const isUntracked = status.not_added.includes(filePath)
+
+      if (isUntracked) {
+        const fullPath = path.join(worktreePath, filePath)
+        try {
+          const content = await fs.promises.readFile(fullPath, 'utf-8')
+          const lines = content.split('\n')
+
+          return {
+            filePath,
+            status: 'untracked',
+            isBinary: false,
+            additions: lines.length,
+            deletions: 0,
+            hunks: [
+              {
+                header: `@@ -0,0 +1,${lines.length} @@`,
+                oldStart: 0,
+                oldLines: 0,
+                newStart: 1,
+                newLines: lines.length,
+                lines: lines.map((line, idx) => ({
+                  type: 'add' as const,
+                  content: line,
+                  newLineNumber: idx + 1,
+                })),
+              },
+            ],
+          }
+        } catch {
+          return null
+        }
+      }
+
+      return null
+    }
+
+    return parseDiff(diffOutput, filePath)
+  } catch (error) {
+    console.error('Error getting worktree file diff:', error)
+    return null
+  }
+}
+
+// Commit changes in a worktree
+export async function commitInWorktree(
+  worktreePath: string,
+  message: string,
+  description?: string
+): Promise<{ success: boolean; message: string }> {
+  try {
+    const worktreeGit = simpleGit(worktreePath)
+
+    // Check if there are staged changes
+    const status = await worktreeGit.status()
+    if (status.staged.length === 0) {
+      return { success: false, message: 'No staged changes to commit' }
+    }
+
+    // Build commit message
+    const fullMessage = description ? `${message}\n\n${description}` : message
+    await worktreeGit.commit(fullMessage)
+
+    return { success: true, message: `Committed: ${message}` }
+  } catch (error) {
+    return { success: false, message: (error as Error).message }
+  }
+}
+
+// Push the worktree's branch to origin
+export async function pushWorktreeBranch(worktreePath: string): Promise<{ success: boolean; message: string }> {
+  try {
+    const worktreeGit = simpleGit(worktreePath)
+    const branchInfo = await worktreeGit.branchLocal()
+    const currentBranch = branchInfo.current
+
+    if (!currentBranch) {
+      return { success: false, message: 'Worktree is in detached HEAD state - cannot push' }
+    }
+
+    await worktreeGit.push(['--set-upstream', 'origin', currentBranch])
+    return { success: true, message: `Pushed ${currentBranch} to origin` }
+  } catch (error) {
+    const errorMessage = (error as Error).message
+    if (errorMessage.includes('rejected')) {
+      return { success: false, message: 'Push rejected. Pull changes first or force push.' }
+    }
+    if (errorMessage.includes('Permission denied') || errorMessage.includes('authentication')) {
+      return { success: false, message: 'Authentication failed. Check your Git credentials.' }
+    }
+    return { success: false, message: errorMessage }
   }
 }
 

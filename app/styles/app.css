@@ -1148,6 +1148,111 @@ body,
   color: var(--text-secondary);
 }
 
+.wip-commit-btn {
+  margin-top: 10px;
+  width: 100%;
+}
+
+/* Worktree Staging Panel - inline in WIP callout */
+.worktree-staging-panel {
+  margin-top: 12px;
+}
+
+.worktree-staging-panel .staging-loading {
+  padding: 16px;
+  text-align: center;
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+.worktree-staging-panel .staging-files {
+  max-height: 180px;
+  overflow-y: auto;
+  background: var(--bg-primary);
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border-subtle);
+  margin-bottom: 12px;
+}
+
+.worktree-staging-panel .staging-section {
+  padding: 6px 0;
+}
+
+.worktree-staging-panel .staging-section:first-child {
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.worktree-staging-panel .staging-section-header {
+  padding: 2px 10px;
+}
+
+.worktree-staging-panel .staging-file-item {
+  padding: 3px 10px;
+}
+
+/* Worktree Diff Preview */
+.worktree-staging-diff {
+  max-height: 200px;
+  background: var(--bg-primary);
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border-subtle);
+  margin-bottom: 12px;
+}
+
+.worktree-staging-diff .staging-diff-header {
+  padding: 6px 10px;
+}
+
+.worktree-staging-diff .staging-diff-content {
+  max-height: 160px;
+  overflow-y: auto;
+  font-size: 10px;
+}
+
+/* Worktree Commit Form */
+.worktree-staging-commit {
+  background: var(--bg-primary);
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border-subtle);
+  padding: 10px;
+}
+
+.worktree-staging-commit .commit-summary-input {
+  margin-bottom: 8px;
+}
+
+.worktree-staging-commit .commit-description-input {
+  margin-bottom: 8px;
+}
+
+.worktree-staging-commit .commit-options {
+  margin-bottom: 10px;
+}
+
+.worktree-staging-commit .commit-option-checkbox {
+  font-size: 11px;
+}
+
+.worktree-staging-commit .commit-option-checkbox code {
+  font-size: 10px;
+  padding: 1px 4px;
+  background: var(--bg-tertiary);
+  border-radius: 3px;
+}
+
+.worktree-commit-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.worktree-commit-actions .btn {
+  flex: 1;
+}
+
+.worktree-commit-actions .commit-btn {
+  flex: 2;
+}
+
 /* Worktree rescue callout - detached HEAD needs rescue */
 .worktree-rescue-callout {
   margin: 16px 0;
