@@ -3283,6 +3283,11 @@ body,
   color: var(--text-muted);
 }
 
+.branch-diff-stats .diff-stat-conflicts {
+  color: var(--warning, #f59e0b);
+  font-weight: 500;
+}
+
 .branch-diff-loading,
 .branch-diff-empty {
   padding: 24px;

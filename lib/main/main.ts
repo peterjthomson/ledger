@@ -300,7 +300,7 @@ app.whenReady().then(() => {
     }
   })
 
-  ipcMain.handle('get-branch-diff', async (_, branchName: string, diffType?: 'diff' | 'changes') => {
+  ipcMain.handle('get-branch-diff', async (_, branchName: string, diffType?: 'diff' | 'changes' | 'preview') => {
     try {
       return await getBranchDiff(branchName, diffType)
     } catch (_error) {

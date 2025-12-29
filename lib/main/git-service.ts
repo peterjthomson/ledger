@@ -2266,11 +2266,15 @@ export interface BranchDiff {
   totalAdditions: number
   totalDeletions: number
   commitCount: number
+  // For PR Preview mode - conflict information
+  hasConflicts?: boolean
+  conflictFiles?: string[]
 }
 
 // Get diff for a branch compared to master/main
 // diffType: 'diff' = two-dot (current state vs master), 'changes' = three-dot (all branch changes since fork)
-export type BranchDiffType = 'diff' | 'changes'
+// 'preview' = simulated merge result (what a PR would contribute)
+export type BranchDiffType = 'diff' | 'changes' | 'preview'
 
 export async function getBranchDiff(branchName: string, diffType: BranchDiffType = 'changes'): Promise<BranchDiff | null> {
   if (!git) throw new Error('No repository selected')
@@ -2304,6 +2308,11 @@ export async function getBranchDiff(branchName: string, diffType: BranchDiffType
       commitCount = parseInt(countOutput.trim()) || 0
     } catch {
       // Ignore count errors
+    }
+
+    // For 'preview' mode, use git merge-tree to simulate the merge result
+    if (diffType === 'preview') {
+      return await getBranchMergePreview(branchName, baseBranch, commitCount)
     }
 
     // Get diff between base and branch
@@ -2434,6 +2443,192 @@ export async function getBranchDiff(branchName: string, diffType: BranchDiffType
   } catch (error) {
     console.error('Error getting branch diff:', error)
     return null
+  }
+}
+
+// Helper function to get merge preview using git merge-tree
+// This simulates what a PR would look like - the unique contribution of the branch
+async function getBranchMergePreview(branchName: string, baseBranch: string, commitCount: number): Promise<BranchDiff | null> {
+  if (!git) throw new Error('No repository selected')
+
+  try {
+    // Use git merge-tree to simulate the merge (Git 2.38+)
+    // This computes what the merge result would be without actually merging
+    let mergeTreeOutput: string
+    let hasConflicts = false
+    const conflictFiles: string[] = []
+
+    try {
+      // Try the modern merge-tree command (Git 2.38+)
+      mergeTreeOutput = await git.raw(['merge-tree', '--write-tree', baseBranch, branchName])
+      
+      // Check for conflicts in the output
+      // Format: <tree-sha>\n followed by optional conflict info
+      const lines = mergeTreeOutput.trim().split('\n')
+      
+      // If there are CONFLICT lines, extract them
+      for (const line of lines) {
+        if (line.startsWith('CONFLICT')) {
+          hasConflicts = true
+          // Extract filename from various conflict formats
+          // e.g., "CONFLICT (content): Merge conflict in file.txt"
+          const fileMatch = line.match(/(?:in|for) (.+?)(?:\s*$|\s+\()/)
+          if (fileMatch) {
+            conflictFiles.push(fileMatch[1])
+          }
+        }
+      }
+    } catch {
+      // Fallback: If merge-tree fails (older Git or other issues),
+      // just return the three-dot diff as a fallback
+      console.warn('merge-tree failed, falling back to three-dot diff')
+      const diffOutput = await git.raw(['diff', `${baseBranch}...${branchName}`, '--patch', '--stat'])
+      return parseDiffOutput(diffOutput, branchName, baseBranch, commitCount)
+    }
+
+    // Get the tree SHA from the first line
+    const treeLines = mergeTreeOutput.trim().split('\n')
+    const treeSha = treeLines[0].trim()
+
+    // Now diff the base branch against the merge result tree
+    // This shows exactly what changes the branch would contribute
+    let diffOutput: string
+    try {
+      diffOutput = await git.raw(['diff', baseBranch, treeSha, '--patch', '--stat'])
+    } catch {
+      // If we can't diff against the tree (shouldn't happen), fall back
+      diffOutput = await git.raw(['diff', `${baseBranch}...${branchName}`, '--patch', '--stat'])
+    }
+
+    const result = parseDiffOutput(diffOutput, branchName, baseBranch, commitCount)
+    if (result) {
+      result.hasConflicts = hasConflicts
+      result.conflictFiles = conflictFiles
+    }
+    return result
+  } catch (error) {
+    console.error('Error getting merge preview:', error)
+    return null
+  }
+}
+
+// Helper to parse diff output into BranchDiff structure
+function parseDiffOutput(diffOutput: string, branchName: string, baseBranch: string, commitCount: number): BranchDiff | null {
+  if (!diffOutput.trim()) {
+    return {
+      branchName,
+      baseBranch: baseBranch.replace('origin/', ''),
+      files: [],
+      totalAdditions: 0,
+      totalDeletions: 0,
+      commitCount,
+    }
+  }
+
+  const files: FileDiff[] = []
+  let totalAdditions = 0
+  let totalDeletions = 0
+
+  // Split by file diffs
+  const diffParts = diffOutput.split(/^diff --git /m).filter(Boolean)
+
+  for (const part of diffParts) {
+    const lines = part.split('\n')
+
+    // Parse file header
+    const headerMatch = lines[0].match(/a\/(.+) b\/(.+)/)
+    if (!headerMatch) continue
+
+    const oldPath = headerMatch[1]
+    const newPath = headerMatch[2]
+
+    // Determine status
+    let status: 'added' | 'modified' | 'deleted' | 'renamed' = 'modified'
+    if (part.includes('new file mode')) status = 'added'
+    else if (part.includes('deleted file mode')) status = 'deleted'
+    else if (oldPath !== newPath) status = 'renamed'
+
+    // Check for binary
+    const isBinary = part.includes('Binary files')
+
+    // Parse hunks
+    const hunks: DiffHunk[] = []
+    let fileAdditions = 0
+    let fileDeletions = 0
+
+    if (!isBinary) {
+      const hunkMatches = part.matchAll(/@@ -(\d+)(?:,(\d+))? \+(\d+)(?:,(\d+))? @@(.*)/g)
+
+      for (const match of hunkMatches) {
+        const oldStart = parseInt(match[1])
+        const oldLinesCount = match[2] ? parseInt(match[2]) : 1
+        const newStart = parseInt(match[3])
+        const newLinesCount = match[4] ? parseInt(match[4]) : 1
+
+        // Find the lines after this hunk header
+        const hunkStartIndex = part.indexOf(match[0])
+        const hunkContent = part.slice(hunkStartIndex + match[0].length)
+        const hunkLines: DiffLine[] = []
+
+        let oldLine = oldStart
+        let newLine = newStart
+
+        for (const line of hunkContent.split('\n')) {
+          if (line.startsWith('@@') || line.startsWith('diff --git')) break
+
+          if (line.startsWith('+') && !line.startsWith('+++')) {
+            hunkLines.push({ type: 'add', content: line.slice(1), newLineNumber: newLine })
+            newLine++
+            fileAdditions++
+          } else if (line.startsWith('-') && !line.startsWith('---')) {
+            hunkLines.push({ type: 'delete', content: line.slice(1), oldLineNumber: oldLine })
+            oldLine++
+            fileDeletions++
+          } else if (line.startsWith(' ')) {
+            hunkLines.push({
+              type: 'context',
+              content: line.slice(1),
+              oldLineNumber: oldLine,
+              newLineNumber: newLine,
+            })
+            oldLine++
+            newLine++
+          }
+        }
+
+        hunks.push({
+          oldStart,
+          oldLines: oldLinesCount,
+          newStart,
+          newLines: newLinesCount,
+          lines: hunkLines,
+        })
+      }
+    }
+
+    totalAdditions += fileAdditions
+    totalDeletions += fileDeletions
+
+    files.push({
+      file: {
+        path: newPath,
+        status,
+        additions: fileAdditions,
+        deletions: fileDeletions,
+        oldPath: status === 'renamed' ? oldPath : undefined,
+      },
+      hunks,
+      isBinary,
+    })
+  }
+
+  return {
+    branchName,
+    baseBranch: baseBranch.replace('origin/', ''),
+    files,
+    totalAdditions,
+    totalDeletions,
+    commitCount,
   }
 }
 

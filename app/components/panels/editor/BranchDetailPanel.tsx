@@ -28,7 +28,7 @@ export function BranchDetailPanel({
   const [branchDiff, setBranchDiff] = useState<BranchDiff | null>(null)
   const [loadingDiff, setLoadingDiff] = useState(false)
   const [expandedFiles, setExpandedFiles] = useState<Set<string>>(new Set())
-  const [diffType, setDiffType] = useState<BranchDiffType>('diff')
+  const [diffType, setDiffType] = useState<BranchDiffType>('preview')
 
   // PR creation form state
   const [showPRForm, setShowPRForm] = useState(false)
@@ -259,6 +259,13 @@ export function BranchDetailPanel({
           <div className="branch-diff-header">
             <div className="branch-diff-tabs">
               <button
+                className={`branch-diff-tab ${diffType === 'preview' ? 'active' : ''}`}
+                onClick={() => setDiffType('preview')}
+                title="What this branch would contribute if merged (PR preview)"
+              >
+                PR Preview
+              </button>
+              <button
                 className={`branch-diff-tab ${diffType === 'diff' ? 'active' : ''}`}
                 onClick={() => setDiffType('diff')}
                 title="Current difference between this branch and master"
@@ -275,6 +282,11 @@ export function BranchDetailPanel({
             </div>
             {branchDiff && (
               <span className="branch-diff-stats">
+                {branchDiff.hasConflicts && (
+                  <span className="diff-stat-conflicts" title={`Conflicts in: ${branchDiff.conflictFiles?.join(', ')}`}>
+                    ⚠️ {branchDiff.conflictFiles?.length || 0} conflicts
+                  </span>
+                )}
                 <span className="diff-stat-files">
                   {branchDiff.files.length} {branchDiff.files.length === 1 ? 'file' : 'files'}
                 </span>

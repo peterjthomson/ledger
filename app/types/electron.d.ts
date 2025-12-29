@@ -150,10 +150,14 @@ export interface BranchDiff {
   totalAdditions: number
   totalDeletions: number
   commitCount: number
+  // For PR Preview mode - conflict information
+  hasConflicts?: boolean
+  conflictFiles?: string[]
 }
 
 // 'diff' = two-dot (current state vs master), 'changes' = three-dot (all branch changes since fork)
-export type BranchDiffType = 'diff' | 'changes'
+// 'preview' = simulated merge result (what a PR would contribute)
+export type BranchDiffType = 'diff' | 'changes' | 'preview'
 
 // Stash entry
 export interface StashEntry {
