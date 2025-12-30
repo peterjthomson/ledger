@@ -1,19 +1,22 @@
 /**
  * DiffPanel - Displays commit diffs with expandable file sections
  *
- * Shows commit metadata (message, author, date) and file-by-file diffs
+ * Shows commit metadata in a standardized panel format, then file-by-file diffs
  * with syntax highlighting for additions/deletions.
  */
 
 import { useState, useEffect } from 'react'
-import type { CommitDiff } from '../../../types/electron'
+import type { CommitDiff, GraphCommit, Branch } from '../../../types/electron'
 
 export interface DiffPanelProps {
   diff: CommitDiff
+  selectedCommit?: GraphCommit | null
   formatRelativeTime: (date: string) => string
+  onBranchClick?: (branchName: string) => void
+  branches?: Branch[]
 }
 
-export function DiffPanel({ diff, formatRelativeTime }: DiffPanelProps) {
+export function DiffPanel({ diff, selectedCommit, formatRelativeTime, onBranchClick, branches }: DiffPanelProps) {
   const [expandedFiles, setExpandedFiles] = useState<Set<string>>(new Set())
 
   const toggleFile = (path: string) => {
@@ -33,22 +36,79 @@ export function DiffPanel({ diff, formatRelativeTime }: DiffPanelProps) {
     setExpandedFiles(new Set(diff.files.map((f) => f.file.path)))
   }, [diff])
 
+  // Extract branch refs from selectedCommit (filter out tags and standalone HEAD)
+  // Handle formats like: "HEAD -> feature/branch", "origin/main", "tag: v1.0"
+  const branchRefs = selectedCommit?.refs
+    .filter((ref) => !ref.startsWith('tag:') && ref !== 'HEAD')
+    .map((ref) => {
+      // Handle "HEAD -> branchname" format (current branch)
+      if (ref.startsWith('HEAD -> ')) {
+        return ref.replace('HEAD -> ', '')
+      }
+      // Remove origin/ prefix for remote tracking refs
+      return ref.replace(/^origin\//, '')
+    })
+    .filter((ref) => ref && ref !== 'HEAD') || []
+
+  // Find the primary branch (first local branch, or first ref)
+  const primaryBranch = branchRefs.find((ref) => 
+    branches?.some((b) => b.name === ref && !b.isRemote)
+  ) || branchRefs[0] || null
+
+  // Handle branch click - find the actual branch object
+  const handleBranchClick = (branchName: string) => {
+    if (onBranchClick) {
+      onBranchClick(branchName)
+    }
+  }
+
   return (
-    <div className="diff-panel">
-      {/* Commit header */}
-      <div className="diff-commit-header">
-        <div className="diff-commit-message">{diff.message}</div>
-        <div className="diff-commit-meta">
-          <code className="commit-hash">{diff.hash.slice(0, 7)}</code>
-          <span>{diff.author}</span>
-          <span>{formatRelativeTime(diff.date)}</span>
+    <div className="diff-panel sidebar-detail-panel">
+      {/* Meta panel header */}
+      <div className="detail-type-badge">Commit</div>
+      <h3 className="detail-title commit-title">{diff.message}</h3>
+      
+      {/* Branch reference - below title, label on own line */}
+      {primaryBranch && (
+        <div className="commit-branch-section">
+          <span className="commit-branch-label">Branch</span>
+          <button
+            className="commit-branch-link"
+            onClick={() => handleBranchClick(primaryBranch)}
+            title={`Go to branch: ${primaryBranch}`}
+          >
+            <span className="branch-icon">⎇</span>
+            {primaryBranch}
+            {branchRefs.length > 1 && (
+              <span className="branch-count">+{branchRefs.length - 1}</span>
+            )}
+          </button>
         </div>
-        <div className="diff-commit-stats">
-          <span className="diff-stat-files">
-            {diff.files.length} {diff.files.length === 1 ? 'file' : 'files'}
+      )}
+
+      {/* Standardized meta grid */}
+      <div className="detail-meta-grid">
+        <div className="detail-meta-item">
+          <span className="meta-label">Hash</span>
+          <code className="meta-value">{diff.hash.slice(0, 7)}</code>
+        </div>
+        <div className="detail-meta-item">
+          <span className="meta-label">Author</span>
+          <span className="meta-value">{diff.author}</span>
+        </div>
+        <div className="detail-meta-item">
+          <span className="meta-label">Date</span>
+          <span className="meta-value">{formatRelativeTime(diff.date)}</span>
+        </div>
+        <div className="detail-meta-item">
+          <span className="meta-label">Changes</span>
+          <span className="meta-value diff-stats-inline">
+            <span className="diff-stat-files">
+              {diff.files.length} {diff.files.length === 1 ? 'file' : 'files'}
+            </span>
+            <span className="diff-stat-additions">+{diff.totalAdditions}</span>
+            <span className="diff-stat-deletions">-{diff.totalDeletions}</span>
           </span>
-          <span className="diff-stat-additions">+{diff.totalAdditions}</span>
-          <span className="diff-stat-deletions">-{diff.totalDeletions}</span>
         </div>
       </div>
 
@@ -112,3 +172,4 @@ export function DiffPanel({ diff, formatRelativeTime }: DiffPanelProps) {
     </div>
   )
 }
+

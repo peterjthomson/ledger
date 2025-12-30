@@ -164,6 +164,7 @@ export function EditorRouter({
       return (
         <StashDetailPanel
           stash={stash}
+          currentBranch={currentBranch}
           formatRelativeTime={formatRelativeTime}
           onStatusChange={onStatusChange}
           onRefresh={onRefresh}

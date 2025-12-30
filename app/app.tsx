@@ -119,11 +119,13 @@ export default function App() {
   // Focus view panel state (resizable + collapsible)
   const [sidebarWidth, setSidebarWidth] = useState(220)
   const [detailWidth, setDetailWidth] = useState(400)
+  const [graphWidth, setGraphWidth] = useState<number | null>(null) // null = auto-size
   const [sidebarVisible, setSidebarVisible] = useState(true)
   const [mainVisible, setMainVisible] = useState(true)
   const [detailVisible, setDetailVisible] = useState(true)
   const [isResizingSidebar, setIsResizingSidebar] = useState(false)
   const [isResizingDetail, setIsResizingDetail] = useState(false)
+  const [isResizingGraph, setIsResizingGraph] = useState(false)
   
   // Sidebar keyboard navigation
   const [sidebarFocusedIndex, setSidebarFocusedIndex] = useState(-1)
@@ -174,6 +176,9 @@ export default function App() {
   }, [status])
 
   // Handle panel resizing
+  const graphResizeStartX = useRef(0)
+  const graphResizeStartWidth = useRef(0)
+  
   useEffect(() => {
     const handleMouseMove = (e: MouseEvent) => {
       if (isResizingSidebar) {
@@ -184,14 +189,20 @@ export default function App() {
         const newWidth = Math.max(200, window.innerWidth - e.clientX)
         setDetailWidth(newWidth)
       }
+      if (isResizingGraph) {
+        const delta = e.clientX - graphResizeStartX.current
+        const newWidth = Math.max(60, graphResizeStartWidth.current + delta)
+        setGraphWidth(newWidth)
+      }
     }
 
     const handleMouseUp = () => {
       setIsResizingSidebar(false)
       setIsResizingDetail(false)
+      setIsResizingGraph(false)
     }
 
-    if (isResizingSidebar || isResizingDetail) {
+    if (isResizingSidebar || isResizingDetail || isResizingGraph) {
       document.addEventListener('mousemove', handleMouseMove)
       document.addEventListener('mouseup', handleMouseUp)
       document.body.style.cursor = 'col-resize'
@@ -204,7 +215,7 @@ export default function App() {
       document.body.style.cursor = ''
       document.body.style.userSelect = ''
     }
-  }, [isResizingSidebar, isResizingDetail])
+  }, [isResizingSidebar, isResizingDetail, isResizingGraph])
 
   // Titlebar actions for Focus mode panel toggles and settings button
   useEffect(() => {
@@ -1840,24 +1851,20 @@ export default function App() {
                       >
                         <div className="item-main">
                           <span className="item-name">
-                            {wt.branch || wt.displayName}
+                            {isWorkingFolder ? `Working Folder: ${wt.branch || 'detached'}` : (wt.branch || wt.displayName)}
                           </span>
                           {!isWorkingFolder && wt.branch === currentBranch && (
                             <span className="current-indicator">●</span>
                           )}
                         </div>
-                        {wt.branch && (
+                        {!isWorkingFolder && wt.branch && (
                           <div className="item-agent-hint">{wt.displayName}</div>
                         )}
                         <div className="item-path" title={wt.path}>
                           {wt.path.replace(/^\/Users\/[^/]+/, '~')}
                         </div>
                         <div className="item-meta worktree-stats">
-                          {isWorkingFolder ? (
-                            <code className="commit-hash">{wt.branch || 'detached'}</code>
-                          ) : (
-                            <code className="commit-hash">{wt.path.split('/').pop()}</code>
-                          )}
+                          <code className="commit-hash">{wt.path.split('/').pop()}</code>
                           {(wt.additions > 0 || wt.deletions > 0) && (
                             <>
                               {wt.additions > 0 && <span className="diff-additions">+{wt.additions}</span>}
@@ -2731,6 +2738,14 @@ export default function App() {
                       onSelectCommit={handleSelectCommit}
                       formatRelativeTime={formatRelativeTime}
                       showGraph={showGraphLines}
+                      graphWidth={graphWidth}
+                      onStartResize={(startX, currentWidth) => {
+                        graphResizeStartX.current = startX
+                        graphResizeStartWidth.current = currentWidth
+                        setIsResizingGraph(true)
+                      }}
+                      onResetWidth={() => setGraphWidth(null)}
+                      isResizing={isResizingGraph}
                     />
                   </div>
                 </>
@@ -2793,7 +2808,19 @@ export default function App() {
               ) : loadingDiff ? (
                 <div className="detail-loading">Loading diff...</div>
               ) : commitDiff ? (
-                <DiffPanel diff={commitDiff} formatRelativeTime={formatRelativeTime} />
+                <DiffPanel 
+                  diff={commitDiff} 
+                  selectedCommit={selectedCommit}
+                  formatRelativeTime={formatRelativeTime} 
+                  branches={branches}
+                  onBranchClick={(branchName) => {
+                    // Find the branch and focus it
+                    const branch = branches.find((b) => b.name === branchName)
+                    if (branch) {
+                      handleSidebarFocus(branch.isRemote ? 'remote' : 'branch', branch)
+                    }
+                  }}
+                />
               ) : (
                 <div className="detail-error">Could not load diff</div>
               )}

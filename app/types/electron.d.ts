@@ -6,6 +6,7 @@ export interface Branch {
   isRemote: boolean
   // Extended metadata
   lastCommitDate?: string
+  lastCommitMessage?: string
   firstCommitDate?: string
   commitCount?: number
   isLocalOnly?: boolean
@@ -339,11 +340,18 @@ export interface ElectronAPI {
   getStashes: () => Promise<StashEntry[]>
   getStashFiles: (stashIndex: number) => Promise<StashFile[]>
   getStashFileDiff: (stashIndex: number, filePath: string) => Promise<string | null>
+  getStashFileDiffParsed: (stashIndex: number, filePath: string) => Promise<StagingFileDiff | null>
   getStashDiff: (stashIndex: number) => Promise<string | null>
   applyStash: (stashIndex: number) => Promise<{ success: boolean; message: string }>
   popStash: (stashIndex: number) => Promise<{ success: boolean; message: string }>
   dropStash: (stashIndex: number) => Promise<{ success: boolean; message: string }>
   stashToBranch: (stashIndex: number, branchName: string) => Promise<{ success: boolean; message: string }>
+  applyStashToBranch: (
+    stashIndex: number,
+    targetBranch: string,
+    stashMessage: string,
+    keepWorktree?: boolean
+  ) => Promise<{ success: boolean; message: string; usedExistingWorktree: boolean; worktreePath?: string }>
   // Worktree operations
   convertWorktreeToBranch: (worktreePath: string) => Promise<{ success: boolean; message: string; branchName?: string }>
   applyWorktreeChanges: (worktreePath: string) => Promise<{ success: boolean; message: string }>

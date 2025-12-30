@@ -45,12 +45,16 @@ const electronAPI = {
   getStashFiles: (stashIndex: number) => ipcRenderer.invoke('get-stash-files', stashIndex),
   getStashFileDiff: (stashIndex: number, filePath: string) =>
     ipcRenderer.invoke('get-stash-file-diff', stashIndex, filePath),
+  getStashFileDiffParsed: (stashIndex: number, filePath: string) =>
+    ipcRenderer.invoke('get-stash-file-diff-parsed', stashIndex, filePath),
   getStashDiff: (stashIndex: number) => ipcRenderer.invoke('get-stash-diff', stashIndex),
   applyStash: (stashIndex: number) => ipcRenderer.invoke('apply-stash', stashIndex),
   popStash: (stashIndex: number) => ipcRenderer.invoke('pop-stash', stashIndex),
   dropStash: (stashIndex: number) => ipcRenderer.invoke('drop-stash', stashIndex),
   stashToBranch: (stashIndex: number, branchName: string) =>
     ipcRenderer.invoke('stash-to-branch', stashIndex, branchName),
+  applyStashToBranch: (stashIndex: number, targetBranch: string, stashMessage: string, keepWorktree?: boolean) =>
+    ipcRenderer.invoke('apply-stash-to-branch', stashIndex, targetBranch, stashMessage, keepWorktree ?? false),
   // Worktree operations
   convertWorktreeToBranch: (worktreePath: string) => ipcRenderer.invoke('convert-worktree-to-branch', worktreePath),
   applyWorktreeChanges: (worktreePath: string) => ipcRenderer.invoke('apply-worktree-changes', worktreePath),

@@ -119,6 +119,7 @@ Run with `npm test` (builds first) or `npm run test:headed`.
 | View diff | `getCommitDiff()`, `getFileDiff()` | Full diff parsing |
 | Stash ops | `applyStash()`, `popStash()`, etc. | Full stash management |
 | PR details | `getPRDetail()` | Full PR info with comments |
+| **Leapfrog stash** | `applyStashToBranch()` | Apply stash to different branch via worktrees |
 
 ## Error Handling
 

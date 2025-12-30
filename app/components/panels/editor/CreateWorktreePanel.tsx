@@ -2,9 +2,10 @@
  * CreateWorktreePanel - Form for creating new worktrees
  *
  * Allows creating worktrees with new or existing branches.
+ * Offers location presets: .worktrees/ (Ledger convention), sibling folder, or custom.
  */
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import type { Branch } from '../../../types/electron'
 import type { StatusMessage } from '../../../types/app-types'
 
@@ -17,6 +18,8 @@ export interface CreateWorktreePanelProps {
   onWorktreeCreated?: (worktreePath: string) => void
 }
 
+type LocationPreset = 'ledger' | 'sibling' | 'custom'
+
 export function CreateWorktreePanel({
   branches,
   repoPath,
@@ -28,7 +31,8 @@ export function CreateWorktreePanel({
   const [branchMode, setBranchMode] = useState<'new' | 'existing'>('new')
   const [newBranchName, setNewBranchName] = useState('')
   const [selectedBranch, setSelectedBranch] = useState('')
-  const [folderPath, setFolderPath] = useState('')
+  const [locationPreset, setLocationPreset] = useState<LocationPreset>('ledger')
+  const [customPath, setCustomPath] = useState('')
   const [creating, setCreating] = useState(false)
 
   // Get repo name for default path suggestion
@@ -38,25 +42,48 @@ export function CreateWorktreePanel({
   // Get local branches for dropdown
   const localBranches = branches.filter((b) => !b.isRemote)
 
-  // Compute default folder path when branch name changes
+  // Compute branch name and sanitized version
   const branchName = branchMode === 'new' ? newBranchName : selectedBranch
   const sanitizedBranchName = branchName.replace(/\//g, '-').replace(/[^a-zA-Z0-9-_]/g, '')
-  const defaultFolderPath = sanitizedBranchName ? `${repoParentDir}/${repoName}--${sanitizedBranchName}` : ''
 
-  // Update folder path when branch changes (if user hasn't manually edited)
-  const [folderManuallyEdited, setFolderManuallyEdited] = useState(false)
-  
-  useEffect(() => {
-    if (!folderManuallyEdited && defaultFolderPath) {
-      setFolderPath(defaultFolderPath)
+  // Compute paths for each preset
+  const presetPaths = useMemo(() => {
+    if (!sanitizedBranchName) {
+      return {
+        ledger: repoPath ? `${repoPath}/.worktrees/` : '.worktrees/',
+        sibling: repoParentDir ? `${repoParentDir}/${repoName}--` : '',
+      }
     }
-  }, [defaultFolderPath, folderManuallyEdited])
+    return {
+      ledger: `${repoPath}/.worktrees/${sanitizedBranchName}`,
+      sibling: `${repoParentDir}/${repoName}--${sanitizedBranchName}`,
+    }
+  }, [repoPath, repoParentDir, repoName, sanitizedBranchName])
+
+  // Get the effective folder path based on preset
+  const folderPath = useMemo(() => {
+    switch (locationPreset) {
+      case 'ledger':
+        return presetPaths.ledger
+      case 'sibling':
+        return presetPaths.sibling
+      case 'custom':
+        return customPath
+    }
+  }, [locationPreset, presetPaths, customPath])
+
+  // Initialize custom path when switching to custom
+  useEffect(() => {
+    if (locationPreset === 'custom' && !customPath && sanitizedBranchName) {
+      setCustomPath(presetPaths.ledger)
+    }
+  }, [locationPreset, customPath, presetPaths.ledger, sanitizedBranchName])
 
   const handleBrowse = async () => {
     const selected = await window.electronAPI.selectWorktreeFolder()
     if (selected) {
-      setFolderPath(selected)
-      setFolderManuallyEdited(true)
+      setCustomPath(selected)
+      setLocationPreset('custom')
     }
   }
 
@@ -167,25 +194,85 @@ export function CreateWorktreePanel({
           )}
         </div>
 
-        {/* Folder Location */}
+        {/* Location Preset Selection */}
         <div className="form-section">
-          <label className="form-label">Folder Location</label>
-          <div className="folder-input-row">
-            <input
-              type="text"
-              className="form-input folder-input"
-              placeholder="Select folder location..."
-              value={folderPath}
-              onChange={(e) => {
-                setFolderPath(e.target.value)
-                setFolderManuallyEdited(true)
-              }}
-            />
+          <label className="form-label">Location</label>
+          <div className="location-presets">
+            <label 
+              className={`location-preset ${locationPreset === 'ledger' ? 'selected' : ''}`}
+              title={presetPaths.ledger}
+            >
+              <input
+                type="radio"
+                name="locationPreset"
+                value="ledger"
+                checked={locationPreset === 'ledger'}
+                onChange={() => setLocationPreset('ledger')}
+              />
+              <div className="preset-content">
+                <span className="preset-name">.worktrees/</span>
+                <span className="preset-description">Inside repo (Ledger convention)</span>
+              </div>
+            </label>
+            <label 
+              className={`location-preset ${locationPreset === 'sibling' ? 'selected' : ''}`}
+              title={presetPaths.sibling}
+            >
+              <input
+                type="radio"
+                name="locationPreset"
+                value="sibling"
+                checked={locationPreset === 'sibling'}
+                onChange={() => setLocationPreset('sibling')}
+              />
+              <div className="preset-content">
+                <span className="preset-name">Sibling folder</span>
+                <span className="preset-description">{repoName}--branch alongside repo</span>
+              </div>
+            </label>
+            <label 
+              className={`location-preset ${locationPreset === 'custom' ? 'selected' : ''}`}
+            >
+              <input
+                type="radio"
+                name="locationPreset"
+                value="custom"
+                checked={locationPreset === 'custom'}
+                onChange={() => setLocationPreset('custom')}
+              />
+              <div className="preset-content">
+                <span className="preset-name">Custom location</span>
+                <span className="preset-description">Choose your own path</span>
+              </div>
+            </label>
+          </div>
+
+          {/* Show path preview / custom input */}
+          <div className="location-path-row">
+            {locationPreset === 'custom' ? (
+              <input
+                type="text"
+                className="form-input folder-input"
+                placeholder="Enter path or browse..."
+                value={customPath}
+                onChange={(e) => setCustomPath(e.target.value)}
+              />
+            ) : (
+              <div className="path-preview" title={folderPath}>
+                {folderPath || 'Enter branch name to see path'}
+              </div>
+            )}
             <button className="btn btn-secondary browse-btn" onClick={handleBrowse}>
               Browse
             </button>
           </div>
-          <p className="form-hint">Path will be created if it doesn't exist</p>
+          <p className="form-hint">
+            {locationPreset === 'ledger' 
+              ? 'Worktrees in .worktrees/ are auto-detected as nested repos by git'
+              : locationPreset === 'sibling'
+              ? 'Creates folder alongside your main repo'
+              : 'Path will be created if it doesn\'t exist'}
+          </p>
         </div>
 
         {/* Actions */}

@@ -35,11 +35,13 @@ import {
   getStashes,
   getStashFiles,
   getStashFileDiff,
+  getStashFileDiffParsed,
   getStashDiff,
   applyStash,
   popStash,
   dropStash,
   stashToBranch,
+  applyStashToBranch,
   convertWorktreeToBranch,
   applyWorktreeChanges,
   removeWorktree,
@@ -443,6 +445,14 @@ app.whenReady().then(() => {
     }
   })
 
+  ipcMain.handle('get-stash-file-diff-parsed', async (_, stashIndex: number, filePath: string) => {
+    try {
+      return await getStashFileDiffParsed(stashIndex, filePath)
+    } catch (_error) {
+      return null
+    }
+  })
+
   ipcMain.handle('get-stash-diff', async (_, stashIndex: number) => {
     try {
       return await getStashDiff(stashIndex)
@@ -480,6 +490,15 @@ app.whenReady().then(() => {
       return await stashToBranch(stashIndex, branchName)
     } catch (error) {
       return { success: false, message: (error as Error).message }
+    }
+  })
+
+  // Apply stash to a different branch using worktrees (Ledger's "leapfrog" feature)
+  ipcMain.handle('apply-stash-to-branch', async (_, stashIndex: number, targetBranch: string, stashMessage: string, keepWorktree?: boolean) => {
+    try {
+      return await applyStashToBranch(stashIndex, targetBranch, stashMessage, keepWorktree ?? false)
+    } catch (error) {
+      return { success: false, message: (error as Error).message, usedExistingWorktree: false }
     }
   })
 

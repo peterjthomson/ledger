@@ -14,6 +14,10 @@ export interface GitGraphProps {
   onSelectCommit: (commit: GraphCommit) => void
   formatRelativeTime: (date: string) => string
   showGraph?: boolean // Show graph lines/nodes, when false it's a flat list
+  graphWidth?: number | null // Manual width override, null = auto-size
+  onStartResize?: (startX: number, currentWidth: number) => void // Callback to start resizing
+  onResetWidth?: () => void // Double-click to reset to auto-size
+  isResizing?: boolean // Whether currently resizing
 }
 
 // Lane colors for branches
@@ -34,6 +38,10 @@ export function GitGraph({
   onSelectCommit,
   formatRelativeTime,
   showGraph = true,
+  graphWidth: manualGraphWidth,
+  onStartResize,
+  onResetWidth,
+  isResizing,
 }: GitGraphProps) {
   // Calculate lane assignments for the graph
   const { lanes, maxLane } = useMemo(() => {
@@ -85,7 +93,8 @@ export function GitGraph({
   const LANE_WIDTH = 16
   const ROW_HEIGHT = 36
   const NODE_RADIUS = 4
-  const graphWidth = (maxLane + 1) * LANE_WIDTH + 20
+  const autoGraphWidth = (maxLane + 1) * LANE_WIDTH + 20
+  const graphWidth = manualGraphWidth ?? autoGraphWidth
 
   // Build a map of commit hash to index for drawing lines
   const commitIndexMap = useMemo(() => {
@@ -97,89 +106,100 @@ export function GitGraph({
   return (
     <div className={`git-graph ${!showGraph ? 'no-graph' : ''}`}>
       {showGraph && (
-        <svg
-          className="git-graph-svg"
-          width={graphWidth}
-          height={commits.length * ROW_HEIGHT}
-          style={{ minWidth: graphWidth }}
-        >
-          {/* Draw connecting lines */}
-          {commits.map((commit, idx) => {
-            const lane = lanes.get(commit.hash) || 0
-            const x = 10 + lane * LANE_WIDTH
-            const y = idx * ROW_HEIGHT + ROW_HEIGHT / 2
-            const color = LANE_COLORS[lane % LANE_COLORS.length]
+        <div className="git-graph-svg-container" style={{ width: graphWidth, minWidth: graphWidth }}>
+          <svg
+            className="git-graph-svg"
+            width={autoGraphWidth}
+            height={commits.length * ROW_HEIGHT}
+            style={{ minWidth: autoGraphWidth }}
+          >
+            {/* Draw connecting lines */}
+            {commits.map((commit, idx) => {
+              const lane = lanes.get(commit.hash) || 0
+              const x = 10 + lane * LANE_WIDTH
+              const y = idx * ROW_HEIGHT + ROW_HEIGHT / 2
+              const color = LANE_COLORS[lane % LANE_COLORS.length]
 
-            return commit.parents.map((parentHash, pIdx) => {
-              const parentIdx = commitIndexMap.get(parentHash)
-              if (parentIdx === undefined) return null
+              return commit.parents.map((parentHash, pIdx) => {
+                const parentIdx = commitIndexMap.get(parentHash)
+                if (parentIdx === undefined) return null
 
-              const parentLane = lanes.get(parentHash) || 0
-              const px = 10 + parentLane * LANE_WIDTH
-              const py = parentIdx * ROW_HEIGHT + ROW_HEIGHT / 2
-              const parentColor = LANE_COLORS[parentLane % LANE_COLORS.length]
+                const parentLane = lanes.get(parentHash) || 0
+                const px = 10 + parentLane * LANE_WIDTH
+                const py = parentIdx * ROW_HEIGHT + ROW_HEIGHT / 2
+                const parentColor = LANE_COLORS[parentLane % LANE_COLORS.length]
 
-              // Draw curved line
-              if (lane === parentLane) {
-                // Straight line
-                return (
-                  <line
-                    key={`${commit.hash}-${parentHash}`}
-                    x1={x}
-                    y1={y}
-                    x2={px}
-                    y2={py}
+                // Draw curved line
+                if (lane === parentLane) {
+                  // Straight line
+                  return (
+                    <line
+                      key={`${commit.hash}-${parentHash}`}
+                      x1={x}
+                      y1={y}
+                      x2={px}
+                      y2={py}
+                      stroke={color}
+                      strokeWidth={2}
+                    />
+                  )
+                } else {
+                  // Curved line for merges/branches
+                  const midY = (y + py) / 2
+                  return (
+                    <path
+                      key={`${commit.hash}-${parentHash}-${pIdx}`}
+                      d={`M ${x} ${y} C ${x} ${midY}, ${px} ${midY}, ${px} ${py}`}
+                      stroke={pIdx === 0 ? color : parentColor}
+                      strokeWidth={2}
+                      fill="none"
+                    />
+                  )
+                }
+              })
+            })}
+
+            {/* Draw commit nodes */}
+            {commits.map((commit, idx) => {
+              const lane = lanes.get(commit.hash) || 0
+              const x = 10 + lane * LANE_WIDTH
+              const y = idx * ROW_HEIGHT + ROW_HEIGHT / 2
+              const color = LANE_COLORS[lane % LANE_COLORS.length]
+              const isSelected = selectedCommit?.hash === commit.hash
+
+              return (
+                <g key={commit.hash}>
+                  {/* Selection ring */}
+                  {isSelected && (
+                    <circle cx={x} cy={y} r={NODE_RADIUS + 3} fill="none" stroke={color} strokeWidth={2} opacity={0.5} />
+                  )}
+                  {/* Node */}
+                  <circle
+                    cx={x}
+                    cy={y}
+                    r={commit.isMerge ? NODE_RADIUS + 1 : NODE_RADIUS}
+                    fill={commit.isMerge ? 'var(--bg-primary)' : color}
                     stroke={color}
-                    strokeWidth={2}
+                    strokeWidth={commit.isMerge ? 2 : 0}
                   />
-                )
-              } else {
-                // Curved line for merges/branches
-                const midY = (y + py) / 2
-                return (
-                  <path
-                    key={`${commit.hash}-${parentHash}-${pIdx}`}
-                    d={`M ${x} ${y} C ${x} ${midY}, ${px} ${midY}, ${px} ${py}`}
-                    stroke={pIdx === 0 ? color : parentColor}
-                    strokeWidth={2}
-                    fill="none"
-                  />
-                )
-              }
-            })
-          })}
-
-          {/* Draw commit nodes */}
-          {commits.map((commit, idx) => {
-            const lane = lanes.get(commit.hash) || 0
-            const x = 10 + lane * LANE_WIDTH
-            const y = idx * ROW_HEIGHT + ROW_HEIGHT / 2
-            const color = LANE_COLORS[lane % LANE_COLORS.length]
-            const isSelected = selectedCommit?.hash === commit.hash
-
-            return (
-              <g key={commit.hash}>
-                {/* Selection ring */}
-                {isSelected && (
-                  <circle cx={x} cy={y} r={NODE_RADIUS + 3} fill="none" stroke={color} strokeWidth={2} opacity={0.5} />
-                )}
-                {/* Node */}
-                <circle
-                  cx={x}
-                  cy={y}
-                  r={commit.isMerge ? NODE_RADIUS + 1 : NODE_RADIUS}
-                  fill={commit.isMerge ? 'var(--bg-primary)' : color}
-                  stroke={color}
-                  strokeWidth={commit.isMerge ? 2 : 0}
-                />
-              </g>
-            )
-          })}
-        </svg>
+                </g>
+              )
+            })}
+          </svg>
+          {/* Resize handle for graph width */}
+          {onStartResize && (
+            <div 
+              className={`graph-resize-handle ${isResizing ? 'active' : ''}`}
+              onMouseDown={(e) => onStartResize(e.clientX, graphWidth)}
+              onDoubleClick={onResetWidth}
+              title="Drag to resize, double-click to reset"
+            />
+          )}
+        </div>
       )}
 
       {/* Commit list */}
-      <div className="git-graph-list" style={{ marginLeft: showGraph ? graphWidth : 0 }}>
+      <div className="git-graph-list">
         {commits.map((commit) => (
           <div
             key={commit.hash}

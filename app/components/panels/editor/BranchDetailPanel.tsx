@@ -158,12 +158,6 @@ export function BranchDetailPanel({
             {branch.isLocalOnly && ' · Local only'}
           </span>
         </div>
-        {branch.lastCommitDate && (
-          <div className="detail-meta-item">
-            <span className="meta-label">Last Commit</span>
-            <span className="meta-value">{formatDate(branch.lastCommitDate)}</span>
-          </div>
-        )}
         {branch.firstCommitDate && (
           <div className="detail-meta-item">
             <span className="meta-label">First Commit</span>
@@ -181,6 +175,16 @@ export function BranchDetailPanel({
           <span className="meta-value">{branch.isMerged ? 'Yes' : 'No'}</span>
         </div>
       </div>
+
+      {/* Latest Commit Message */}
+      {branch.lastCommitMessage && (
+        <div className="latest-commit-section">
+          <div className="latest-commit-label">Latest Commit</div>
+          <div className="latest-commit-message" title={branch.lastCommitMessage}>
+            {branch.lastCommitMessage}
+          </div>
+        </div>
+      )}
 
       {/* PR Creation Form */}
       {showPRForm && !isMainOrMaster && (

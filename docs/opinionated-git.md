@@ -119,6 +119,63 @@ Diff the merge result against master
 
 ---
 
+## Leapfrog Stash Apply
+
+**The Problem:** Git's `stash apply` only works on your current branch. If you stashed changes on branch A but you're now on branch B, you have to checkout A first - which risks conflicts with your current work.
+
+```
+error: Your local changes would be overwritten by checkout.
+Please commit your changes or stash them before you switch branches.
+```
+
+**Ledger's Solution:** Apply a stash directly to its original branch without switching, using worktrees:
+
+```
+You're on: feature/new-thing
+Stash was from: feature/old-thing
+
+Standard git:  checkout old → apply → checkout new (risky!)
+Ledger:        "Apply to feature/old-thing" (via worktree)
+```
+
+**How it works:**
+
+| Scenario | What Ledger Does |
+|----------|------------------|
+| Target branch has an **existing worktree** | Apply stash directly to that worktree. Changes remain uncommitted. |
+| Target branch has **no worktree** | Create temp worktree → apply stash → auto-commit → clean up |
+
+**The Flow:**
+
+```
+User clicks "Apply to feature/old-thing"
+    ↓
+Does feature/old-thing have a worktree?
+    ↓ Yes                              ↓ No
+Apply stash there               Create temp worktree at
+(uncommitted)                   .git/ledger-temp-worktrees/
+    ↓                                  ↓
+Done!                           Apply stash
+                                       ↓
+                                Auto-commit: "Apply stash: <message>"
+                                       ↓
+                                Remove temp worktree
+                                       ↓
+                                Done!
+```
+
+**Benefits:**
+- Never lose your current context
+- Safe - no risk of conflicts blocking your checkout
+- Changes are either uncommitted (existing worktree) or auto-committed (temp worktree)
+- Temp worktrees are automatically cleaned up
+
+**This is "parallel git":** Worktrees let you work on multiple branches simultaneously. Ledger extends this to operations like stash apply that git normally requires branch switching for.
+
+**Implementation:** `applyStashToBranch()` in `git-service.ts`
+
+---
+
 ## Future Opinions
 
 Things we might handle automatically in the future:
