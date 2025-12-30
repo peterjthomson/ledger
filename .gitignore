@@ -10,3 +10,5 @@ playwright-report/
 docs/wip
 # Build artifacts WIP folder (for in-progress notarization)
 wip/
+# Ledger worktrees convention - worktrees created by Ledger
+.worktrees/
