@@ -5,7 +5,7 @@
  * for creating new branches and PRs.
  */
 
-import { useState, useEffect, useRef, useCallback } from 'react'
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import type { WorkingStatus, UncommittedFile, StagingFileDiff } from '../../../types/electron'
 import type { StatusMessage } from '../../../types/app-types'
 
@@ -62,11 +62,37 @@ export function StagingPanel({ workingStatus, currentBranch, onRefresh, onStatus
   const unstagedFiles = workingStatus.files.filter((f) => !f.staged)
   const allFiles = [...stagedFiles, ...unstagedFiles]
 
-  // Update suggested branch name when commit message changes
+  // Generate suggested commit message from files (staged preferred, unstaged as preview)
+  const suggestedCommitMessage = useMemo(() => {
+    // Use staged files if any, otherwise preview from unstaged
+    const filesToUse = stagedFiles.length > 0 ? stagedFiles : unstagedFiles
+    if (filesToUse.length === 0) return ''
+    
+    // Get the primary file (first one, or could pick by other heuristics)
+    const primaryFile = filesToUse[0]
+    const fileName = primaryFile.path.split('/').pop() || primaryFile.path
+    
+    // Generate action verb based on status
+    let action = 'Update'
+    if (primaryFile.status === 'added' || primaryFile.status === 'untracked') {
+      action = 'Add'
+    } else if (primaryFile.status === 'deleted') {
+      action = 'Remove'
+    } else if (primaryFile.status === 'renamed') {
+      action = 'Rename'
+    }
+    
+    return `${action} ${fileName}`
+  }, [stagedFiles, unstagedFiles])
+
+  // Effective commit message: user input OR auto-suggested from files
+  const effectiveCommitMessage = commitMessage.trim() || suggestedCommitMessage
+
+  // Update suggested branch name when effective commit message changes
   useEffect(() => {
-    const suggested = generateBranchNameFromMessage(commitMessage)
+    const suggested = generateBranchNameFromMessage(effectiveCommitMessage)
     setSuggestedBranchName(suggested)
-  }, [commitMessage])
+  }, [effectiveCommitMessage])
 
   // Keyboard navigation for file list
   const handleFileListKeyDown = useCallback((e: React.KeyboardEvent) => {
@@ -223,7 +249,7 @@ export function StagingPanel({ workingStatus, currentBranch, onRefresh, onStatus
 
   // Commit with optional force to skip behind-check
   const handleCommit = async (force: boolean = false) => {
-    if (!commitMessage.trim() || stagedFiles.length === 0) return
+    if (!effectiveCommitMessage || stagedFiles.length === 0) return
 
     setIsCommitting(true)
     try {
@@ -239,7 +265,7 @@ export function StagingPanel({ workingStatus, currentBranch, onRefresh, onStatus
       }
 
       const result = await window.electronAPI.commitChanges(
-        commitMessage.trim(),
+        effectiveCommitMessage,
         commitDescription.trim() || undefined,
         force
       )
@@ -257,7 +283,7 @@ export function StagingPanel({ workingStatus, currentBranch, onRefresh, onStatus
             // If create PR is enabled, create the PR
             if (createPR) {
               onStatusChange({ type: 'info', message: 'Creating pull request...' })
-              const prTitleToUse = prTitle.trim() || generatePRTitle(targetBranch)
+              const prTitleToUse = prTitle.trim() || suggestedPRTitle
               const prResult = await window.electronAPI.createPullRequest({
                 title: prTitleToUse,
                 body: prBody.trim() || undefined,
@@ -373,13 +399,19 @@ export function StagingPanel({ workingStatus, currentBranch, onRefresh, onStatus
     await handleCommit(true)
   }
 
-  // Auto-generate PR title from branch name
-  const generatePRTitle = (branch: string) => {
+  // Auto-generate PR title - cascade: commit message → branch name
+  const suggestedPRTitle = useMemo(() => {
+    // Prefer commit message (preserves original casing and wording)
+    if (effectiveCommitMessage) {
+      return effectiveCommitMessage
+    }
+    // Fallback: format branch name into title
+    const branch = fullBranchName || currentBranch
     return branch
       .replace(/^(feature|bugfix|hotfix)\//, '')
       .replace(/[-_]/g, ' ')
       .replace(/\b\w/g, (c) => c.toUpperCase())
-  }
+  }, [effectiveCommitMessage, fullBranchName, currentBranch])
 
   // File status helpers
   const getFileStatusIcon = (status: UncommittedFile['status']) => {
@@ -587,7 +619,7 @@ export function StagingPanel({ workingStatus, currentBranch, onRefresh, onStatus
         <input
           type="text"
           className="commit-summary-input"
-          placeholder="Commit message (required)"
+          placeholder={suggestedCommitMessage || 'Commit message (required)'}
           value={commitMessage}
           onChange={(e) => setCommitMessage(e.target.value)}
           maxLength={72}
@@ -636,16 +668,11 @@ export function StagingPanel({ workingStatus, currentBranch, onRefresh, onStatus
               <input
                 type="text"
                 className="branch-name-input"
-                placeholder="branch-name"
+                placeholder={suggestedBranchName || 'branch-name'}
                 value={branchName}
                 onChange={(e) => setBranchName(e.target.value.replace(/[^a-zA-Z0-9-_]/g, ''))}
               />
             </div>
-            {fullBranchName && (
-              <div className="branch-preview">
-                → <code>{fullBranchName}</code>
-              </div>
-            )}
           </div>
         )}
         <div className="commit-options">
@@ -673,7 +700,7 @@ export function StagingPanel({ workingStatus, currentBranch, onRefresh, onStatus
                   className="pr-inline-title"
                   value={prTitle}
                   onChange={(e) => setPrTitle(e.target.value)}
-                  placeholder={`PR title (default: ${generatePRTitle(fullBranchName || currentBranch)})`}
+                  placeholder={suggestedPRTitle || 'PR title'}
                 />
                 <textarea
                   className="pr-inline-body"
@@ -721,7 +748,7 @@ export function StagingPanel({ workingStatus, currentBranch, onRefresh, onStatus
             className="btn btn-primary commit-btn"
             onClick={() => handleCommit()}
             disabled={
-              !commitMessage.trim() ||
+              !effectiveCommitMessage ||
               stagedFiles.length === 0 ||
               isCommitting ||
               (createNewBranch && !effectiveBranchName) ||

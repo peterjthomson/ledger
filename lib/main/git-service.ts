@@ -873,31 +873,72 @@ export async function mergePullRequest(
     method?: MergeMethod
     deleteAfterMerge?: boolean
   }
-): Promise<{ success: boolean; message: string }> {
-  if (!repoPath) {
+): Promise<{ success: boolean; message: string; stashed?: boolean }> {
+  if (!repoPath || !git) {
     return { success: false, message: 'No repository selected' }
   }
 
+  const args = ['pr', 'merge', prNumber.toString()]
+
+  // Add merge method (providing this explicitly avoids interactive prompts)
+  const method = options?.method || 'merge'
+  args.push(`--${method}`)
+
+  // Delete branch after merge (default: true)
+  if (options?.deleteAfterMerge !== false) {
+    args.push('--delete-branch')
+  }
+
+  const runMerge = async () => {
+    await execAsync(`gh ${args.join(' ')}`, { cwd: repoPath! })
+  }
+
   try {
-    const args = ['pr', 'merge', prNumber.toString()]
-
-    // Add merge method (providing this explicitly avoids interactive prompts)
-    const method = options?.method || 'merge'
-    args.push(`--${method}`)
-
-    // Delete branch after merge (default: true)
-    if (options?.deleteAfterMerge !== false) {
-      args.push('--delete-branch')
-    }
-
-    await execAsync(`gh ${args.join(' ')}`, { cwd: repoPath })
-
+    // First attempt - try without stashing
+    await runMerge()
     return {
       success: true,
       message: `Pull request #${prNumber} merged successfully`,
     }
   } catch (error) {
     const errorMessage = (error as Error).message
+
+    // If checkout conflict due to uncommitted changes, auto-stash and retry
+    if (errorMessage.includes('would be overwritten by checkout') || errorMessage.includes('commit your changes or stash them')) {
+      const hasChanges = await hasUncommittedChanges()
+      if (hasChanges) {
+        try {
+          await git.raw(['stash', 'push', '--include-untracked', '-m', 'ledger-auto-stash-for-merge'])
+          
+          // Retry the merge
+          await runMerge()
+          
+          // Restore stashed changes
+          try {
+            await git.raw(['stash', 'pop'])
+            return {
+              success: true,
+              message: `Pull request #${prNumber} merged successfully`,
+              stashed: true,
+            }
+          } catch (_stashErr) {
+            return {
+              success: true,
+              message: `PR #${prNumber} merged! Your stashed changes may have conflicts - run 'git stash pop' manually.`,
+              stashed: true,
+            }
+          }
+        } catch (retryError) {
+          // Restore stash on retry failure
+          try {
+            await git.raw(['stash', 'pop'])
+          } catch {
+            // Ignore
+          }
+          return { success: false, message: (retryError as Error).message }
+        }
+      }
+    }
 
     // Check if merge succeeded but branch deletion failed (e.g., branch in use by worktree)
     if (errorMessage.includes('was already merged') && errorMessage.includes('Cannot delete branch')) {
@@ -1162,36 +1203,9 @@ export async function commentOnPR(prNumber: number, body: string): Promise<{ suc
   }
 }
 
-// Merge a PR
+// Merge a PR (delegates to mergePullRequest with auto-stash support)
 export async function mergePR(prNumber: number, mergeMethod: 'merge' | 'squash' | 'rebase' = 'merge'): Promise<{ success: boolean; message: string }> {
-  if (!repoPath) {
-    return { success: false, message: 'No repository selected' }
-  }
-
-  try {
-    const methodFlag = mergeMethod === 'merge' ? '--merge' : mergeMethod === 'squash' ? '--squash' : '--rebase'
-    const cmd = `gh pr merge ${prNumber} ${methodFlag} --delete-branch`
-
-    await execAsync(cmd, { cwd: repoPath })
-
-    return { success: true, message: 'PR merged successfully' }
-  } catch (error) {
-    const errorMessage = (error as Error).message
-
-    if (errorMessage.includes('not logged')) {
-      return { success: false, message: 'Not logged into GitHub CLI. Run `gh auth login` in terminal.' }
-    }
-
-    if (errorMessage.includes('already been merged')) {
-      return { success: false, message: 'This PR has already been merged' }
-    }
-
-    if (errorMessage.includes('not mergeable')) {
-      return { success: false, message: 'PR is not mergeable. Check for conflicts or required checks.' }
-    }
-
-    return { success: false, message: errorMessage }
-  }
+  return mergePullRequest(prNumber, { method: mergeMethod, deleteAfterMerge: true })
 }
 
 // Get the GitHub remote URL for the repository
@@ -2891,11 +2905,23 @@ export async function unstageAll(): Promise<{ success: boolean; message: string 
   }
 }
 
-// Discard changes in a file (revert to last commit)
+// Discard changes in a file (revert to last commit, or delete if untracked)
 export async function discardFileChanges(filePath: string): Promise<{ success: boolean; message: string }> {
   if (!git) throw new Error('No repository selected')
 
   try {
+    // Check if the file is untracked
+    const status = await git.status()
+    const isUntracked = status.not_added.includes(filePath)
+
+    if (isUntracked) {
+      // For untracked files, delete the file
+      const fullPath = path.join(repoPath!, filePath)
+      await fs.promises.unlink(fullPath)
+      return { success: true, message: `Deleted untracked file ${filePath}` }
+    }
+
+    // For tracked files, restore to last commit
     await git.raw(['restore', filePath])
     return { success: true, message: `Discarded changes in ${filePath}` }
   } catch (error) {
