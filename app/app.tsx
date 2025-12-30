@@ -3015,24 +3015,32 @@ export default function App() {
               className={`focus-detail ${!mainVisible ? 'detail-expanded' : ''}`} 
               style={mainVisible ? { width: detailWidth } : undefined}
             >
-              {/* Editor Navigation */}
-              <div className="editor-nav">
-                <button
-                  className="editor-nav-btn"
-                  onClick={goBack}
-                  disabled={!canGoBack}
-                  title="Go back (⌘[)"
-                >
-                  ←
-                </button>
-                <button
-                  className="editor-nav-btn"
-                  onClick={goForward}
-                  disabled={!canGoForward}
-                  title="Go forward (⌘])"
-                >
-                  →
-                </button>
+              {/* Editor Header */}
+              <div className="column-header editor-header">
+                <div className="column-title">
+                  <h2>
+                    <span className="column-icon">◇</span>
+                    Editor
+                  </h2>
+                </div>
+                <div className="editor-nav">
+                  <button
+                    className="editor-nav-btn"
+                    onClick={goBack}
+                    disabled={!canGoBack}
+                    title="Go back (⌘[)"
+                  >
+                    ←
+                  </button>
+                  <button
+                    className="editor-nav-btn"
+                    onClick={goForward}
+                    disabled={!canGoForward}
+                    title="Go forward (⌘])"
+                  >
+                    →
+                  </button>
+                </div>
               </div>
               {sidebarFocus?.type === 'uncommitted' && workingStatus ? (
                 <StagingPanel
