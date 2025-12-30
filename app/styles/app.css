@@ -531,6 +531,7 @@ body,
   align-items: center;
   justify-content: space-between;
   gap: 8px;
+  line-height: 1.3;
 }
 
 .item-name {
@@ -540,6 +541,7 @@ body,
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  line-height: 1.3;
 }
 
 .item.current .item-name {
@@ -1049,19 +1051,18 @@ body,
 }
 
 .worktree-item.working-folder .item-name {
-  color: var(--text-muted);
-  font-weight: 400;
+  color: var(--text-secondary);
+  font-weight: 500;
 }
 
 .worktree-item.working-folder .item-path {
-  color: var(--text-muted);
-  opacity: 0.8;
+  color: var(--text-secondary);
 }
 
 /* Working folder icon prefix */
 .working-folder-icon {
   margin-right: 4px;
-  opacity: 0.6;
+  opacity: 0.8;
 }
 
 /* Working folder in sidebar - also subtle */
@@ -1070,7 +1071,7 @@ body,
 }
 
 .working-folder-sidebar-item .sidebar-item-name {
-  color: var(--text-muted);
+  color: var(--text-secondary);
 }
 
 /* Working folder detail panel - can keep some accent for context */
@@ -1393,7 +1394,7 @@ body,
 }
 
 .commit-message.uncommitted-label {
-  color: var(--text-muted);
+  color: var(--text-secondary);
 }
 
 .commit-meta {
@@ -1874,6 +1875,35 @@ body,
 .copyable-text {
   user-select: text;
   cursor: text;
+}
+
+/* Latest Commit Section */
+.latest-commit-section {
+  margin-top: 16px;
+  padding: 12px;
+  background: var(--bg-secondary);
+  border-radius: var(--radius-sm);
+  border-left: 3px solid var(--accent);
+}
+
+.latest-commit-label {
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: var(--text-muted);
+  margin-bottom: 6px;
+}
+
+.latest-commit-message {
+  font-size: 12px;
+  line-height: 1.4;
+  color: var(--text-primary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
 }
 
 .detail-actions {
@@ -4388,6 +4418,45 @@ body,
   margin-right: -2px;
 }
 
+/* Graph resize handle (inside git graph) */
+.graph-resize-handle {
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: 6px;
+  height: 100%;
+  background: transparent;
+  cursor: col-resize;
+  z-index: 10;
+  transition: background 0.15s ease;
+}
+
+.graph-resize-handle::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 10px;
+}
+
+.graph-resize-handle:hover,
+.graph-resize-handle.active {
+  background: var(--accent);
+}
+
+/* Git graph SVG container */
+.git-graph-svg-container {
+  position: relative;
+  flex-shrink: 0;
+  overflow: hidden;
+}
+
+.git-graph-svg-container .git-graph-svg {
+  position: relative;
+}
+
 /* ========================================
    Radar Column Drag and Drop
    ======================================== */
@@ -5129,7 +5198,8 @@ body,
   }
 
   /* Hide resize handles in narrow view */
-  .resize-handle {
+  .resize-handle,
+  .graph-resize-handle {
     display: none;
   }
 }
