@@ -560,6 +560,18 @@ export default function App() {
     setSidebarFiltersOpen((prev) => ({ ...prev, [section]: !prev[section] }))
   }, [])
 
+  // Radar single-click handlers - focus item in editor (stays in Radar if editor visible)
+  const handleRadarItemClick = useCallback(
+    (type: SidebarFocusType, data: PullRequest | Branch | Worktree | StashEntry | WorkingStatus) => {
+      // If editor is visible in Radar, just focus the item
+      if (radarHasEditor) {
+        handleSidebarFocus(type, data)
+      }
+      // Otherwise do nothing on single click (double-click will navigate to Focus)
+    },
+    [radarHasEditor, handleSidebarFocus]
+  )
+
   // Radar card double-click handlers - switch to Focus mode with item selected
   const handleRadarPRClick = useCallback(
     (pr: PullRequest) => {
@@ -1872,7 +1884,8 @@ export default function App() {
                   {filteredPRs.map((pr) => (
                     <li
                       key={pr.number}
-                      className={`item pr-item clickable ${pr.isDraft ? 'draft' : ''}`}
+                      className={`item pr-item clickable ${pr.isDraft ? 'draft' : ''} ${sidebarFocus?.type === 'pr' && (sidebarFocus.data as PullRequest).number === pr.number ? 'selected' : ''}`}
+                      onClick={() => handleRadarItemClick('pr', pr)}
                       onDoubleClick={() => handleRadarPRClick(pr)}
                       onContextMenu={(e) => handleContextMenu(e, 'pr', pr)}
                     >
@@ -1977,7 +1990,8 @@ export default function App() {
                     return (
                       <li
                         key={wt.path}
-                        className={`item worktree-item clickable ${!isWorkingFolder && wt.branch === currentBranch ? 'current' : ''} ${isWorkingFolder ? 'working-folder' : ''}`}
+                        className={`item worktree-item clickable ${!isWorkingFolder && wt.branch === currentBranch ? 'current' : ''} ${isWorkingFolder ? 'working-folder' : ''} ${sidebarFocus?.type === 'worktree' && (sidebarFocus.data as Worktree).path === wt.path ? 'selected' : ''}`}
+                        onClick={() => handleRadarItemClick('worktree', wt)}
                         onDoubleClick={() => !isWorkingFolder && handleRadarWorktreeClick(wt)}
                         onContextMenu={(e) => handleContextMenu(e, 'worktree', wt)}
                       >
@@ -2089,7 +2103,8 @@ export default function App() {
               {/* Uncommitted changes as virtual commit */}
               {workingStatus?.hasChanges && (
                 <div
-                  className="commit-item uncommitted clickable"
+                  className={`commit-item uncommitted clickable ${sidebarFocus?.type === 'uncommitted' ? 'selected' : ''}`}
+                  onClick={() => handleRadarItemClick('uncommitted', workingStatus)}
                   onDoubleClick={() => handleRadarUncommittedClick()}
                   onContextMenu={(e) => handleContextMenu(e, 'uncommitted', workingStatus)}
                 >
@@ -2120,7 +2135,12 @@ export default function App() {
                 filteredGraphCommits.map((commit) => (
                   <div
                     key={commit.hash}
-                    className={`commit-item ${commit.isMerge ? 'merge' : ''} ${switching ? 'disabled' : ''}`}
+                    className={`commit-item clickable ${commit.isMerge ? 'merge' : ''} ${switching ? 'disabled' : ''} ${selectedCommit?.hash === commit.hash ? 'selected' : ''}`}
+                    onClick={() => {
+                      if (radarHasEditor) {
+                        handleSelectCommit(commit)
+                      }
+                    }}
                     onDoubleClick={() => handleRadarCommitClick(commit)}
                     onContextMenu={(e) => handleContextMenu(e, 'commit', commit)}
                   >
@@ -2229,7 +2249,8 @@ export default function App() {
                   {localBranches.map((branch) => (
                     <li
                       key={branch.name}
-                      className={`item branch-item clickable ${branch.current ? 'current' : ''} ${switching ? 'disabled' : ''}`}
+                      className={`item branch-item clickable ${branch.current ? 'current' : ''} ${switching ? 'disabled' : ''} ${sidebarFocus?.type === 'branch' && (sidebarFocus.data as Branch).name === branch.name ? 'selected' : ''}`}
+                      onClick={() => handleRadarItemClick('branch', branch)}
                       onDoubleClick={() => handleRadarBranchClick(branch)}
                       onContextMenu={(e) => handleContextMenu(e, 'local-branch', branch)}
                     >
@@ -2337,7 +2358,8 @@ export default function App() {
                   {remoteBranches.map((branch) => (
                     <li
                       key={branch.name}
-                      className={`item remote-item clickable ${switching ? 'disabled' : ''}`}
+                      className={`item remote-item clickable ${switching ? 'disabled' : ''} ${sidebarFocus?.type === 'remote' && (sidebarFocus.data as Branch).name === branch.name ? 'selected' : ''}`}
+                      onClick={() => handleRadarItemClick('remote', branch)}
                       onDoubleClick={() => handleRadarRemoteBranchClick(branch)}
                       onContextMenu={(e) => handleContextMenu(e, 'remote-branch', branch)}
                     >

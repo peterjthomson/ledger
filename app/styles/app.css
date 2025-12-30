@@ -791,6 +791,17 @@ body,
   cursor: not-allowed;
 }
 
+.item.selected,
+.commit-item.selected {
+  background: var(--accent-glow);
+  border-left-color: var(--accent);
+}
+
+.item.selected:hover,
+.commit-item.selected:hover {
+  background: var(--accent-glow);
+}
+
 /* Status Toast */
 .status-toast {
   position: fixed;
