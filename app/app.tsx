@@ -1843,6 +1843,7 @@ export default function App() {
                           )}
                           {wt.changedFileCount === 0 && <span className="clean-indicator">clean</span>}
                         </div>
+                        <PluginWidgetSlot slot="worktree-list-item" data={wt} />
                       </li>
                     )
                   })}

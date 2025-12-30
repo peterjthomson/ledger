@@ -9,6 +9,7 @@
 
   --text-primary: #000000;
   --text-secondary: #666666;
+  --text-tertiary: #888888;
   --text-muted: #999999;
 
   /* Softer Mac Mail-style blue */
@@ -23,6 +24,17 @@
 
   --border: #cccccc;
   --border-subtle: #dddddd;
+  --border-color: var(--border);
+
+  /* Accent alias for plugin styles */
+  --accent-color: var(--accent);
+
+  /* Plugin type colors */
+  --color-blue: #5b9bd5;
+  --color-purple: #9b59b6;
+  --color-green: #4a8c50;
+  --color-orange: #c08030;
+  --color-red: #c5060b;
 
   /* Semantic badge/status colors - Light mode */
   --success-bg: #d4edda;
@@ -64,6 +76,7 @@
 
   --text-primary: #e0e0e0;
   --text-secondary: #a0a0a0;
+  --text-tertiary: #808080;
   --text-muted: #707070;
 
   /* Blue accent for dark mode */
@@ -78,6 +91,17 @@
 
   --border: #404040;
   --border-subtle: #333333;
+  --border-color: var(--border);
+
+  /* Accent alias for plugin styles */
+  --accent-color: var(--accent);
+
+  /* Plugin type colors */
+  --color-blue: #569cd6;
+  --color-purple: #b48ead;
+  --color-green: #6a9955;
+  --color-orange: #ddb76f;
+  --color-red: #f14c4c;
 
   /* Semantic badge/status colors - Dark mode */
   --success-bg: #1e3a1e;

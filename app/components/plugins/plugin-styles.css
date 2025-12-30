@@ -483,3 +483,133 @@
   margin: 0;
   max-width: 300px;
 }
+
+/* ============================================================================
+   Widget Slots
+   ============================================================================ */
+
+.plugin-widget-slot {
+  display: contents;
+}
+
+.plugin-widget {
+  display: inline-flex;
+  align-items: center;
+}
+
+/* ============================================================================
+   Loading States
+   ============================================================================ */
+
+.plugin-loading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 40px 20px;
+  gap: 16px;
+  color: var(--text-secondary);
+  font-size: 13px;
+}
+
+.plugin-loading-spinner {
+  width: 24px;
+  height: 24px;
+  border: 2px solid var(--border-color);
+  border-top-color: var(--accent-color);
+  border-radius: 50%;
+  animation: plugin-spin 0.8s linear infinite;
+}
+
+@keyframes plugin-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* ============================================================================
+   Error States
+   ============================================================================ */
+
+.plugin-error {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 40px 20px;
+  text-align: center;
+  color: var(--error-text);
+  background: var(--error-bg);
+  border-radius: 8px;
+  margin: 16px;
+}
+
+.plugin-error-icon {
+  width: 48px;
+  height: 48px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background: var(--error);
+  color: white;
+  margin-bottom: 12px;
+}
+
+.plugin-error-title {
+  font-size: 14px;
+  font-weight: 600;
+  margin: 0 0 8px 0;
+}
+
+.plugin-error-message {
+  font-size: 12px;
+  margin: 0 0 16px 0;
+  max-width: 400px;
+  opacity: 0.9;
+}
+
+.plugin-error-retry {
+  padding: 8px 16px;
+  border-radius: 6px;
+  border: 1px solid var(--error-border);
+  background: transparent;
+  color: var(--error-text);
+  cursor: pointer;
+  font-size: 12px;
+  transition: background 0.15s ease;
+}
+
+.plugin-error-retry:hover {
+  background: var(--error-border);
+}
+
+.plugin-error-inline {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 16px;
+  background: var(--error-bg);
+  border: 1px solid var(--error-border);
+  border-radius: 6px;
+  color: var(--error-text);
+  font-size: 12px;
+  margin: 8px;
+}
+
+.plugin-error-inline svg {
+  flex-shrink: 0;
+}
+
+/* ============================================================================
+   Plugin Card Error State
+   ============================================================================ */
+
+.plugin-card.has-error {
+  border-color: var(--error-border);
+  background: color-mix(in srgb, var(--error-bg) 30%, var(--bg-secondary));
+}
+
+.plugin-card.has-error .plugin-card-icon {
+  color: var(--error);
+}
