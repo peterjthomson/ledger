@@ -8,6 +8,9 @@
     "name": "Peter Thomson",
     "url": "https://github.com/peterjthomson"
   },
+  "engines": {
+    "node": ">=20.19.0"
+  },
   "scripts": {
     "dev": "cross-env ELECTRON_DISABLE_SANDBOX=1 electron-vite dev -w",
     "format": "prettier --write .",
