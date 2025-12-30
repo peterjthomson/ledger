@@ -27,6 +27,7 @@ export interface BranchInfo {
   isRemote: boolean
   // Extended metadata
   lastCommitDate?: string
+  lastCommitMessage?: string
   firstCommitDate?: string
   commitCount?: number
   isLocalOnly?: boolean
@@ -66,14 +67,16 @@ export async function getBranches() {
 
 export async function getBranchMetadata(branchName: string): Promise<{
   lastCommitDate: string
+  lastCommitMessage: string
   firstCommitDate: string
   commitCount: number
 }> {
   if (!git) throw new Error('No repository selected')
 
-  // Get last commit date
+  // Get last commit date and message
   const lastCommit = await git.log([branchName, '-1', '--format=%ci'])
   const lastCommitDate = lastCommit.latest?.date || ''
+  const lastCommitMessage = lastCommit.latest?.message || ''
 
   // Get first commit date (oldest commit on this branch)
   const firstCommitRaw = await git.raw(['log', branchName, '--reverse', '--format=%ci', '-1'])
@@ -85,6 +88,7 @@ export async function getBranchMetadata(branchName: string): Promise<{
 
   return {
     lastCommitDate,
+    lastCommitMessage,
     firstCommitDate,
     commitCount,
   }
@@ -160,6 +164,7 @@ export async function getBranchesWithMetadata() {
         return {
           ...branch,
           lastCommitDate: meta.lastCommitDate,
+          lastCommitMessage: meta.lastCommitMessage,
           firstCommitDate: meta.firstCommitDate,
           commitCount: meta.commitCount,
           isMerged: !unmergedSet.has(branch.name),

@@ -6,6 +6,7 @@ export interface Branch {
   isRemote: boolean
   // Extended metadata
   lastCommitDate?: string
+  lastCommitMessage?: string
   firstCommitDate?: string
   commitCount?: number
   isLocalOnly?: boolean
