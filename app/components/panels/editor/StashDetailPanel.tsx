@@ -5,11 +5,12 @@
  */
 
 import { useState, useEffect } from 'react'
-import type { StashEntry, StashFile } from '../../../types/electron'
+import type { StashEntry, StashFile, StagingFileDiff } from '../../../types/electron'
 import type { StatusMessage } from '../../../types/app-types'
 
 export interface StashDetailPanelProps {
   stash: StashEntry
+  currentBranch: string | null
   formatRelativeTime: (date: string) => string
   onStatusChange?: (status: StatusMessage | null) => void
   onRefresh?: () => Promise<void>
@@ -18,6 +19,7 @@ export interface StashDetailPanelProps {
 
 export function StashDetailPanel({
   stash,
+  currentBranch,
   formatRelativeTime,
   onStatusChange,
   onRefresh,
@@ -26,16 +28,23 @@ export function StashDetailPanel({
   const [files, setFiles] = useState<StashFile[]>([])
   const [loading, setLoading] = useState(true)
   const [selectedFile, setSelectedFile] = useState<string | null>(null)
-  const [fileDiff, setFileDiff] = useState<string | null>(null)
+  const [fileDiff, setFileDiff] = useState<StagingFileDiff | null>(null)
   const [loadingDiff, setLoadingDiff] = useState(false)
   const [actionInProgress, setActionInProgress] = useState(false)
   const [showBranchModal, setShowBranchModal] = useState(false)
   const [branchName, setBranchName] = useState('')
+  const [expandedFiles, setExpandedFiles] = useState<Set<string>>(new Set())
 
-  // Handle Apply stash
+  const isOnOriginalBranch = stash.branch === currentBranch
+
+  // Calculate totals from files
+  const totalAdditions = files.reduce((sum, f) => sum + f.additions, 0)
+  const totalDeletions = files.reduce((sum, f) => sum + f.deletions, 0)
+
+  // Handle Apply stash to current branch
   const handleApply = async () => {
     setActionInProgress(true)
-    onStatusChange?.({ type: 'info', message: `Applying stash@{${stash.index}}...` })
+    onStatusChange?.({ type: 'info', message: `Applying stash@{${stash.index}} to ${currentBranch}...` })
 
     try {
       const result = await window.electronAPI.applyStash(stash.index)
@@ -64,6 +73,39 @@ export function StashDetailPanel({
       if (result.success) {
         onStatusChange?.({ type: 'success', message: result.message })
         onClearFocus?.()
+        await onRefresh?.()
+      } else {
+        onStatusChange?.({ type: 'error', message: result.message })
+      }
+    } catch (error) {
+      onStatusChange?.({ type: 'error', message: (error as Error).message })
+    } finally {
+      setActionInProgress(false)
+    }
+  }
+
+  // Handle Apply stash to original branch (Ledger's "leapfrog" feature)
+  // This uses worktrees to apply the stash without switching branches
+  const handleApplyToOriginalBranch = async () => {
+    if (!stash.branch) return
+
+    setActionInProgress(true)
+    onStatusChange?.({ 
+      type: 'info', 
+      message: `Applying stash to '${stash.branch}' via worktree...` 
+    })
+
+    try {
+      const result = await window.electronAPI.applyStashToBranch(
+        stash.index, 
+        stash.branch, 
+        stash.message
+      )
+      if (result.success) {
+        const extraInfo = result.usedExistingWorktree 
+          ? ' (changes are uncommitted in the worktree)'
+          : ''
+        onStatusChange?.({ type: 'success', message: result.message + extraInfo })
         await onRefresh?.()
       } else {
         onStatusChange?.({ type: 'error', message: result.message })
@@ -107,6 +149,10 @@ export function StashDetailPanel({
       try {
         const stashFiles = await window.electronAPI.getStashFiles(stash.index)
         setFiles(stashFiles)
+        // Auto-expand first 3 files
+        if (stashFiles.length > 0) {
+          setExpandedFiles(new Set(stashFiles.slice(0, 3).map(f => f.path)))
+        }
       } catch (error) {
         console.error('Error loading stash files:', error)
         setFiles([])
@@ -130,7 +176,7 @@ export function StashDetailPanel({
     const loadDiff = async () => {
       setLoadingDiff(true)
       try {
-        const diff = await window.electronAPI.getStashFileDiff(stash.index, selectedFile)
+        const diff = await window.electronAPI.getStashFileDiffParsed(stash.index, selectedFile)
         setFileDiff(diff)
       } catch (_error) {
         setFileDiff(null)
@@ -172,73 +218,146 @@ export function StashDetailPanel({
     }
   }
 
+  const toggleFileExpanded = (path: string) => {
+    setExpandedFiles(prev => {
+      const next = new Set(prev)
+      if (next.has(path)) {
+        next.delete(path)
+      } else {
+        next.add(path)
+      }
+      return next
+    })
+    setSelectedFile(path)
+  }
+
   return (
-    <div className="stash-detail-panel">
+    <div className="sidebar-detail-panel stash-detail-panel">
       {/* Header */}
-      <div className="stash-header">
-        <div className="detail-type-badge">Stash</div>
-        <h3 className="stash-title">{stash.message || `Stash ${stash.index}`}</h3>
-        <div className="stash-meta">
-          {stash.branch && <code className="stash-branch">{stash.branch}</code>}
-          <span className="stash-date">{formatRelativeTime(stash.date)}</span>
+      <div className="detail-type-badge">Stash</div>
+      <h3 className="detail-title">{stash.message || `Stash ${stash.index}`}</h3>
+      
+      {/* Metadata Grid */}
+      <div className="detail-meta-grid">
+        <div className="detail-meta-item">
+          <span className="meta-label">Stashed From</span>
+          <code className="meta-value">{stash.branch || 'unknown'}</code>
+        </div>
+        <div className="detail-meta-item">
+          <span className="meta-label">Current Branch</span>
+          <code className="meta-value">{currentBranch || 'detached'}</code>
+        </div>
+        <div className="detail-meta-item">
+          <span className="meta-label">When</span>
+          <span className="meta-value">{formatRelativeTime(stash.date)}</span>
+        </div>
+        <div className="detail-meta-item">
+          <span className="meta-label">Status</span>
+          <span className="meta-value">
+            {isOnOriginalBranch ? (
+              <span className="stash-status-match">✓ On original branch</span>
+            ) : (
+              <span className="stash-status-different">Different branch</span>
+            )}
+          </span>
         </div>
       </div>
 
-      {/* Files List */}
-      <div className="stash-files">
+      {/* Changed Files Section */}
+      <div className="stash-changed-files">
         <div className="stash-files-header">
-          Changed Files
-          <span className="stash-files-count">{files.length}</span>
+          <span>Changed Files</span>
+          <span className="stash-files-stats">
+            <span className="stash-files-count">{files.length}</span>
+            <span className="diff-additions">+{totalAdditions}</span>
+            <span className="diff-deletions">-{totalDeletions}</span>
+          </span>
         </div>
+
         {loading ? (
           <div className="stash-loading">Loading files...</div>
         ) : files.length === 0 ? (
           <div className="stash-empty">No files in stash</div>
         ) : (
-          <ul className="stash-files-list">
+          <div className="stash-files-list">
             {files.map((file) => (
-              <li
-                key={file.path}
-                className={`stash-file-item ${getStatusClass(file.status)} ${selectedFile === file.path ? 'selected' : ''}`}
-                onClick={() => setSelectedFile(file.path)}
-              >
-                <span className={`stash-file-status ${getStatusClass(file.status)}`}>{getStatusIcon(file.status)}</span>
-                <span className="stash-file-path" title={file.path}>
-                  {file.path}
-                </span>
-                <span className="stash-file-stats">
-                  <span className="diff-additions">+{file.additions}</span>
-                  <span className="diff-deletions">-{file.deletions}</span>
-                </span>
-              </li>
+              <div key={file.path} className="stash-file-item-container">
+                <div
+                  className={`stash-file-item ${expandedFiles.has(file.path) ? 'expanded' : ''}`}
+                  onClick={() => toggleFileExpanded(file.path)}
+                >
+                  <span className={`stash-file-chevron ${expandedFiles.has(file.path) ? 'open' : ''}`}>▸</span>
+                  <span className={`stash-file-status ${getStatusClass(file.status)}`}>
+                    {getStatusIcon(file.status)}
+                  </span>
+                  <span className="stash-file-path" title={file.path}>
+                    {file.path}
+                  </span>
+                  <span className="stash-file-stats">
+                    <span className="diff-additions">+{file.additions}</span>
+                    <span className="diff-deletions">-{file.deletions}</span>
+                  </span>
+                </div>
+
+                {/* Inline Diff */}
+                {expandedFiles.has(file.path) && selectedFile === file.path && (
+                  <div className="stash-file-diff">
+                    {loadingDiff ? (
+                      <div className="stash-diff-loading">Loading diff...</div>
+                    ) : fileDiff ? (
+                      <div className="stash-diff-hunks">
+                        {fileDiff.isBinary ? (
+                          <div className="stash-diff-binary">Binary file</div>
+                        ) : fileDiff.hunks.length === 0 ? (
+                          <div className="stash-diff-empty">No changes</div>
+                        ) : (
+                          fileDiff.hunks.map((hunk, hunkIdx) => (
+                            <div key={hunkIdx} className="stash-diff-hunk">
+                              <div className="stash-diff-hunk-header">
+                                @@ -{hunk.oldStart},{hunk.oldLines} +{hunk.newStart},{hunk.newLines} @@
+                              </div>
+                              <div className="stash-diff-lines">
+                                {hunk.lines.map((line, lineIdx) => (
+                                  <div key={lineIdx} className={`stash-diff-line stash-diff-line-${line.type}`}>
+                                    <span className="stash-diff-line-number old">{line.oldLineNumber || ''}</span>
+                                    <span className="stash-diff-line-number new">{line.newLineNumber || ''}</span>
+                                    <span className="stash-diff-line-prefix">
+                                      {line.type === 'add' ? '+' : line.type === 'delete' ? '-' : ' '}
+                                    </span>
+                                    <span className="stash-diff-line-content">{line.content}</span>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          ))
+                        )}
+                      </div>
+                    ) : (
+                      <div className="stash-diff-empty">Could not load diff</div>
+                    )}
+                  </div>
+                )}
+              </div>
             ))}
-          </ul>
+          </div>
         )}
       </div>
 
-      {/* Diff Preview */}
-      {selectedFile && (
-        <div className="stash-diff">
-          <div className="stash-diff-header">
-            <span className="stash-diff-title">{selectedFile}</span>
-          </div>
-          <div className="stash-diff-content">
-            {loadingDiff ? (
-              <div className="stash-diff-loading">Loading diff...</div>
-            ) : fileDiff ? (
-              <pre className="stash-diff-code">{fileDiff}</pre>
-            ) : (
-              <div className="stash-diff-empty">Could not load diff</div>
-            )}
-          </div>
-        </div>
-      )}
-
       {/* Action Buttons */}
-      <div className="stash-actions">
+      <div className="detail-actions stash-actions">
         <button className="btn btn-primary" onClick={handleApply} disabled={actionInProgress}>
-          Apply
+          Apply to {currentBranch || 'Current Branch'}
         </button>
+        {!isOnOriginalBranch && stash.branch && (
+          <button
+            className="btn btn-secondary btn-leapfrog"
+            onClick={handleApplyToOriginalBranch}
+            disabled={actionInProgress}
+            title={`Apply to '${stash.branch}' using worktrees (no branch switch needed)`}
+          >
+            Apply to {stash.branch}
+          </button>
+        )}
         <button className="btn btn-secondary" onClick={() => setShowBranchModal(true)} disabled={actionInProgress}>
           Create Branch
         </button>
@@ -298,7 +417,6 @@ export function StashDetailPanel({
           </div>
         </div>
       )}
-
     </div>
   )
 }

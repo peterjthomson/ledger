@@ -3919,63 +3919,41 @@ body,
   overflow: hidden;
 }
 
-.stash-header {
-  padding: 16px;
-  border-bottom: 1px solid var(--border);
+/* Stash status indicators */
+.stash-status-match {
+  color: var(--success);
 }
 
-.stash-title {
-  font-size: 16px;
-  font-weight: 600;
-  font-family: var(--font-mono);
-  color: var(--text-primary);
-  margin: 8px 0;
+.stash-status-different {
+  color: var(--warning-text);
 }
 
-.stash-message {
-  font-size: 13px;
-  color: var(--text-secondary);
-  margin: 0 0 8px 0;
-}
-
-.stash-meta {
+/* Changed Files Section */
+.stash-changed-files {
+  flex: 1;
   display: flex;
-  align-items: center;
-  gap: 12px;
-  font-size: 12px;
-  color: var(--text-muted);
-}
-
-.stash-branch {
-  font-size: 11px;
-  padding: 2px 6px;
-  background: var(--bg-tertiary);
-  border-radius: 4px;
-  color: var(--text-secondary);
-}
-
-/* Files List */
-.stash-files {
-  flex: 0 0 auto;
-  max-height: 200px;
-  overflow-y: auto;
-  border-bottom: 1px solid var(--border);
+  flex-direction: column;
+  overflow: hidden;
+  margin-top: 16px;
+  border-top: 1px solid var(--border-subtle);
 }
 
 .stash-files-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 10px 16px;
+  padding: 12px 0;
   font-size: 11px;
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.03em;
   color: var(--text-secondary);
-  background: var(--bg-secondary);
-  border-bottom: 1px solid var(--border);
-  position: sticky;
-  top: 0;
+}
+
+.stash-files-stats {
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
 
 .stash-files-count {
@@ -3995,31 +3973,42 @@ body,
 }
 
 .stash-files-list {
-  list-style: none;
-  margin: 0;
-  padding: 0;
+  flex: 1;
+  overflow-y: auto;
+}
+
+.stash-file-item-container {
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.stash-file-item-container:last-child {
+  border-bottom: none;
 }
 
 .stash-file-item {
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 8px 16px;
+  padding: 8px 0;
   cursor: pointer;
   transition: background 0.1s ease;
-  border-bottom: 1px solid var(--border-subtle);
-}
-
-.stash-file-item:last-child {
-  border-bottom: none;
 }
 
 .stash-file-item:hover {
   background: var(--bg-secondary);
+  margin: 0 -16px;
+  padding: 8px 16px;
 }
 
-.stash-file-item.selected {
-  background: rgba(0, 122, 255, 0.1);
+.stash-file-chevron {
+  font-size: 10px;
+  color: var(--text-muted);
+  transition: transform 0.15s ease;
+  flex-shrink: 0;
+}
+
+.stash-file-chevron.open {
+  transform: rotate(90deg);
 }
 
 .stash-file-status {
@@ -4072,64 +4061,108 @@ body,
   flex-shrink: 0;
 }
 
-/* Diff Preview */
-.stash-diff {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
+/* Inline Diff */
+.stash-file-diff {
+  background: var(--bg-secondary);
+  border-radius: var(--radius-sm);
+  margin: 4px 0 8px 24px;
   overflow: hidden;
 }
 
-.stash-diff-header {
-  padding: 10px 16px;
-  background: var(--bg-secondary);
-  border-bottom: 1px solid var(--border);
-  font-size: 12px;
-  font-weight: 500;
-}
-
-.stash-diff-title {
-  font-family: var(--font-mono);
-  color: var(--text-primary);
-}
-
-.stash-diff-content {
-  flex: 1;
-  overflow: auto;
-  background: var(--bg-primary);
-}
-
 .stash-diff-loading,
-.stash-diff-empty {
-  padding: 24px;
+.stash-diff-empty,
+.stash-diff-binary {
+  padding: 16px;
   text-align: center;
   color: var(--text-muted);
-  font-size: 12px;
+  font-size: 11px;
 }
 
-.stash-diff-code {
-  margin: 0;
-  padding: 12px;
+.stash-diff-hunks {
   font-size: 11px;
   font-family: var(--font-mono);
-  line-height: 1.5;
-  white-space: pre;
   overflow-x: auto;
-  color: var(--text-primary);
+}
+
+.stash-diff-hunk {
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.stash-diff-hunk:last-child {
+  border-bottom: none;
+}
+
+.stash-diff-hunk-header {
+  padding: 4px 8px;
+  background: var(--bg-tertiary);
+  color: var(--text-muted);
+  font-size: 10px;
+}
+
+.stash-diff-lines {
+  padding: 0;
+}
+
+.stash-diff-line {
+  display: flex;
+  line-height: 1.6;
+}
+
+.stash-diff-line-add {
+  background: var(--diff-add-bg, rgba(46, 160, 67, 0.15));
+}
+
+.stash-diff-line-delete {
+  background: var(--diff-delete-bg, rgba(248, 81, 73, 0.15));
+}
+
+.stash-diff-line-number {
+  width: 32px;
+  padding: 0 4px;
+  text-align: right;
+  color: var(--text-muted);
+  user-select: none;
+  flex-shrink: 0;
+  font-size: 10px;
+}
+
+.stash-diff-line-prefix {
+  width: 16px;
+  text-align: center;
+  color: var(--text-muted);
+  user-select: none;
+  flex-shrink: 0;
+}
+
+.stash-diff-line-add .stash-diff-line-prefix {
+  color: var(--success);
+}
+
+.stash-diff-line-delete .stash-diff-line-prefix {
+  color: var(--error);
+}
+
+.stash-diff-line-content {
+  flex: 1;
+  white-space: pre;
+  padding-right: 8px;
 }
 
 /* Stash Actions */
 .stash-actions {
-  display: flex;
-  gap: 8px;
-  padding: 12px 16px;
-  border-top: 1px solid var(--border);
-  background: var(--bg-secondary);
-  flex-shrink: 0;
+  flex-direction: column;
 }
 
-.stash-actions .btn {
-  flex: 1;
+/* Leapfrog button - Ledger's parallel git feature */
+.stash-actions .btn-leapfrog {
+  background: var(--accent-glow);
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.stash-actions .btn-leapfrog:hover:not(:disabled) {
+  background: var(--accent);
+  color: white;
 }
 
 .stash-actions .btn-danger {
@@ -4255,6 +4288,85 @@ body,
   font-size: 11px;
   color: var(--text-muted);
   margin: 0;
+}
+
+/* Location Presets */
+.create-worktree-form .location-presets {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.create-worktree-form .location-preset {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  transition: all 0.15s ease;
+  background: var(--bg-primary);
+}
+
+.create-worktree-form .location-preset:hover {
+  border-color: var(--border-hover);
+  background: var(--bg-secondary);
+}
+
+.create-worktree-form .location-preset.selected {
+  border-color: var(--accent);
+  background: var(--accent-glow);
+}
+
+.create-worktree-form .location-preset input[type="radio"] {
+  margin-top: 2px;
+  accent-color: var(--accent);
+  cursor: pointer;
+}
+
+.create-worktree-form .preset-content {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.create-worktree-form .preset-name {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-primary);
+}
+
+.create-worktree-form .preset-description {
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+.create-worktree-form .location-preset.selected .preset-name {
+  color: var(--accent);
+}
+
+/* Location Path Row */
+.create-worktree-form .location-path-row {
+  display: flex;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.create-worktree-form .path-preview {
+  flex: 1;
+  min-width: 0;
+  padding: 8px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  font-size: 12px;
+  font-family: var(--font-mono);
+  color: var(--text-secondary);
+  background: var(--bg-tertiary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .create-worktree-actions {

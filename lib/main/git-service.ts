@@ -2777,7 +2777,7 @@ export async function getStashFiles(stashIndex: number): Promise<StashFile[]> {
   }
 }
 
-// Get diff for a specific file in a stash
+// Get diff for a specific file in a stash (raw text)
 // Note: git stash show doesn't support -- filepath syntax, so we use git diff instead
 export async function getStashFileDiff(stashIndex: number, filePath: string): Promise<string | null> {
   if (!git) throw new Error('No repository selected')
@@ -2787,6 +2787,24 @@ export async function getStashFileDiff(stashIndex: number, filePath: string): Pr
     const stashRef = `stash@{${stashIndex}}`
     const output = await git.raw(['diff', `${stashRef}^`, stashRef, '--', filePath])
     return output || null
+  } catch {
+    return null
+  }
+}
+
+// Get parsed diff for a specific file in a stash (with hunks)
+export async function getStashFileDiffParsed(stashIndex: number, filePath: string): Promise<StagingFileDiff | null> {
+  if (!git) throw new Error('No repository selected')
+
+  try {
+    const stashRef = `stash@{${stashIndex}}`
+    const diffOutput = await git.raw(['diff', `${stashRef}^`, stashRef, '--', filePath])
+    
+    if (!diffOutput.trim()) {
+      return null
+    }
+    
+    return parseDiff(diffOutput, filePath)
   } catch {
     return null
   }
@@ -2855,6 +2873,111 @@ export async function stashToBranch(
     return { success: true, message: `Created branch '${branchName}' from stash@{${stashIndex}}` }
   } catch (error) {
     return { success: false, message: (error as Error).message }
+  }
+}
+
+/**
+ * Apply a stash to a different branch using worktrees (Ledger's "leapfrog" feature)
+ * 
+ * This is a Ledger-specific feature that enables parallel git operations:
+ * - If the target branch has an existing worktree, applies the stash there
+ * - If not, creates a new worktree in .worktrees/, applies the stash, auto-commits, and cleans up
+ *   (User may be offered option to keep the worktree in the future)
+ * 
+ * This allows applying stashes to branches without switching your current context.
+ */
+export async function applyStashToBranch(
+  stashIndex: number,
+  targetBranch: string,
+  stashMessage: string,
+  keepWorktree: boolean = false
+): Promise<{ success: boolean; message: string; usedExistingWorktree: boolean; worktreePath?: string }> {
+  if (!git) throw new Error('No repository selected')
+  if (!repoPath) throw new Error('No repository path set')
+
+  try {
+    // Get the stash ref
+    const stashRef = `stash@{${stashIndex}}`
+    
+    // Check if target branch has an existing worktree
+    const worktrees = await getWorktrees()
+    const existingWorktree = worktrees.find(wt => wt.branch === targetBranch)
+    
+    if (existingWorktree) {
+      // Apply stash to existing worktree
+      const worktreeGit = simpleGit(existingWorktree.path)
+      await worktreeGit.raw(['stash', 'apply', stashRef])
+      
+      return {
+        success: true,
+        message: `Applied stash to existing worktree at ${existingWorktree.path}. Changes are uncommitted.`,
+        usedExistingWorktree: true,
+        worktreePath: existingWorktree.path,
+      }
+    }
+    
+    // No existing worktree - create one in .worktrees/ directory
+    // Sanitize branch name for folder (replace / with -)
+    const sanitizedBranch = targetBranch.replace(/\//g, '-').replace(/[^a-zA-Z0-9-_]/g, '')
+    const worktreePath = path.join(repoPath, '.worktrees', sanitizedBranch)
+    
+    try {
+      // Create .worktrees directory if needed
+      await fs.promises.mkdir(path.dirname(worktreePath), { recursive: true })
+      
+      // Create worktree for the target branch
+      await git.raw(['worktree', 'add', worktreePath, targetBranch])
+      
+      // Apply stash in the worktree
+      const worktreeGit = simpleGit(worktreePath)
+      await worktreeGit.raw(['stash', 'apply', stashRef])
+      
+      // Stage all changes
+      await worktreeGit.add('.')
+      
+      // Commit with a descriptive message
+      const commitMessage = stashMessage 
+        ? `Apply stash: ${stashMessage}`
+        : `Apply stash@{${stashIndex}}`
+      await worktreeGit.commit(commitMessage)
+      
+      // Get the commit hash for the message
+      const log = await worktreeGit.log(['-1', '--format=%h'])
+      const commitHash = log.latest?.hash || 'unknown'
+      
+      if (keepWorktree) {
+        // User wants to keep the worktree for further work
+        return {
+          success: true,
+          message: `Applied stash to '${targetBranch}' (commit ${commitHash}). Worktree available at .worktrees/${sanitizedBranch}`,
+          usedExistingWorktree: false,
+          worktreePath,
+        }
+      }
+      
+      // Clean up: remove the worktree
+      await git.raw(['worktree', 'remove', worktreePath])
+      
+      return {
+        success: true,
+        message: `Applied stash to '${targetBranch}' (commit ${commitHash}). Worktree cleaned up.`,
+        usedExistingWorktree: false,
+      }
+    } catch (innerError) {
+      // Try to clean up the worktree if something went wrong
+      try {
+        await git.raw(['worktree', 'remove', '--force', worktreePath])
+      } catch {
+        // Ignore cleanup errors
+      }
+      throw innerError
+    }
+  } catch (error) {
+    return {
+      success: false,
+      message: (error as Error).message,
+      usedExistingWorktree: false,
+    }
   }
 }
 
