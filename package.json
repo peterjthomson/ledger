@@ -1,6 +1,6 @@
 {
   "name": "ledger",
-  "version": "1.2.0",
+  "version": "1.2.1",
   "description": "A modern git interface for macOS - view branches, worktrees, and pull requests",
   "main": "./out/main/main.js",
   "license": "MIT",
