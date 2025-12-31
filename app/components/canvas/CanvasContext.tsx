@@ -26,7 +26,7 @@ import type {
 export const RADAR_CANVAS: Canvas = {
   id: 'radar',
   name: 'Radar',
-  icon: '📡',
+  icon: '⊞',
   isPreset: true,
   columns: [
     { id: 'radar-stashes', slotType: 'list', panel: 'stash-list', width: 'flex', minWidth: 150, label: 'Stashes', icon: '⊡', collapsible: true },
@@ -41,7 +41,7 @@ export const RADAR_CANVAS: Canvas = {
 export const FOCUS_CANVAS: Canvas = {
   id: 'focus',
   name: 'Focus',
-  icon: '🎯',
+  icon: '☰',
   isPreset: true,
   columns: [
     { id: 'focus-sidebar', slotType: 'list', panel: 'sidebar', width: 220, minWidth: 180, label: 'All', icon: '☰', collapsible: true },
@@ -83,6 +83,7 @@ const initialCanvasState: CanvasState = {
 
 type CanvasAction =
   | { type: 'SET_ACTIVE_CANVAS'; canvasId: string }
+  | { type: 'UPDATE_CANVAS'; canvasId: string; updates: Partial<Omit<Canvas, 'id' | 'columns'>> }
   | { type: 'UPDATE_COLUMN'; canvasId: string; columnId: string; updates: Partial<Column> }
   | { type: 'REORDER_COLUMNS'; canvasId: string; fromIndex: number; toIndex: number }
   | { type: 'ADD_COLUMN'; canvasId: string; column: Column; index?: number }
@@ -108,6 +109,17 @@ function canvasReducer(state: CanvasState, action: CanvasAction): CanvasState {
       const canvas = state.canvases.find((c) => c.id === action.canvasId)
       if (!canvas) return state
       return { ...state, activeCanvasId: action.canvasId }
+    }
+
+    case 'UPDATE_CANVAS': {
+      return {
+        ...state,
+        canvases: state.canvases.map((canvas) =>
+          canvas.id === action.canvasId
+            ? { ...canvas, ...action.updates }
+            : canvas
+        ),
+      }
     }
 
     case 'UPDATE_COLUMN': {
@@ -345,6 +357,7 @@ interface CanvasContextValue {
   // Canvas operations
   setActiveCanvas: (canvasId: string) => void
   addCanvas: (canvas: Canvas) => void
+  updateCanvas: (canvasId: string, updates: Partial<Omit<Canvas, 'id' | 'columns'>>) => void
   removeCanvas: (canvasId: string) => void
   loadCanvases: (canvases: Canvas[], activeCanvasId?: string) => void
 
@@ -400,6 +413,10 @@ export function CanvasProvider({ children }: CanvasProviderProps) {
 
   const addCanvas = useCallback((canvas: Canvas) => {
     dispatch({ type: 'ADD_CANVAS', canvas })
+  }, [])
+
+  const updateCanvas = useCallback((canvasId: string, updates: Partial<Omit<Canvas, 'id' | 'columns'>>) => {
+    dispatch({ type: 'UPDATE_CANVAS', canvasId, updates })
   }, [])
 
   const removeCanvas = useCallback((canvasId: string) => {
@@ -501,6 +518,7 @@ export function CanvasProvider({ children }: CanvasProviderProps) {
     canGoForward,
     setActiveCanvas,
     addCanvas,
+    updateCanvas,
     removeCanvas,
     loadCanvases,
     updateColumn,

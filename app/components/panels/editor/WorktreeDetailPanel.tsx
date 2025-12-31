@@ -17,6 +17,7 @@ export interface WorktreeDetailPanelProps {
   onRefresh?: () => Promise<void>
   onClearFocus?: () => void
   onCheckoutWorktree?: (worktree: Worktree) => void
+  onOpenStaging?: () => void
 }
 
 export function WorktreeDetailPanel({
@@ -27,6 +28,7 @@ export function WorktreeDetailPanel({
   onRefresh,
   onClearFocus,
   onCheckoutWorktree,
+  onOpenStaging,
 }: WorktreeDetailPanelProps) {
   const [actionInProgress, setActionInProgress] = useState(false)
   // Staging/commit state
@@ -378,6 +380,11 @@ export function WorktreeDetailPanel({
           <button className="btn btn-primary" onClick={handleOpenInFinder}>
             Open in Finder
           </button>
+          {onOpenStaging && (
+            <button className="btn btn-secondary" onClick={onOpenStaging}>
+              Open Staging
+            </button>
+          )}
         </div>
       </div>
     )
@@ -741,6 +748,12 @@ export function WorktreeDetailPanel({
         <button className="btn btn-secondary" onClick={handleOpenInFinder} disabled={actionInProgress}>
           Open in Finder
         </button>
+
+        {isCurrent && onOpenStaging && (
+          <button className="btn btn-secondary" onClick={onOpenStaging} disabled={actionInProgress}>
+            Open Staging
+          </button>
+        )}
 
         {!isCurrent && (
           <button className="btn btn-secondary btn-danger" onClick={() => handleRemove(false)} disabled={actionInProgress}>

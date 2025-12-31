@@ -30,6 +30,7 @@ export interface EditorRouterProps {
   onCheckoutWorktree?: (worktree: Worktree) => void
   onDeleteBranch?: (branch: Branch) => void
   onDeleteRemoteBranch?: (branch: Branch) => void
+  onOpenStaging?: () => void
   branches?: Branch[]
   repoPath?: string | null
   worktrees?: Worktree[]
@@ -51,6 +52,7 @@ export function EditorRouter({
   onCheckoutWorktree,
   onDeleteBranch,
   onDeleteRemoteBranch,
+  onOpenStaging,
   branches,
   repoPath,
   onFocusWorktree,
@@ -71,6 +73,7 @@ export function EditorRouter({
           onStatusChange={onStatusChange}
           onCheckoutBranch={onCheckoutBranch}
           onDeleteBranch={onDeleteBranch}
+          onOpenStaging={onOpenStaging}
           switching={switching}
           deleting={deleting}
         />
@@ -142,6 +145,7 @@ export function EditorRouter({
           onRefresh={onRefresh}
           onClearFocus={onClearFocus}
           onCheckoutWorktree={onCheckoutWorktree}
+          onOpenStaging={onOpenStaging}
         />
       )
     }

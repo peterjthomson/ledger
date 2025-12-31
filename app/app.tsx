@@ -66,7 +66,7 @@ export default function App() {
   } = useCanvas()
   
   // Initialize keyboard shortcuts for editor navigation
-  useCanvasNavigation()
+  const { openStaging } = useCanvasNavigation()
   
   // Initialize canvas persistence (auto-save custom canvases and active canvas)
   useCanvasPersistence()
@@ -1167,6 +1167,7 @@ export default function App() {
           onCheckoutWorktree={handleWorktreeDoubleClick}
           onDeleteBranch={handleDeleteBranch}
           onDeleteRemoteBranch={handleDeleteRemoteBranch}
+          onOpenStaging={openStaging}
           branches={branches}
           repoPath={repoPath}
           worktrees={worktrees}
@@ -1365,30 +1366,17 @@ export default function App() {
         <div className="header-actions">
           {repoPath && (
             <div className="view-toggle">
-              <button
-                className={`view-toggle-btn ${viewMode === 'radar' ? 'active' : ''}`}
-                onClick={() => setActiveCanvas('radar')}
-                title="Radar Mode"
-              >
-                <span className="view-icon">⊞</span>
-                <span className="view-label">Radar</span>
-              </button>
-              <button
-                className={`view-toggle-btn ${viewMode === 'focus' ? 'active' : ''}`}
-                onClick={() => setActiveCanvas('focus')}
-                title="Focus Mode"
-              >
-                <span className="view-icon">☰</span>
-                <span className="view-label">Focus</span>
-              </button>
-              <button
-                className={`view-toggle-btn ${viewMode === 'graph' ? 'active' : ''}`}
-                onClick={() => setActiveCanvas('graph')}
-                title="Graph View"
-              >
-                <span className="view-icon">◉</span>
-                <span className="view-label">Graph</span>
-              </button>
+              {canvasState.canvases.map((canvas) => (
+                <button
+                  key={canvas.id}
+                  className={`view-toggle-btn ${viewMode === canvas.id ? 'active' : ''}`}
+                  onClick={() => setActiveCanvas(canvas.id)}
+                  title={canvas.name}
+                >
+                  <span className="view-icon">{canvas.icon || '◻'}</span>
+                  <span className="view-label">{canvas.name}</span>
+                </button>
+              ))}
             </div>
           )}
           {!repoPath ? (

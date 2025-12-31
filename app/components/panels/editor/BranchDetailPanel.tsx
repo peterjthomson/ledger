@@ -14,6 +14,7 @@ export interface BranchDetailPanelProps {
   onStatusChange?: (status: StatusMessage | null) => void
   onCheckoutBranch?: (branch: Branch) => void
   onDeleteBranch?: (branch: Branch) => void
+  onOpenStaging?: () => void
   switching?: boolean
   deleting?: boolean
 }
@@ -24,6 +25,7 @@ export function BranchDetailPanel({
   onStatusChange,
   onCheckoutBranch,
   onDeleteBranch,
+  onOpenStaging,
   switching,
   deleting,
 }: BranchDetailPanelProps) {
@@ -248,6 +250,11 @@ export function BranchDetailPanel({
           {branch.current && (
             <button className="btn btn-primary" onClick={handlePush} disabled={pushing || deleting}>
               {pushing ? 'Pushing...' : 'Push to Origin'}
+            </button>
+          )}
+          {branch.current && onOpenStaging && (
+            <button className="btn btn-secondary" onClick={onOpenStaging} disabled={deleting}>
+              Open Staging
             </button>
           )}
           {!isMainOrMaster && (

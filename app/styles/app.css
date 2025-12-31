@@ -5157,13 +5157,22 @@ body,
 }
 
 .settings-panel .settings-hint {
-  margin: 0;
-  padding: 16px;
+  margin: 0 0 12px 0;
   font-size: 12px;
   color: var(--text-muted);
-  text-align: center;
-  background: var(--bg-secondary);
-  border-radius: 8px;
+}
+
+/* Divider between settings sections */
+.settings-divider {
+  height: 1px;
+  background: var(--border);
+  margin: 28px 0;
+}
+
+/* Bottom spacer for scroll focus */
+.settings-bottom-spacer {
+  height: 40vh;
+  flex-shrink: 0;
 }
 
 /* Active state for gear button in titlebar */
@@ -5327,6 +5336,479 @@ body,
 
 .theme-card-custom .theme-name {
   font-size: 12px;
+}
+
+/* ========================================
+   Canvas Settings Styles
+   ======================================== */
+
+.canvas-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-top: 12px;
+}
+
+.canvas-list-item {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-subtle);
+  border-radius: 8px;
+  padding: 12px;
+  transition: all 0.15s ease;
+}
+
+.canvas-list-item:hover {
+  border-color: var(--border);
+}
+
+.canvas-list-item.active {
+  border-color: var(--accent);
+}
+
+.canvas-list-item-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.canvas-list-item.selected .canvas-list-item-header {
+  margin-bottom: 12px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.canvas-list-item-expand {
+  font-size: 8px;
+  color: var(--text-muted);
+  width: 12px;
+  transition: transform 0.15s ease;
+}
+
+.canvas-list-item-icon-wrapper {
+  position: relative;
+}
+
+.canvas-list-item-icon {
+  font-size: 14px;
+  padding: 4px 6px;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  background: transparent;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.canvas-list-item-icon:hover {
+  background: var(--bg-hover);
+  border-color: var(--border-subtle);
+}
+
+.canvas-icon-picker {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  z-index: 100;
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  gap: 2px;
+  padding: 6px;
+  background: var(--bg-primary);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  margin-top: 4px;
+}
+
+.canvas-icon-option {
+  padding: 6px;
+  font-size: 14px;
+  border: none;
+  background: transparent;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.1s ease;
+}
+
+.canvas-icon-option:hover {
+  background: var(--bg-hover);
+}
+
+.canvas-icon-option.active {
+  background: var(--accent);
+  color: white;
+}
+
+.canvas-list-item-name {
+  font-weight: 500;
+  font-size: 13px;
+  color: var(--text-primary);
+}
+
+.canvas-list-item-name.editable {
+  cursor: text;
+  padding: 2px 4px;
+  margin: -2px -4px;
+  border-radius: 4px;
+  transition: background 0.15s ease;
+}
+
+.canvas-list-item-name.editable:hover {
+  background: var(--bg-hover);
+}
+
+.canvas-rename-input {
+  font-weight: 500;
+  font-size: 13px;
+  color: var(--text-primary);
+  background: var(--bg-primary);
+  border: 1px solid var(--accent);
+  border-radius: 4px;
+  padding: 2px 6px;
+  outline: none;
+  min-width: 100px;
+}
+
+.canvas-list-item-badge {
+  font-size: 10px;
+  padding: 2px 6px;
+  background: var(--bg-tertiary);
+  border-radius: 4px;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+  margin-left: auto;
+}
+
+.canvas-list-item-active {
+  font-size: 10px;
+  padding: 2px 6px;
+  background: var(--accent);
+  border-radius: 4px;
+  color: white;
+}
+
+/* Canvas Preview - Mini Layout Diagram */
+.canvas-preview {
+  display: flex;
+  gap: 2px;
+  padding: 4px 6px;
+  background: var(--bg-tertiary);
+  border-radius: 4px;
+  margin-left: auto;
+  margin-right: 8px;
+}
+
+.canvas-preview-column {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 16px;
+  border-radius: 2px;
+  font-size: 8px;
+}
+
+.canvas-preview-list {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-subtle);
+}
+
+.canvas-preview-editor {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-subtle);
+}
+
+.canvas-preview-viz {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-subtle);
+}
+
+.canvas-preview-icon {
+  opacity: 0.6;
+}
+
+.canvas-list-item-columns {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding-left: 20px;
+}
+
+.canvas-column-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.canvas-column-icon {
+  font-size: 12px;
+  color: var(--text-muted);
+  width: 18px;
+  text-align: center;
+}
+
+.canvas-column-label {
+  color: var(--text-primary);
+  font-weight: 500;
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.canvas-column-hidden {
+  font-size: 10px;
+  padding: 1px 4px;
+  background: var(--bg-tertiary);
+  border-radius: 3px;
+  color: var(--text-muted);
+  margin-left: auto;
+}
+
+/* Canvas Create Form */
+.canvas-create-form {
+  display: flex;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.canvas-create-input {
+  flex: 1;
+  padding: 8px 12px;
+  border: 1px solid var(--border-subtle);
+  border-radius: 6px;
+  background: var(--bg-secondary);
+  color: var(--text-primary);
+  font-size: 13px;
+}
+
+.canvas-create-input:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+
+.canvas-create-input::placeholder {
+  color: var(--text-muted);
+}
+
+.canvas-create-btn {
+  padding: 8px 14px;
+  background: var(--accent);
+  color: white;
+  border: none;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: opacity 0.15s ease;
+}
+
+.canvas-create-btn:hover:not(:disabled) {
+  opacity: 0.9;
+}
+
+.canvas-create-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Canvas List Item - Selected State */
+.canvas-list-item.selected {
+  border-color: var(--border);
+  background: var(--bg-hover);
+}
+
+.canvas-list-item-header {
+  cursor: pointer;
+}
+
+/* Canvas Action Buttons */
+.canvas-list-item-actions {
+  display: flex;
+  gap: 6px;
+  margin-left: auto;
+}
+
+.canvas-action-btn {
+  padding: 4px 8px;
+  border: 1px solid var(--border-subtle);
+  border-radius: 4px;
+  background: var(--bg-secondary);
+  color: var(--text-secondary);
+  font-size: 11px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.canvas-action-btn:hover {
+  border-color: var(--border);
+  background: var(--bg-hover);
+}
+
+.canvas-activate-btn:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.canvas-delete-btn:hover {
+  border-color: var(--error);
+  color: var(--error);
+}
+
+/* Column Controls */
+.canvas-column-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  color: var(--text-secondary);
+  padding: 8px;
+  margin: 0 -8px;
+  border-radius: 6px;
+  background: transparent;
+  transition: all 0.15s ease;
+  cursor: grab;
+}
+
+.canvas-column-item:hover {
+  background: var(--bg-hover);
+}
+
+.canvas-column-item.dragging {
+  opacity: 0.5;
+  background: var(--bg-tertiary);
+}
+
+.canvas-column-item.drag-over {
+  background: var(--bg-hover);
+  box-shadow: inset 0 -2px 0 var(--accent);
+}
+
+/* Drag Handle */
+.canvas-column-drag-handle {
+  color: var(--text-muted);
+  cursor: grab;
+  padding: 2px;
+  opacity: 0.5;
+  transition: opacity 0.15s ease;
+}
+
+.canvas-column-item:hover .canvas-column-drag-handle {
+  opacity: 1;
+}
+
+.canvas-column-drag-handle:active {
+  cursor: grabbing;
+}
+
+.canvas-column-select {
+  padding: 4px 8px;
+  border: 1px solid var(--border-subtle);
+  border-radius: 4px;
+  background: var(--bg-secondary);
+  color: var(--text-secondary);
+  font-size: 11px;
+  cursor: pointer;
+  min-width: 100px;
+}
+
+.canvas-column-select:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+
+.canvas-column-remove {
+  padding: 4px;
+  border: none;
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-left: auto;
+  transition: all 0.15s ease;
+}
+
+.canvas-column-remove:hover {
+  background: var(--bg-hover);
+  color: var(--error);
+}
+
+/* Add Column */
+.canvas-add-column-btn {
+  width: 100%;
+  padding: 10px;
+  margin-top: 12px;
+  border: 1px dashed var(--border-subtle);
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 12px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.canvas-add-column-btn:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 5%, transparent);
+}
+
+.canvas-add-column-form {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 12px;
+  padding: 10px;
+  background: var(--bg-tertiary);
+  border-radius: 6px;
+  border: 1px solid var(--border-subtle);
+}
+
+.canvas-add-column-form .canvas-column-select {
+  flex: 1;
+}
+
+.canvas-add-column-confirm {
+  padding: 6px 14px;
+  background: var(--accent);
+  color: white;
+  border: none;
+  border-radius: 4px;
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.canvas-add-column-confirm:hover {
+  filter: brightness(1.1);
+}
+
+.canvas-add-column-cancel {
+  padding: 6px 14px;
+  background: transparent;
+  color: var(--text-muted);
+  border: 1px solid var(--border-subtle);
+  border-radius: 4px;
+  font-size: 12px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.canvas-add-column-cancel:hover {
+  border-color: var(--border);
+  color: var(--text-secondary);
+  background: var(--bg-hover);
 }
 
 /* ========================================
