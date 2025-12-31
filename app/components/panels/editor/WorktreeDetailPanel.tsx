@@ -743,8 +743,8 @@ export function WorktreeDetailPanel({
         </button>
 
         {!isCurrent && (
-          <button className="btn btn-secondary" onClick={() => handleRemove(false)} disabled={actionInProgress}>
-            Remove
+          <button className="btn btn-secondary btn-danger" onClick={() => handleRemove(false)} disabled={actionInProgress}>
+            Remove Worktree
           </button>
         )}
       </div>

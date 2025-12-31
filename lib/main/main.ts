@@ -16,6 +16,8 @@ import {
   getEnhancedWorktrees,
   checkoutBranch,
   createBranch,
+  deleteBranch,
+  deleteRemoteBranch,
   pushBranch,
   checkoutRemoteBranch,
   getPullRequests,
@@ -52,6 +54,7 @@ import {
   stageAll,
   unstageAll,
   discardFileChanges,
+  discardAllChanges,
   getFileDiff,
   commitChanges,
   pullCurrentBranch,
@@ -183,6 +186,22 @@ app.whenReady().then(() => {
   ipcMain.handle('create-branch', async (_, branchName: string, checkout: boolean = true) => {
     try {
       return await createBranch(branchName, checkout)
+    } catch (error) {
+      return { success: false, message: (error as Error).message }
+    }
+  })
+
+  ipcMain.handle('delete-branch', async (_, branchName: string, force: boolean = false) => {
+    try {
+      return await deleteBranch(branchName, force)
+    } catch (error) {
+      return { success: false, message: (error as Error).message }
+    }
+  })
+
+  ipcMain.handle('delete-remote-branch', async (_, branchName: string) => {
+    try {
+      return await deleteRemoteBranch(branchName)
     } catch (error) {
       return { success: false, message: (error as Error).message }
     }
@@ -538,6 +557,14 @@ app.whenReady().then(() => {
   ipcMain.handle('discard-file-changes', async (_, filePath: string) => {
     try {
       return await discardFileChanges(filePath)
+    } catch (error) {
+      return { success: false, message: (error as Error).message }
+    }
+  })
+
+  ipcMain.handle('discard-all-changes', async () => {
+    try {
+      return await discardAllChanges()
     } catch (error) {
       return { success: false, message: (error as Error).message }
     }

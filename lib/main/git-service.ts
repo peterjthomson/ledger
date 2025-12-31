@@ -650,6 +650,79 @@ export async function createBranch(
   }
 }
 
+// Delete a branch
+export async function deleteBranch(
+  branchName: string,
+  force: boolean = false
+): Promise<{ success: boolean; message: string }> {
+  if (!git) throw new Error('No repository selected')
+
+  try {
+    const trimmedName = branchName.trim()
+    if (!trimmedName) {
+      return { success: false, message: 'Branch name cannot be empty' }
+    }
+
+    // Don't allow deleting main/master
+    if (trimmedName === 'main' || trimmedName === 'master') {
+      return { success: false, message: 'Cannot delete main or master branch' }
+    }
+
+    // Check if currently on this branch
+    const status = await git.status()
+    if (status.current === trimmedName) {
+      return { success: false, message: 'Cannot delete the currently checked out branch' }
+    }
+
+    // Delete the branch
+    const deleteFlag = force ? '-D' : '-d'
+    await git.branch([deleteFlag, trimmedName])
+    return { success: true, message: `Deleted branch '${trimmedName}'` }
+  } catch (error) {
+    const errorMessage = (error as Error).message
+    // If branch not fully merged, suggest force delete
+    if (errorMessage.includes('not fully merged')) {
+      return {
+        success: false,
+        message: `Branch '${branchName}' is not fully merged. Use force delete to remove it anyway.`,
+      }
+    }
+    return { success: false, message: errorMessage }
+  }
+}
+
+// Delete a remote branch (git push origin --delete branchname)
+export async function deleteRemoteBranch(
+  branchName: string
+): Promise<{ success: boolean; message: string }> {
+  if (!git) throw new Error('No repository selected')
+
+  try {
+    // Clean up the branch name (remove remotes/origin/ prefix if present)
+    let cleanName = branchName.trim()
+    cleanName = cleanName.replace(/^remotes\//, '').replace(/^origin\//, '')
+    
+    if (!cleanName) {
+      return { success: false, message: 'Branch name cannot be empty' }
+    }
+
+    // Don't allow deleting main/master
+    if (cleanName === 'main' || cleanName === 'master') {
+      return { success: false, message: 'Cannot delete main or master branch' }
+    }
+
+    // Delete the remote branch
+    await git.raw(['push', 'origin', '--delete', cleanName])
+    return { success: true, message: `Deleted remote branch 'origin/${cleanName}'` }
+  } catch (error) {
+    const errorMessage = (error as Error).message
+    if (errorMessage.includes('remote ref does not exist')) {
+      return { success: false, message: `Remote branch '${branchName}' does not exist` }
+    }
+    return { success: false, message: errorMessage }
+  }
+}
+
 // Checkout a remote branch (creates local tracking branch)
 export async function checkoutRemoteBranch(
   remoteBranch: string
@@ -3052,6 +3125,36 @@ export async function discardFileChanges(filePath: string): Promise<{ success: b
     // For tracked files, restore to last commit
     await git.raw(['restore', filePath])
     return { success: true, message: `Discarded changes in ${filePath}` }
+  } catch (error) {
+    return { success: false, message: (error as Error).message }
+  }
+}
+
+// Discard all changes (both staged and unstaged)
+export async function discardAllChanges(): Promise<{ success: boolean; message: string }> {
+  if (!git) throw new Error('No repository selected')
+
+  try {
+    const status = await git.status()
+    
+    // First unstage everything
+    if (status.staged.length > 0) {
+      await git.raw(['restore', '--staged', '.'])
+    }
+    
+    // Restore tracked files to last commit
+    const trackedModified = [...status.modified, ...status.deleted]
+    if (trackedModified.length > 0) {
+      await git.raw(['restore', '.'])
+    }
+    
+    // Remove untracked files
+    if (status.not_added.length > 0) {
+      await git.raw(['clean', '-fd'])
+    }
+    
+    const totalChanges = status.files.length
+    return { success: true, message: `Discarded all ${totalChanges} changes` }
   } catch (error) {
     return { success: false, message: (error as Error).message }
   }

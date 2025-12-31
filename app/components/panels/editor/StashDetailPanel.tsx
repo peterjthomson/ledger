@@ -361,8 +361,8 @@ export function StashDetailPanel({
         <button className="btn btn-secondary" onClick={() => setShowBranchModal(true)} disabled={actionInProgress}>
           Create Branch
         </button>
-        <button className="btn btn-danger" onClick={handleDrop} disabled={actionInProgress}>
-          Drop
+        <button className="btn btn-secondary btn-danger" onClick={handleDrop} disabled={actionInProgress}>
+          Drop Stash
         </button>
       </div>
 

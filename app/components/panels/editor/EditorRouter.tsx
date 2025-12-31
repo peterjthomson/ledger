@@ -21,12 +21,15 @@ export interface EditorRouterProps {
   formatDate: (date?: string) => string
   currentBranch: string
   switching?: boolean
+  deleting?: boolean
   onStatusChange?: (status: StatusMessage | null) => void
   onRefresh?: () => Promise<void>
   onClearFocus?: () => void
   onCheckoutBranch?: (branch: Branch) => void
   onCheckoutRemoteBranch?: (branch: Branch) => void
   onCheckoutWorktree?: (worktree: Worktree) => void
+  onDeleteBranch?: (branch: Branch) => void
+  onDeleteRemoteBranch?: (branch: Branch) => void
   branches?: Branch[]
   repoPath?: string | null
   worktrees?: Worktree[]
@@ -39,12 +42,15 @@ export function EditorRouter({
   formatDate,
   currentBranch,
   switching,
+  deleting,
   onStatusChange,
   onRefresh,
   onClearFocus,
   onCheckoutBranch,
   onCheckoutRemoteBranch,
   onCheckoutWorktree,
+  onDeleteBranch,
+  onDeleteRemoteBranch,
   branches,
   repoPath,
   onFocusWorktree,
@@ -64,7 +70,9 @@ export function EditorRouter({
           formatDate={formatDate}
           onStatusChange={onStatusChange}
           onCheckoutBranch={onCheckoutBranch}
+          onDeleteBranch={onDeleteBranch}
           switching={switching}
+          deleting={deleting}
         />
       )
     }
@@ -72,6 +80,7 @@ export function EditorRouter({
     case 'remote': {
       const branch = focus.data as Branch
       const displayName = branch.name.replace('remotes/', '').replace(/^origin\//, '')
+      const isMainOrMaster = displayName === 'main' || displayName === 'master'
       return (
         <div className="sidebar-detail-panel">
           <div className="detail-type-badge">Remote Branch</div>
@@ -105,13 +114,18 @@ export function EditorRouter({
           {/* Actions */}
           <div className="detail-actions">
             {onCheckoutRemoteBranch && (
-              <button className="btn btn-primary" onClick={() => onCheckoutRemoteBranch(branch)} disabled={switching}>
+              <button className="btn btn-primary" onClick={() => onCheckoutRemoteBranch(branch)} disabled={switching || deleting}>
                 {switching ? 'Checking out...' : 'Checkout'}
               </button>
             )}
-            <button className="btn btn-secondary" onClick={() => window.electronAPI.openBranchInGitHub(branch.name)}>
+            <button className="btn btn-secondary" onClick={() => window.electronAPI.openBranchInGitHub(branch.name)} disabled={deleting}>
               View on GitHub
             </button>
+            {!isMainOrMaster && onDeleteRemoteBranch && (
+              <button className="btn btn-secondary btn-danger" onClick={() => onDeleteRemoteBranch(branch)} disabled={switching || deleting}>
+                {deleting ? 'Deleting...' : 'Delete Remote Branch'}
+              </button>
+            )}
           </div>
         </div>
       )

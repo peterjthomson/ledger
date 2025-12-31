@@ -235,6 +235,21 @@ export function StagingPanel({ workingStatus, currentBranch, onRefresh, onStatus
     }
   }
 
+  // Discard all changes
+  const handleDiscardAll = async () => {
+    const totalChanges = workingStatus.files.length
+    if (!confirm(`Discard all ${totalChanges} changes? This cannot be undone.`)) return
+
+    const result = await window.electronAPI.discardAllChanges()
+    if (result.success) {
+      onStatusChange({ type: 'success', message: result.message })
+      setSelectedFile(null)
+      await onRefresh()
+    } else {
+      onStatusChange({ type: 'error', message: result.message })
+    }
+  }
+
   // Handle right-click on unstaged file
   const handleFileContextMenu = (e: React.MouseEvent, file: UncommittedFile) => {
     e.preventDefault()
@@ -459,6 +474,15 @@ export function StagingPanel({ workingStatus, currentBranch, onRefresh, onStatus
             <span className="diff-deletions">-{workingStatus.deletions}</span>
           </span>
         </div>
+        {workingStatus.files.length > 0 && (
+          <button
+            className="btn btn-secondary btn-danger btn-small"
+            onClick={handleDiscardAll}
+            title="Discard all changes"
+          >
+            Discard All
+          </button>
+        )}
       </div>
 
       {/* File Lists */}

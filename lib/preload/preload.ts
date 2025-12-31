@@ -14,6 +14,8 @@ const electronAPI = {
   // Checkout operations
   checkoutBranch: (branchName: string) => ipcRenderer.invoke('checkout-branch', branchName),
   createBranch: (branchName: string, checkout?: boolean) => ipcRenderer.invoke('create-branch', branchName, checkout),
+  deleteBranch: (branchName: string, force?: boolean) => ipcRenderer.invoke('delete-branch', branchName, force),
+  deleteRemoteBranch: (branchName: string) => ipcRenderer.invoke('delete-remote-branch', branchName),
   pushBranch: (branchName?: string, setUpstream?: boolean) =>
     ipcRenderer.invoke('push-branch', branchName, setUpstream),
   checkoutRemoteBranch: (remoteBranch: string) => ipcRenderer.invoke('checkout-remote-branch', remoteBranch),
@@ -82,6 +84,7 @@ const electronAPI = {
   stageAll: () => ipcRenderer.invoke('stage-all'),
   unstageAll: () => ipcRenderer.invoke('unstage-all'),
   discardFileChanges: (filePath: string) => ipcRenderer.invoke('discard-file-changes', filePath),
+  discardAllChanges: () => ipcRenderer.invoke('discard-all-changes'),
   getFileDiff: (filePath: string, staged: boolean) => ipcRenderer.invoke('get-file-diff', filePath, staged),
   commitChanges: (message: string, description?: string, force?: boolean) =>
     ipcRenderer.invoke('commit-changes', message, description, force),

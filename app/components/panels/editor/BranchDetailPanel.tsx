@@ -13,7 +13,9 @@ export interface BranchDetailPanelProps {
   formatDate: (date?: string) => string
   onStatusChange?: (status: StatusMessage | null) => void
   onCheckoutBranch?: (branch: Branch) => void
+  onDeleteBranch?: (branch: Branch) => void
   switching?: boolean
+  deleting?: boolean
 }
 
 export function BranchDetailPanel({
@@ -21,7 +23,9 @@ export function BranchDetailPanel({
   formatDate,
   onStatusChange,
   onCheckoutBranch,
+  onDeleteBranch,
   switching,
+  deleting,
 }: BranchDetailPanelProps) {
   const [creatingPR, setCreatingPR] = useState(false)
   const [pushing, setPushing] = useState(false)
@@ -237,23 +241,28 @@ export function BranchDetailPanel({
       {!showPRForm && (
         <div className="detail-actions">
           {!branch.current && onCheckoutBranch && (
-            <button className="btn btn-primary" onClick={() => onCheckoutBranch(branch)} disabled={switching}>
+            <button className="btn btn-primary" onClick={() => onCheckoutBranch(branch)} disabled={switching || deleting}>
               {switching ? 'Checking out...' : 'Checkout'}
             </button>
           )}
           {branch.current && (
-            <button className="btn btn-primary" onClick={handlePush} disabled={pushing}>
+            <button className="btn btn-primary" onClick={handlePush} disabled={pushing || deleting}>
               {pushing ? 'Pushing...' : 'Push to Origin'}
             </button>
           )}
           {!isMainOrMaster && (
-            <button className="btn btn-secondary" onClick={handleStartPRCreation}>
+            <button className="btn btn-secondary" onClick={handleStartPRCreation} disabled={deleting}>
               Create Pull Request
             </button>
           )}
-          <button className="btn btn-secondary" onClick={() => window.electronAPI.openBranchInGitHub(branch.name)}>
+          <button className="btn btn-secondary" onClick={() => window.electronAPI.openBranchInGitHub(branch.name)} disabled={deleting}>
             View on GitHub
           </button>
+          {!isMainOrMaster && !branch.current && onDeleteBranch && (
+            <button className="btn btn-secondary btn-danger" onClick={() => onDeleteBranch(branch)} disabled={switching || deleting}>
+              {deleting ? 'Deleting...' : 'Delete Branch'}
+            </button>
+          )}
         </div>
       )}
 

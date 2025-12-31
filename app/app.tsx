@@ -51,6 +51,7 @@ export default function App() {
   const [loading, setLoading] = useState(false)
   const [status, setStatus] = useState<StatusMessage | null>(null)
   const [switching, setSwitching] = useState(false)
+  const [deleting, setDeleting] = useState(false)
   const [contextMenu, setContextMenu] = useState<ContextMenu | null>(null)
   const [showNewBranchModal, setShowNewBranchModal] = useState(false)
   const [newBranchName, setNewBranchName] = useState('')
@@ -150,12 +151,14 @@ export default function App() {
   const [localBranchSearch, setLocalBranchSearch] = useState('')
   const [remoteBranchSearch, setRemoteBranchSearch] = useState('')
   const [worktreeSearch, setWorktreeSearch] = useState('')
+  const [stashSearch, setStashSearch] = useState('')
 
   // Collapsible controls state
   const [prControlsOpen, setPrControlsOpen] = useState(false)
   const [localControlsOpen, setLocalControlsOpen] = useState(false)
   const [remoteControlsOpen, setRemoteControlsOpen] = useState(false)
   const [worktreeControlsOpen, setWorktreeControlsOpen] = useState(false)
+  const [stashControlsOpen, setStashControlsOpen] = useState(false)
 
   // Worktree filter state
   const [worktreeParentFilter, setWorktreeParentFilter] = useState<string>('all')
@@ -177,6 +180,7 @@ export default function App() {
 
   // Radar view column order (drag-and-drop)
   const [radarColumnOrder, setRadarColumnOrder] = useState<string[]>([
+    'stashes',
     'prs',
     'worktrees',
     'commits',
@@ -273,7 +277,7 @@ export default function App() {
           key="editor-toggle"
           className="panel-toggle-btn"
           onClick={toggleRadarEditor}
-          title={radarHasEditor ? 'Hide editor panel' : 'Show editor panel'}
+          title={radarHasEditor ? 'Hide Detail Panel' : 'Show Detail Panel'}
         >
           <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
             <rect x="0.5" y="0.5" width="15" height="15" rx="1.5" stroke="currentColor" strokeWidth="1" />
@@ -290,7 +294,7 @@ export default function App() {
           key="sidebar-toggle"
           className="panel-toggle-btn"
           onClick={() => setSidebarVisible(!sidebarVisible)}
-          title={sidebarVisible ? 'Hide sidebar' : 'Show sidebar'}
+          title={sidebarVisible ? 'Hide Sidebar Panel' : 'Show Sidebar Panel'}
         >
           <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
             <rect x="0.5" y="0.5" width="15" height="15" rx="1.5" stroke="currentColor" strokeWidth="1" />
@@ -301,7 +305,7 @@ export default function App() {
           key="main-toggle"
           className="panel-toggle-btn"
           onClick={() => setMainVisible(!mainVisible)}
-          title={mainVisible ? 'Hide main panel' : 'Show main panel'}
+          title={mainVisible ? 'Hide Graph Panel' : 'Show Graph Panel'}
         >
           <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
             <rect x="0.5" y="0.5" width="15" height="15" rx="1.5" stroke="currentColor" strokeWidth="1" />
@@ -312,7 +316,7 @@ export default function App() {
           key="detail-toggle"
           className="panel-toggle-btn"
           onClick={() => setDetailVisible(!detailVisible)}
-          title={detailVisible ? 'Hide detail panel' : 'Show detail panel'}
+          title={detailVisible ? 'Hide Detail Panel' : 'Show Detail Panel'}
         >
           <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
             <rect x="0.5" y="0.5" width="15" height="15" rx="1.5" stroke="currentColor" strokeWidth="1" />
@@ -987,6 +991,73 @@ export default function App() {
     [switching]
   )
 
+  // Delete a branch
+  const handleDeleteBranch = useCallback(
+    async (branch: Branch) => {
+      if (branch.current || deleting) return
+
+      const isMainOrMaster = branch.name === 'main' || branch.name === 'master'
+      if (isMainOrMaster) {
+        setStatus({ type: 'error', message: 'Cannot delete main or master branch' })
+        return
+      }
+
+      setDeleting(true)
+      setStatus({ type: 'info', message: `Deleting branch '${branch.name}'...` })
+
+      try {
+        const result = await window.electronAPI.deleteBranch(branch.name)
+        if (result.success) {
+          setStatus({ type: 'success', message: result.message })
+          setSidebarFocus(null)
+          await refresh()
+        } else {
+          setStatus({ type: 'error', message: result.message })
+        }
+      } catch (error) {
+        setStatus({ type: 'error', message: (error as Error).message })
+      } finally {
+        setDeleting(false)
+      }
+    },
+    [deleting, refresh]
+  )
+
+  // Delete a remote branch
+  const handleDeleteRemoteBranch = useCallback(
+    async (branch: Branch) => {
+      if (deleting) return
+
+      const displayName = branch.name.replace('remotes/', '').replace(/^origin\//, '')
+      const isMainOrMaster = displayName === 'main' || displayName === 'master'
+      if (isMainOrMaster) {
+        setStatus({ type: 'error', message: 'Cannot delete main or master branch' })
+        return
+      }
+
+      if (!confirm(`Delete remote branch '${displayName}'? This will remove it from the remote repository.`)) return
+
+      setDeleting(true)
+      setStatus({ type: 'info', message: `Deleting remote branch '${displayName}'...` })
+
+      try {
+        const result = await window.electronAPI.deleteRemoteBranch(branch.name)
+        if (result.success) {
+          setStatus({ type: 'success', message: result.message })
+          setSidebarFocus(null)
+          await refresh()
+        } else {
+          setStatus({ type: 'error', message: result.message })
+        }
+      } catch (error) {
+        setStatus({ type: 'error', message: (error as Error).message })
+      } finally {
+        setDeleting(false)
+      }
+    },
+    [deleting, refresh]
+  )
+
   // Create a new branch
   const handleCreateBranch = useCallback(async () => {
     if (!newBranchName.trim() || creatingBranch) return
@@ -1297,6 +1368,18 @@ export default function App() {
 
     return filtered
   }, [worktrees, worktreeParentFilter, repoPath, worktreeSearch, workingFolderWorktree])
+
+  // Filter stashes
+  const filteredStashes = useMemo(() => {
+    if (!stashSearch.trim()) return stashes
+
+    const search = stashSearch.toLowerCase().trim()
+    return stashes.filter(
+      (stash) =>
+        stash.message.toLowerCase().includes(search) ||
+        (stash.branch && stash.branch.toLowerCase().includes(search))
+    )
+  }, [stashes, stashSearch])
 
   // Filter and sort PRs
   const filteredPRs = useMemo(() => {
@@ -1798,6 +1881,78 @@ export default function App() {
       {/* Main Content */}
       {repoPath && !error && viewMode === 'radar' && (
         <main className="ledger-content five-columns">
+          {/* Stashes Column */}
+          <section
+            className={`column stashes-column ${draggingColumn === 'stashes' ? 'dragging' : ''} ${dragOverColumn === 'stashes' ? 'drag-over' : ''}`}
+            style={{ order: radarColumnOrder.indexOf('stashes') }}
+            draggable
+            onDragStart={(e) => handleColumnDragStart(e, 'stashes')}
+            onDragOver={(e) => handleColumnDragOver(e, 'stashes')}
+            onDragLeave={handleColumnDragLeave}
+            onDrop={(e) => handleColumnDrop(e, 'stashes')}
+            onDragEnd={handleColumnDragEnd}
+          >
+            <div className="column-drag-handle" title="Drag to reorder">
+              ⋮⋮
+            </div>
+            <div
+              className={`column-header clickable-header ${stashControlsOpen ? 'open' : ''}`}
+              onClick={() => setStashControlsOpen(!stashControlsOpen)}
+            >
+              <div className="column-title">
+                <h2>
+                  <span className="column-icon">⊡</span>
+                  Stashes
+                </h2>
+                <span className={`header-chevron ${stashControlsOpen ? 'open' : ''}`}>▾</span>
+              </div>
+              <span className="count-badge">{filteredStashes.length}</span>
+            </div>
+            {stashControlsOpen && (
+              <div className="column-controls" onClick={(e) => e.stopPropagation()}>
+                <div className="control-row">
+                  <label>Search</label>
+                  <input
+                    type="text"
+                    className="control-search"
+                    placeholder="Message or branch..."
+                    value={stashSearch}
+                    onChange={(e) => setStashSearch(e.target.value)}
+                  />
+                </div>
+              </div>
+            )}
+            <div className="column-content">
+              {filteredStashes.length === 0 ? (
+                <div className="empty-column">
+                  {stashSearch.trim() ? 'No stashes match filter' : 'No stashes'}
+                </div>
+              ) : (
+                <ul className="item-list">
+                  {filteredStashes.map((stash) => (
+                    <li
+                      key={stash.index}
+                      className={`item stash-item clickable ${sidebarFocus?.type === 'stash' && (sidebarFocus.data as StashEntry).index === stash.index ? 'selected' : ''}`}
+                      onClick={() => handleRadarItemClick('stash', stash)}
+                      onDoubleClick={() => handleSidebarFocus('stash', stash)}
+                    >
+                      <div className="item-main">
+                        <span className="item-name" title={stash.message}>
+                          {stash.message}
+                        </span>
+                      </div>
+                      <div className="item-meta">
+                        <code className="commit-hash">stash@{'{' + stash.index + '}'}</code>
+                        {stash.branch && <span className="stash-branch">on {stash.branch}</span>}
+                        <span className="stash-time">{formatRelativeTime(stash.date)}</span>
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          </section>
+
           {/* Pull Requests Column */}
           <section
             className={`column pr-column ${draggingColumn === 'prs' ? 'dragging' : ''} ${dragOverColumn === 'prs' ? 'drag-over' : ''}`}
@@ -2443,12 +2598,15 @@ export default function App() {
                     formatDate={formatDate}
                     currentBranch={currentBranch}
                     switching={switching}
+                    deleting={deleting}
                     onStatusChange={setStatus}
                     onRefresh={refresh}
                     onClearFocus={() => setSidebarFocus(null)}
                     onCheckoutBranch={handleBranchDoubleClick}
                     onCheckoutRemoteBranch={handleRemoteBranchDoubleClick}
                     onCheckoutWorktree={handleWorktreeDoubleClick}
+                    onDeleteBranch={handleDeleteBranch}
+                    onDeleteRemoteBranch={handleDeleteRemoteBranch}
                     branches={branches}
                     repoPath={repoPath}
                     worktrees={worktrees}

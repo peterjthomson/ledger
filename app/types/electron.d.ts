@@ -307,6 +307,8 @@ export interface ElectronAPI {
   // Checkout operations
   checkoutBranch: (branchName: string) => Promise<CheckoutResult>
   createBranch: (branchName: string, checkout?: boolean) => Promise<{ success: boolean; message: string }>
+  deleteBranch: (branchName: string, force?: boolean) => Promise<{ success: boolean; message: string }>
+  deleteRemoteBranch: (branchName: string) => Promise<{ success: boolean; message: string }>
   pushBranch: (branchName?: string, setUpstream?: boolean) => Promise<{ success: boolean; message: string }>
   checkoutRemoteBranch: (remoteBranch: string) => Promise<CheckoutResult>
   openWorktree: (worktreePath: string) => Promise<{ success: boolean; message: string }>
@@ -381,6 +383,7 @@ export interface ElectronAPI {
   stageAll: () => Promise<{ success: boolean; message: string }>
   unstageAll: () => Promise<{ success: boolean; message: string }>
   discardFileChanges: (filePath: string) => Promise<{ success: boolean; message: string }>
+  discardAllChanges: () => Promise<{ success: boolean; message: string }>
   getFileDiff: (filePath: string, staged: boolean) => Promise<StagingFileDiff | null>
   commitChanges: (
     message: string,
