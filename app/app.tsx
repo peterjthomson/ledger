@@ -560,6 +560,23 @@ export default function App() {
     setSidebarSections((prev) => ({ ...prev, [section]: !prev[section] }))
   }, [])
 
+  // Check if all sidebar sections are expanded
+  const allSectionsExpanded = useMemo(() => {
+    return Object.values(sidebarSections).every((v) => v)
+  }, [sidebarSections])
+
+  // Toggle all sidebar sections
+  const toggleAllSidebarSections = useCallback(() => {
+    const newState = !allSectionsExpanded
+    setSidebarSections({
+      branches: newState,
+      remotes: newState,
+      worktrees: newState,
+      stashes: newState,
+      prs: newState,
+    })
+  }, [allSectionsExpanded])
+
   // Toggle sidebar filter panel
   const toggleSidebarFilter = useCallback((section: keyof typeof sidebarFiltersOpen) => {
     setSidebarFiltersOpen((prev) => ({ ...prev, [section]: !prev[section] }))
@@ -2653,6 +2670,20 @@ export default function App() {
               tabIndex={0}
               onKeyDown={handleSidebarKeyDown}
             >
+              {/* All Header - expand/collapse all sections */}
+              <div className="sidebar-all-header">
+                <div className="sidebar-all-drag-handle">⋮⋮</div>
+                <div className="sidebar-all-content" onClick={toggleAllSidebarSections}>
+                  <div className="column-title">
+                    <h2>
+                      <span className="column-icon">☰</span>
+                      All
+                    </h2>
+                  </div>
+                  <span className={`sidebar-all-chevron ${allSectionsExpanded ? 'open' : ''}`}>▾</span>
+                </div>
+              </div>
+
               {/* PRs Section */}
               <div className="sidebar-section">
                 <div className="sidebar-section-header">
@@ -3200,63 +3231,65 @@ export default function App() {
                   </button>
                 </div>
               </div>
-              {sidebarFocus?.type === 'uncommitted' && workingStatus ? (
-                <StagingPanel
-                  workingStatus={workingStatus}
-                  currentBranch={currentBranch}
-                  onRefresh={refresh}
-                  onStatusChange={setStatus}
-                />
-              ) : sidebarFocus?.type === 'pr' ? (
-                <PRReviewPanel
-                  pr={sidebarFocus.data as PullRequest}
-                  formatRelativeTime={formatRelativeTime}
-                  onCheckout={handlePRCheckout}
-                  onPRMerged={refresh}
-                  switching={switching}
-                />
-              ) : sidebarFocus ? (
-                <SidebarDetailPanel
-                  focus={sidebarFocus}
-                  formatRelativeTime={formatRelativeTime}
-                  formatDate={formatDate}
-                  currentBranch={currentBranch}
-                  switching={switching}
-                  onStatusChange={setStatus}
-                  onRefresh={refresh}
-                  onClearFocus={() => setSidebarFocus(null)}
-                  onCheckoutBranch={handleBranchDoubleClick}
-                  onCheckoutRemoteBranch={handleRemoteBranchDoubleClick}
-                  onCheckoutWorktree={handleWorktreeDoubleClick}
+              <div className="editor-panel-content">
+                {sidebarFocus?.type === 'uncommitted' && workingStatus ? (
+                  <StagingPanel
+                    workingStatus={workingStatus}
+                    currentBranch={currentBranch}
+                    onRefresh={refresh}
+                    onStatusChange={setStatus}
+                  />
+                ) : sidebarFocus?.type === 'pr' ? (
+                  <PRReviewPanel
+                    pr={sidebarFocus.data as PullRequest}
+                    formatRelativeTime={formatRelativeTime}
+                    onCheckout={handlePRCheckout}
+                    onPRMerged={refresh}
+                    switching={switching}
+                  />
+                ) : sidebarFocus ? (
+                  <SidebarDetailPanel
+                    focus={sidebarFocus}
+                    formatRelativeTime={formatRelativeTime}
+                    formatDate={formatDate}
+                    currentBranch={currentBranch}
+                    switching={switching}
+                    onStatusChange={setStatus}
+                    onRefresh={refresh}
+                    onClearFocus={() => setSidebarFocus(null)}
+                    onCheckoutBranch={handleBranchDoubleClick}
+                    onCheckoutRemoteBranch={handleRemoteBranchDoubleClick}
+                    onCheckoutWorktree={handleWorktreeDoubleClick}
                   branches={branches}
                   repoPath={repoPath}
                   worktrees={worktrees}
                   onFocusWorktree={(wt) => setSidebarFocus({ type: 'worktree', data: wt })}
-                />
-              ) : !selectedCommit ? (
-                <div className="detail-empty">
-                  <span className="detail-empty-icon">◇</span>
-                  <p>Select an item to view details</p>
-                </div>
-              ) : loadingDiff ? (
-                <div className="detail-loading">Loading diff...</div>
-              ) : commitDiff ? (
-                <DiffPanel 
-                  diff={commitDiff} 
-                  selectedCommit={selectedCommit}
-                  formatRelativeTime={formatRelativeTime} 
-                  branches={branches}
-                  onBranchClick={(branchName) => {
-                    // Find the branch and focus it
-                    const branch = branches.find((b) => b.name === branchName)
-                    if (branch) {
-                      handleSidebarFocus(branch.isRemote ? 'remote' : 'branch', branch)
-                    }
-                  }}
-                />
-              ) : (
-                <div className="detail-error">Could not load diff</div>
-              )}
+                  />
+                ) : !selectedCommit ? (
+                  <div className="detail-empty">
+                    <span className="detail-empty-icon">◇</span>
+                    <p>Select an item to view details</p>
+                  </div>
+                ) : loadingDiff ? (
+                  <div className="detail-loading">Loading diff...</div>
+                ) : commitDiff ? (
+                  <DiffPanel 
+                    diff={commitDiff} 
+                    selectedCommit={selectedCommit}
+                    formatRelativeTime={formatRelativeTime} 
+                    branches={branches}
+                    onBranchClick={(branchName) => {
+                      // Find the branch and focus it
+                      const branch = branches.find((b) => b.name === branchName)
+                      if (branch) {
+                        handleSidebarFocus(branch.isRemote ? 'remote' : 'branch', branch)
+                      }
+                    }}
+                  />
+                ) : (
+                  <div className="detail-error">Could not load diff</div>
+                )}
+              </div>
             </aside>
           )}
         </main>

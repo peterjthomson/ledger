@@ -468,11 +468,11 @@ export function StagingPanel({ workingStatus, currentBranch, onRefresh, onStatus
       {/* Header */}
       <div className="staging-header">
         <div className="staging-title">
-          <span className="detail-type-badge uncommitted">Changes</span>
-          <span className="staging-stats">
+          <div className="detail-type-badge uncommitted">Changes</div>
+          <div className="staging-stats">
             <span className="diff-additions">+{workingStatus.additions}</span>
             <span className="diff-deletions">-{workingStatus.deletions}</span>
-          </span>
+          </div>
         </div>
         {workingStatus.files.length > 0 && (
           <button

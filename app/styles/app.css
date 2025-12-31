@@ -128,6 +128,32 @@ body,
   line-height: 1.4;
 }
 
+/* ========================================
+   Global Scrollbar Styles
+   Ultra-narrow, subtle scrollbar for all scrollable areas
+   ======================================== */
+*::-webkit-scrollbar {
+  width: 2px;
+  height: 2px;
+}
+
+*::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+*::-webkit-scrollbar-thumb {
+  background: var(--border-subtle);
+  border-radius: 3px;
+}
+
+*::-webkit-scrollbar-thumb:hover {
+  background: var(--border);
+}
+
+*::-webkit-scrollbar-corner {
+  background: transparent;
+}
+
 /* Main App Container */
 .ledger-app {
   display: flex;
@@ -375,6 +401,9 @@ body,
   gap: 8px;
   margin: 0;
   font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
 }
 
 .column-header h2 .branch-badge {
@@ -491,22 +520,6 @@ body,
   background: var(--bg-primary);
 }
 
-.column-content::-webkit-scrollbar {
-  width: 2px;
-}
-
-.column-content::-webkit-scrollbar-track {
-  background: transparent;
-}
-
-.column-content::-webkit-scrollbar-thumb {
-  background: var(--border-subtle);
-  border-radius: 3px;
-}
-
-.column-content::-webkit-scrollbar-thumb:hover {
-  background: var(--border);
-}
 
 /* Item Lists */
 .item-list {
@@ -1567,6 +1580,93 @@ body,
   flex-shrink: 0;
 }
 
+/* All header - expand/collapse all sections */
+.sidebar-all-header {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  background: var(--bg-secondary);
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.sidebar-all-drag-handle {
+  position: absolute;
+  top: 10px;
+  right: 8px;
+  width: 20px;
+  height: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  color: var(--text-muted);
+  cursor: grab;
+  opacity: 0;
+  transition: opacity 0.15s ease, color 0.15s ease;
+  border-radius: var(--radius-sm);
+  z-index: 10;
+  letter-spacing: -2px;
+  user-select: none;
+}
+
+.sidebar-all-header:hover .sidebar-all-drag-handle {
+  opacity: 0.6;
+}
+
+.sidebar-all-drag-handle:hover {
+  opacity: 1 !important;
+  color: var(--accent);
+}
+
+.sidebar-all-content {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 14px;
+  min-height: 40px;
+  box-sizing: border-box;
+  cursor: pointer;
+  user-select: none;
+  transition: background 0.1s ease;
+}
+
+.sidebar-all-content:hover {
+  background: var(--bg-tertiary);
+}
+
+.sidebar-all-content .column-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.sidebar-all-content h2 {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: var(--text-secondary);
+}
+
+.sidebar-all-content .column-icon {
+  font-size: 14px;
+}
+
+.sidebar-all-chevron {
+  font-size: 14px;
+  color: var(--text-muted);
+  transition: transform 0.2s ease;
+  margin-right: 20px;
+}
+
+.sidebar-all-chevron.open {
+  transform: rotate(180deg);
+}
+
 .sidebar-section {
   border-bottom: 1px solid var(--border-subtle);
 }
@@ -1853,12 +1953,14 @@ body,
 .sidebar-detail-panel {
   flex: 1;
   padding: 16px;
-  overflow-y: auto;
+  overflow-y: visible;
+  min-height: min-content;
 }
 
 .detail-type-badge {
   display: inline-block;
   width: fit-content;
+  align-self: flex-start;
   font-size: 10px;
   font-weight: 600;
   text-transform: uppercase;
@@ -2116,10 +2218,11 @@ body,
   height: 100%;
 }
 
+/* Uncommitted badge - same grey style as others */
 .detail-type-badge.uncommitted {
-  background: var(--accent-glow);
-  border-color: var(--accent);
-  color: var(--accent);
+  background: var(--bg-tertiary);
+  border-color: var(--border-subtle);
+  color: var(--text-muted);
 }
 
 .uncommitted-files {
@@ -2227,7 +2330,8 @@ body,
   display: flex;
   flex-direction: column;
   flex: 1;
-  overflow: hidden;
+  overflow: visible;
+  min-height: min-content;
 }
 
 .staging-header {
@@ -2241,11 +2345,19 @@ body,
 .staging-title {
   display: flex;
   align-items: center;
+  justify-content: space-between;
   gap: 10px;
+}
+
+/* Keep badge centered in row layout, override align-self: flex-start */
+.staging-title .detail-type-badge {
+  align-self: center;
+  margin-bottom: 0;
 }
 
 .staging-stats {
   font-size: 11px;
+  margin-left: auto;
 }
 
 /* File Lists */
@@ -2802,6 +2914,8 @@ body,
   align-items: center;
   justify-content: space-between;
   padding: 10px 14px;
+  min-height: 40px;
+  box-sizing: border-box;
   background: var(--bg-secondary);
   border-bottom: 1px solid var(--border-subtle);
   cursor: pointer;
@@ -3054,6 +3168,29 @@ body,
   flex: 1;
 }
 
+/* Editor panel scrollable content area */
+.editor-panel-content {
+  flex: 1;
+  overflow-y: auto;
+  overflow-x: hidden;
+  overscroll-behavior-y: auto;
+  -webkit-overflow-scrolling: touch;
+  /* Enable elastic/bungie scroll on macOS */
+}
+
+
+/* Ensure child panels fill the space but allow scroll */
+.editor-panel-content > * {
+  min-height: 0;
+}
+
+/* Make empty/loading/error states center in the scrollable area */
+.editor-panel-content .detail-empty,
+.editor-panel-content .detail-loading,
+.editor-panel-content .detail-error {
+  min-height: 100%;
+}
+
 .detail-empty,
 .detail-loading,
 .detail-error {
@@ -3077,7 +3214,8 @@ body,
   flex: 1;
   display: flex;
   flex-direction: column;
-  overflow: hidden;
+  overflow: visible;
+  min-height: min-content;
 }
 
 /* Commit title styling - allow multi-line for long messages */
@@ -3498,7 +3636,8 @@ body,
   display: flex;
   flex-direction: column;
   flex: 1;
-  overflow: hidden;
+  overflow: visible;
+  min-height: min-content;
 }
 
 .pr-review-loading,
@@ -5281,9 +5420,9 @@ body,
 }
 
 .column-header .editor-nav-btn {
-  width: 24px;
-  height: 24px;
-  font-size: 12px;
+  width: 20px;
+  height: 20px;
+  font-size: 11px;
 }
 
 .editor-nav-btn {
