@@ -22,6 +22,12 @@ interface CanvasColumn {
   width: number | 'flex';
   minWidth?: number;
   config?: Record<string, unknown>;
+  // Display
+  label?: string;
+  icon?: string;
+  // Visibility
+  visible?: boolean;
+  collapsible?: boolean;
 }
 
 interface CanvasConfig {
@@ -202,14 +208,16 @@ export function getCanvases(): CanvasConfig[] {
 
 export function saveCanvases(canvases: CanvasConfig[]): void {
   const settings = loadSettings();
-  // Only save non-preset canvases (presets are defined in code)
-  settings.canvases = canvases.filter(c => !c.isPreset);
+  // Save all canvases - presets included to preserve user modifications
+  // (column widths, visibility, order). On load, preset columns will be
+  // merged with code definitions to pick up any new columns.
+  settings.canvases = canvases;
   saveSettings(settings);
 }
 
 export function getActiveCanvasId(): string {
   const settings = loadSettings();
-  return settings.activeCanvasId || 'focus';
+  return settings.activeCanvasId || 'radar';
 }
 
 export function saveActiveCanvasId(canvasId: string): void {
@@ -231,9 +239,9 @@ export function addCanvas(canvas: CanvasConfig): void {
 export function removeCanvas(canvasId: string): void {
   const settings = loadSettings();
   settings.canvases = (settings.canvases || []).filter(c => c.id !== canvasId);
-  // If we removed the active canvas, reset to focus
+  // If we removed the active canvas, reset to radar
   if (settings.activeCanvasId === canvasId) {
-    settings.activeCanvasId = 'focus';
+    settings.activeCanvasId = 'radar';
   }
   saveSettings(settings);
 }

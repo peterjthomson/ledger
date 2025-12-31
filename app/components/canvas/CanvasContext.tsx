@@ -75,8 +75,6 @@ const initialCanvasState: CanvasState = {
   canvases: [...PRESET_CANVASES],
   activeCanvasId: 'radar',
   editorState: initialEditorState,
-  startingCanvasId: 'radar',
-  editorHomeCanvasId: 'focus',
 }
 
 // ========================================
@@ -272,11 +270,57 @@ function canvasReducer(state: CanvasState, action: CanvasAction): CanvasState {
     }
 
     case 'LOAD_CANVASES': {
-      // Merge with presets (presets always win)
-      const userCanvases = action.canvases.filter((c) => !PRESET_CANVASES.some((p) => p.id === c.id))
+      // Merge saved canvases with code-defined presets
+      // For presets: preserve user's column modifications (width, visible, order)
+      // but pick up any new columns added in code
+      const mergedCanvases = PRESET_CANVASES.map((preset) => {
+        const savedPreset = action.canvases.find((c) => c.id === preset.id)
+        if (!savedPreset) return preset
+
+        // Create a map of saved column state keyed by column ID
+        const savedColumnMap = new Map(
+          savedPreset.columns.map((col) => [col.id, col])
+        )
+
+        // Merge columns: preserve saved width/visible, but use code-defined structure
+        const mergedColumns = preset.columns.map((codeCol) => {
+          const savedCol = savedColumnMap.get(codeCol.id)
+          if (!savedCol) return codeCol // New column in code, use as-is
+
+          // Preserve user modifications (width, visible) from saved state
+          return {
+            ...codeCol, // Use code-defined structure (slotType, panel, label, icon, etc.)
+            width: savedCol.width, // User's width preference
+            visible: savedCol.visible, // User's visibility preference
+          }
+        })
+
+        // Check for saved columns that were reordered
+        // If user reordered columns, use their order (but only for columns that exist in code)
+        const savedOrder = savedPreset.columns
+          .map((sc) => sc.id)
+          .filter((id) => mergedColumns.some((mc) => mc.id === id))
+
+        // Sort mergedColumns according to saved order, with new columns at the end
+        const orderedColumns = [
+          ...savedOrder.map((id) => mergedColumns.find((c) => c.id === id)!),
+          ...mergedColumns.filter((c) => !savedOrder.includes(c.id)),
+        ]
+
+        return {
+          ...preset,
+          columns: orderedColumns,
+        }
+      })
+
+      // Add custom (non-preset) canvases from saved state
+      const customCanvases = action.canvases.filter(
+        (c) => !PRESET_CANVASES.some((p) => p.id === c.id)
+      )
+
       return {
         ...state,
-        canvases: [...PRESET_CANVASES, ...userCanvases],
+        canvases: [...mergedCanvases, ...customCanvases],
         activeCanvasId: action.activeCanvasId || state.activeCanvasId,
       }
     }
