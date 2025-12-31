@@ -40,10 +40,6 @@ export type {
   CanvasUIState,
 } from './CanvasRenderer'
 
-// Panel rendering (lower-level, for custom integrations)
-export { renderListPanel, renderVizPanel, renderEditorPanel } from './PanelRenderer'
-export type { ListPanelData, VizPanelData, EditorPanelData } from './PanelRenderer'
-
 // Navigation hook
 export { useCanvasNavigation } from './useCanvasNavigation'
 export type { UseCanvasNavigationOptions, CanvasNavigationResult } from './useCanvasNavigation'
