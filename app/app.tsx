@@ -30,7 +30,8 @@ import {
   PRReviewPanel,
   SidebarDetailPanel,
 } from './components/panels/editor'
-import { initializeTheme, setThemeMode as applyThemeMode, getCurrentThemeMode, loadVSCodeTheme, type ThemeMode } from './theme'
+import { SettingsPanel } from './components/SettingsPanel'
+import { initializeTheme, setThemeMode as applyThemeMode, getCurrentThemeMode, type ThemeMode } from './theme'
 
 export default function App() {
   const [repoPath, setRepoPath] = useState<string | null>(null)
@@ -51,7 +52,7 @@ export default function App() {
   const [newBranchName, setNewBranchName] = useState('')
   const [creatingBranch, setCreatingBranch] = useState(false)
   const [githubUrl, setGithubUrl] = useState<string | null>(null)
-  const [_themeMode, setThemeMode] = useState<ThemeMode>('light')
+  const [themeMode, setThemeMode] = useState<ThemeMode>('light')
   const { setTitle, setTitlebarActions } = useWindowContext()
 
   // Canvas navigation for global editor state
@@ -90,6 +91,12 @@ export default function App() {
       })
     }
   }, [radarHasEditor, radarCanvas, removeColumn, addColumn])
+
+  // Theme change handler for Settings panel
+  const handleThemeChange = useCallback(async (mode: ThemeMode) => {
+    setThemeMode(mode)
+    await applyThemeMode(mode)
+  }, [])
 
   // Current canvas mode for titlebar button styling
   const viewMode = canvasState.activeCanvasId as ViewMode
@@ -1102,6 +1109,17 @@ export default function App() {
 
   // Render editor panel content based on current selection
   const renderEditorContent = useCallback(() => {
+    // Settings panel takes priority when active
+    if (mainPanelView === 'settings') {
+      return (
+        <SettingsPanel
+          themeMode={themeMode}
+          onThemeChange={handleThemeChange}
+          onBack={() => setMainPanelView('history')}
+        />
+      )
+    }
+
     // Staging panel for uncommitted changes
     if (sidebarFocus?.type === 'uncommitted' && workingStatus) {
       return (
@@ -1180,6 +1198,7 @@ export default function App() {
     // Empty state
     return null
   }, [
+    mainPanelView, themeMode, handleThemeChange,
     sidebarFocus, workingStatus, currentBranch, refresh, switching, deleting,
     formatRelativeTime, formatDate, handlePRCheckout, handleBranchDoubleClick,
     handleRemoteBranchDoubleClick, handleWorktreeDoubleClick, handleDeleteBranch,
