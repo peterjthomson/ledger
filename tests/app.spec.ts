@@ -102,7 +102,7 @@ test.describe('Ledger App - Main View', () => {
     // Wait for canvas layout to be rendered first
     await page.waitForSelector('.canvas-layout', { timeout: 5000 })
     // Ensure we're in Radar mode (click Radar button)
-    await page.locator('button.view-toggle-btn[title="Radar Mode"]').click()
+    await page.locator('button.view-toggle-btn[title="Radar"]').click()
     await page.waitForTimeout(100) // Brief wait for canvas switch
     // New selector uses data-panel attribute
     const prColumn = page.locator('.canvas-column[data-panel="pr-list"]')
@@ -191,7 +191,7 @@ test.describe('Ledger App - Main View', () => {
 
   test('displays Focus Mode toggle button', async () => {
     test.skip(!repoLoaded, 'Repo did not auto-load')
-    const toggleButton = page.locator('button.view-toggle-btn[title="Focus Mode"]')
+    const toggleButton = page.locator('button.view-toggle-btn[title="Focus"]')
     await expect(toggleButton).toBeVisible()
     await expect(toggleButton).toContainText('Focus')
   })
@@ -200,7 +200,7 @@ test.describe('Ledger App - Main View', () => {
     test.skip(!repoLoaded, 'Repo did not auto-load')
     
     // Click the toggle button to switch to Focus Mode
-    const toggleButton = page.locator('button.view-toggle-btn[title="Focus Mode"]')
+    const toggleButton = page.locator('button.view-toggle-btn[title="Focus"]')
     await toggleButton.click()
     
     // Verify Focus Mode canvas is active (has sidebar panel)
@@ -218,11 +218,11 @@ test.describe('Ledger App - Main View', () => {
     test.skip(!repoLoaded, 'Repo did not auto-load')
     
     // First switch to Focus Mode
-    await page.locator('button.view-toggle-btn[title="Focus Mode"]').click()
+    await page.locator('button.view-toggle-btn[title="Focus"]').click()
     await expect(page.locator('.canvas-column[data-panel="sidebar"]')).toBeVisible()
     
     // Click the toggle button to switch back to Radar Mode
-    const radarButton = page.locator('button.view-toggle-btn[title="Radar Mode"]')
+    const radarButton = page.locator('button.view-toggle-btn[title="Radar"]')
     await radarButton.click()
     
     // Verify Radar canvas is active (has pr-list column, no sidebar)
