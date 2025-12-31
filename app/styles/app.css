@@ -5382,6 +5382,89 @@ body,
   height: 100%;
 }
 
+/* Viz panel wrapper */
+.viz-panel {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+.viz-panel-content {
+  flex: 1;
+  overflow: auto;
+}
+
+/* Editor panel wrapper (inside canvas) */
+.editor-panel {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+.editor-panel .editor-slot {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.editor-panel .editor-slot-content {
+  flex: 1;
+  overflow: auto;
+}
+
+/* Editor slot header with nav buttons */
+.editor-slot .column-header.editor-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 14px;
+  min-height: 44px;
+  box-sizing: border-box;
+  background: var(--bg-secondary);
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.editor-slot .editor-header .column-title h2 {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin: 0;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.editor-slot .editor-nav {
+  display: flex;
+  gap: 4px;
+}
+
+.editor-slot .editor-nav-btn {
+  width: 28px;
+  height: 28px;
+  border: none;
+  background: var(--bg-tertiary);
+  color: var(--text-secondary);
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.15s ease;
+}
+
+.editor-slot .editor-nav-btn:hover:not(:disabled) {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+}
+
+.editor-slot .editor-nav-btn:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+}
+
 /* ========================================
    Unified List (Focus sidebar)
    ======================================== */
@@ -5396,7 +5479,10 @@ body,
 .unified-list-header {
   display: flex;
   align-items: center;
-  padding: 10px 12px;
+  justify-content: space-between;
+  padding: 10px 14px;
+  min-height: 44px;
+  box-sizing: border-box;
   background: var(--bg-secondary);
   border-bottom: 1px solid var(--border-subtle);
 }

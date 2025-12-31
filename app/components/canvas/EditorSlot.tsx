@@ -21,24 +21,32 @@ export function EditorSlot({ column, renderPanel }: EditorSlotProps) {
 
   return (
     <div className="editor-slot" data-column-id={column.id}>
-      {/* Navigation Bar */}
-      <div className="editor-nav">
-        <button
-          className="editor-nav-btn"
-          onClick={goBack}
-          disabled={!canGoBack}
-          title="Go back (⌘[)"
-        >
-          ←
-        </button>
-        <button
-          className="editor-nav-btn"
-          onClick={goForward}
-          disabled={!canGoForward}
-          title="Go forward (⌘])"
-        >
-          →
-        </button>
+      {/* Header with navigation */}
+      <div className="column-header editor-header">
+        <div className="column-title">
+          <h2>
+            <span className="column-icon">{column.icon || '◇'}</span>
+            {column.label || 'Details'}
+          </h2>
+        </div>
+        <div className="editor-nav">
+          <button
+            className="editor-nav-btn"
+            onClick={goBack}
+            disabled={!canGoBack}
+            title="Go back (⌘[)"
+          >
+            ←
+          </button>
+          <button
+            className="editor-nav-btn"
+            onClick={goForward}
+            disabled={!canGoForward}
+            title="Go forward (⌘])"
+          >
+            →
+          </button>
+        </div>
       </div>
 
       {/* Panel Content */}
@@ -47,10 +55,10 @@ export function EditorSlot({ column, renderPanel }: EditorSlotProps) {
           renderPanel(currentEditorEntry.panel, currentEditorEntry.data)
         ) : (
           <div className="editor-slot-empty">
-            <div className="editor-slot-empty-icon">📄</div>
+            <div className="editor-slot-empty-icon">◇</div>
             <p>Select an item to view details</p>
             <p className="editor-slot-empty-hint">
-              Double-click on a PR, branch, or worktree to open it here
+              Click on a PR, branch, or worktree
             </p>
           </div>
         )}

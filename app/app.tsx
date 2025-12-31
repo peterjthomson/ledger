@@ -1715,6 +1715,93 @@ export default function App() {
     selectedCommit,
   }), [sidebarFocus, selectedCommit])
 
+  // Render editor panel content based on current selection
+  const renderEditorContent = useCallback(() => {
+    // Staging panel for uncommitted changes
+    if (sidebarFocus?.type === 'uncommitted' && workingStatus) {
+      return (
+        <StagingPanel
+          workingStatus={workingStatus}
+          currentBranch={currentBranch}
+          onRefresh={refresh}
+          onStatusChange={setStatus}
+        />
+      )
+    }
+    
+    // PR Review panel
+    if (sidebarFocus?.type === 'pr') {
+      return (
+        <PRReviewPanel
+          pr={sidebarFocus.data as PullRequest}
+          formatRelativeTime={formatRelativeTime}
+          onCheckout={handlePRCheckout}
+          onPRMerged={refresh}
+          switching={switching}
+        />
+      )
+    }
+    
+    // Sidebar detail panel for branches, worktrees, stashes
+    if (sidebarFocus) {
+      return (
+        <SidebarDetailPanel
+          focus={sidebarFocus}
+          formatRelativeTime={formatRelativeTime}
+          formatDate={formatDate}
+          currentBranch={currentBranch}
+          switching={switching}
+          deleting={deleting}
+          onStatusChange={setStatus}
+          onRefresh={refresh}
+          onClearFocus={() => setSidebarFocus(null)}
+          onCheckoutBranch={handleBranchDoubleClick}
+          onCheckoutRemoteBranch={handleRemoteBranchDoubleClick}
+          onCheckoutWorktree={handleWorktreeDoubleClick}
+          onDeleteBranch={handleDeleteBranch}
+          onDeleteRemoteBranch={handleDeleteRemoteBranch}
+          branches={branches}
+          repoPath={repoPath}
+          worktrees={worktrees}
+          onFocusWorktree={(wt) => setSidebarFocus({ type: 'worktree', data: wt })}
+        />
+      )
+    }
+    
+    // Diff panel for selected commit
+    if (selectedCommit) {
+      if (loadingDiff) {
+        return <div className="detail-loading">Loading diff...</div>
+      }
+      if (commitDiff) {
+        return (
+          <DiffPanel
+            diff={commitDiff}
+            selectedCommit={selectedCommit}
+            formatRelativeTime={formatRelativeTime}
+            branches={branches}
+            onBranchClick={(branchName) => {
+              const branch = branches.find((b) => b.name === branchName)
+              if (branch) {
+                handleSidebarFocus(branch.isRemote ? 'remote' : 'branch', branch)
+              }
+            }}
+          />
+        )
+      }
+      return <div className="detail-error">Could not load diff</div>
+    }
+    
+    // Empty state
+    return null
+  }, [
+    sidebarFocus, workingStatus, currentBranch, refresh, switching, deleting,
+    formatRelativeTime, formatDate, handlePRCheckout, handleBranchDoubleClick,
+    handleRemoteBranchDoubleClick, handleWorktreeDoubleClick, handleDeleteBranch,
+    handleDeleteRemoteBranch, branches, repoPath, worktrees, handleSidebarFocus,
+    selectedCommit, loadingDiff, commitDiff
+  ])
+
   const canvasHandlers: CanvasHandlers = useMemo(() => ({
     formatRelativeTime,
     formatDate,
@@ -1739,11 +1826,12 @@ export default function App() {
     onContextMenuStash: (e, stash) => handleContextMenu(e, 'stash', stash as unknown as Worktree),
     // Commit handlers
     onSelectCommit: handleSelectCommit,
-    // Editor content (for now, delegate to existing render logic)
-    renderEditorContent: undefined,
+    // Editor content - renders actual panels
+    renderEditorContent,
   }), [
     formatRelativeTime, formatDate, handleRadarItemClick, handleRadarPRClick, handleRadarBranchClick,
-    handleRadarWorktreeClick, handleContextMenu, handleSidebarFocus, handleSelectCommit, navigateToEditor
+    handleRadarWorktreeClick, handleContextMenu, handleSidebarFocus, handleSelectCommit, navigateToEditor,
+    renderEditorContent
   ])
 
   const canvasUIState: CanvasUIState = useMemo(() => ({

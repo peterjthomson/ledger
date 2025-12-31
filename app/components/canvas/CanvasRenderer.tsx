@@ -277,12 +277,24 @@ export function CanvasRenderer({
       switch (column.panel) {
         case 'git-graph':
           return (
-            <GitGraph
-              commits={data.commits}
-              selectedCommit={selection.selectedCommit}
-              onSelectCommit={handlers.onSelectCommit}
-              formatRelativeTime={handlers.formatRelativeTime}
-            />
+            <div className="viz-panel git-graph-panel">
+              <div className="column-header">
+                <div className="column-title">
+                  <h2>
+                    <span className="column-icon">{column.icon || '◉'}</span>
+                    {column.label || 'History'}
+                  </h2>
+                </div>
+              </div>
+              <div className="viz-panel-content">
+                <GitGraph
+                  commits={data.commits}
+                  selectedCommit={selection.selectedCommit}
+                  onSelectCommit={handlers.onSelectCommit}
+                  formatRelativeTime={handlers.formatRelativeTime}
+                />
+              </div>
+            </div>
           )
 
         default:
@@ -301,27 +313,29 @@ export function CanvasRenderer({
     (column: Column): ReactNode => {
       // Use EditorSlot which handles back/forward navigation
       return (
-        <EditorSlot
-          column={column}
-          renderPanel={(panel, panelData) => {
-            // If there's custom editor content from the parent, use it
-            if (handlers.renderEditorContent) {
-              return handlers.renderEditorContent()
-            }
-            
-            // Otherwise render based on panel type
-            // This will be expanded as we migrate editor panels
-            return (
-              <div className="editor-slot-empty">
-                <div className="editor-slot-empty-icon">◇</div>
-                <p>Panel: {panel}</p>
-                <p className="editor-slot-empty-hint">
-                  {panelData ? 'Has data' : 'Select an item'}
-                </p>
-              </div>
-            )
-          }}
-        />
+        <div className="editor-panel">
+          <EditorSlot
+            column={column}
+            renderPanel={(_panel, _panelData) => {
+              // Try to render editor content from parent
+              const content = handlers.renderEditorContent?.()
+              if (content) {
+                return content
+              }
+              
+              // Empty state
+              return (
+                <div className="editor-slot-empty">
+                  <div className="editor-slot-empty-icon">◇</div>
+                  <p>Select an item to view details</p>
+                  <p className="editor-slot-empty-hint">
+                    Click on a PR, branch, or worktree
+                  </p>
+                </div>
+              )
+            }}
+          />
+        </div>
       )
     },
     [handlers.renderEditorContent]
