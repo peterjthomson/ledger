@@ -107,6 +107,8 @@ const electronAPI = {
   mergePR: (prNumber: number, mergeMethod?: 'merge' | 'squash' | 'rebase') => ipcRenderer.invoke('merge-pr', prNumber, mergeMethod),
   // Tech tree operations
   getMergedBranchTree: (limit?: number) => ipcRenderer.invoke('get-merged-branch-tree', limit),
+  // FileGraph operations
+  getFileGraph: () => ipcRenderer.invoke('get-file-graph'),
   // Theme operations
   getThemeMode: () => ipcRenderer.invoke('get-theme-mode'),
   getSelectedThemeId: () => ipcRenderer.invoke('get-selected-theme-id'),

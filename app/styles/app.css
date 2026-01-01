@@ -7287,3 +7287,241 @@ body,
   height: 100%;
   pointer-events: none;
 }
+
+/* ========================================
+   FileGraph - Code Treemap Visualization
+   ======================================== */
+
+.file-graph-panel .viz-panel-content {
+  padding: 0;
+  overflow: hidden;
+}
+
+.file-graph-content {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  overflow: hidden;
+}
+
+.file-graph {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  overflow: hidden;
+  background: var(--bg-primary);
+}
+
+/* Breadcrumb navigation */
+.file-graph-breadcrumb {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 8px 12px;
+  background: var(--bg-secondary);
+  border-bottom: 1px solid var(--border-primary);
+  font-size: 12px;
+  flex-shrink: 0;
+  overflow-x: auto;
+}
+
+.file-graph-breadcrumb .breadcrumb-item {
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-size: 12px;
+  font-family: inherit;
+  transition: all 0.15s ease;
+}
+
+.file-graph-breadcrumb .breadcrumb-item:hover {
+  background: var(--bg-tertiary);
+  color: var(--text-primary);
+}
+
+.file-graph-breadcrumb .breadcrumb-item.current {
+  color: var(--text-primary);
+  font-weight: 500;
+}
+
+.file-graph-breadcrumb .breadcrumb-separator {
+  color: var(--text-muted);
+  opacity: 0.5;
+}
+
+.file-graph-breadcrumb .breadcrumb-lines {
+  margin-left: auto;
+  color: var(--text-muted);
+  font-family: 'SF Mono', 'Fira Code', monospace;
+  font-size: 11px;
+}
+
+/* Treemap container */
+.file-graph-container {
+  flex: 1;
+  min-height: 0;
+  position: relative;
+}
+
+.file-graph-svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+/* Treemap nodes */
+.file-graph-node {
+  cursor: pointer;
+  transition: opacity 0.1s ease;
+}
+
+.file-graph-node.directory {
+  cursor: pointer;
+}
+
+.file-graph-node.file {
+  cursor: default;
+}
+
+.file-graph-node:hover rect {
+  opacity: 0.9;
+}
+
+.file-graph-node.hovered rect {
+  opacity: 1;
+}
+
+.file-graph-label {
+  font-family: 'SF Pro Text', -apple-system, sans-serif;
+  font-weight: 500;
+  pointer-events: none;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+}
+
+/* Language legend */
+.file-graph-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  padding: 8px 12px;
+  background: var(--bg-secondary);
+  border-top: 1px solid var(--border-primary);
+  font-size: 11px;
+  flex-shrink: 0;
+}
+
+.file-graph-legend .legend-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.file-graph-legend .legend-color {
+  width: 10px;
+  height: 10px;
+  border-radius: 2px;
+  flex-shrink: 0;
+}
+
+.file-graph-legend .legend-label {
+  color: var(--text-secondary);
+}
+
+.file-graph-legend .legend-count {
+  color: var(--text-muted);
+  font-family: 'SF Mono', 'Fira Code', monospace;
+}
+
+/* Tooltip */
+.file-graph-tooltip {
+  position: fixed;
+  z-index: 1000;
+  background: var(--bg-primary);
+  border: 1px solid var(--border-primary);
+  border-radius: 6px;
+  padding: 8px 12px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  pointer-events: none;
+  max-width: 300px;
+}
+
+.file-graph-tooltip .tooltip-name {
+  font-weight: 600;
+  color: var(--text-primary);
+  font-size: 13px;
+  margin-bottom: 2px;
+}
+
+.file-graph-tooltip .tooltip-path {
+  font-size: 11px;
+  color: var(--text-muted);
+  font-family: 'SF Mono', 'Fira Code', monospace;
+  word-break: break-all;
+  margin-bottom: 6px;
+}
+
+.file-graph-tooltip .tooltip-stats {
+  display: flex;
+  gap: 12px;
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.file-graph-tooltip .tooltip-lang {
+  padding: 1px 6px;
+  background: var(--bg-tertiary);
+  border-radius: 4px;
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+/* Loading state */
+.file-graph-loading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  gap: 16px;
+  color: var(--text-muted);
+  font-size: 13px;
+}
+
+.file-graph-spinner {
+  width: 32px;
+  height: 32px;
+  border: 2px solid var(--border-primary);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: file-graph-spin 1s linear infinite;
+}
+
+@keyframes file-graph-spin {
+  to { transform: rotate(360deg); }
+}
+
+/* Error state */
+.file-graph-error {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  color: var(--text-error);
+  font-size: 13px;
+  padding: 24px;
+  text-align: center;
+}
+
+/* Empty state */
+.file-graph-empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  color: var(--text-muted);
+  font-size: 13px;
+}

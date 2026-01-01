@@ -102,6 +102,9 @@ export default function App() {
   const [stashes, setStashes] = useState<StashEntry[]>([])
   const [loadingDiff, setLoadingDiff] = useState(false)
   const [sidebarFocus, setSidebarFocus] = useState<SidebarFocus | null>(null)
+  // FileGraph state
+  const [fileGraph, setFileGraph] = useState<import('./types/electron').FileGraphData | null>(null)
+  const [fileGraphLoading, setFileGraphLoading] = useState(false)
   // History/Commits panel filters (shared between Radar and Focus modes)
   // Graph display options
   const [showCheckpoints] = useState(false) // Hide Conductor checkpoints by default
@@ -343,6 +346,20 @@ export default function App() {
         })
         .catch(() => {
           // Silently ignore - we already have basic branch data
+        })
+
+      // Phase 3: FileGraph loading (can be slow on large repos)
+      setFileGraphLoading(true)
+      window.electronAPI
+        .getFileGraph()
+        .then((result) => {
+          setFileGraph(result)
+        })
+        .catch(() => {
+          setFileGraph(null)
+        })
+        .finally(() => {
+          setFileGraphLoading(false)
         })
     } catch (err) {
       setError((err as Error).message)
@@ -1104,7 +1121,9 @@ export default function App() {
     workingStatus,
     commitDiff,
     loadingDiff,
-  }), [repoPath, pullRequests, prError, branches, currentBranch, worktrees, stashes, graphCommits, workingStatus, commitDiff, loadingDiff])
+    fileGraph,
+    fileGraphLoading,
+  }), [repoPath, pullRequests, prError, branches, currentBranch, worktrees, stashes, graphCommits, workingStatus, commitDiff, loadingDiff, fileGraph, fileGraphLoading])
 
   const canvasSelection: CanvasSelection = useMemo(() => ({
     selectedPR: sidebarFocus?.type === 'pr' ? (sidebarFocus.data as PullRequest) : null,

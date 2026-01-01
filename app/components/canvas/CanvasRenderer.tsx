@@ -30,7 +30,7 @@ import { EditorSlot } from './EditorSlot'
 
 // Import panels
 import { PRList, BranchList, WorktreeList, StashList, CommitList, Sidebar, RepoList } from '../panels/list'
-import { GitGraph, ContributorChart, TechTreeChart } from '../panels/viz'
+import { GitGraph, ContributorChart, TechTreeChart, FileGraph } from '../panels/viz'
 
 // ========================================
 // Data Interface
@@ -67,6 +67,10 @@ export interface CanvasData {
   // Commit diff (for viewing diffs)
   commitDiff: CommitDiff | null
   loadingDiff: boolean
+  
+  // FileGraph data
+  fileGraph: import('../../../types/electron').FileGraphData | null
+  fileGraphLoading: boolean
 }
 
 /**
@@ -382,6 +386,23 @@ export function CanvasRenderer({
             </div>
           )
 
+        case 'file-graph':
+          return (
+            <div className="viz-panel file-graph-panel">
+              <div className="column-header">
+                <div className="column-title">
+                  <h2>
+                    <span className="column-icon">{column.icon || '▦'}</span>
+                    {column.label || 'Code Map'}
+                  </h2>
+                </div>
+              </div>
+              <div className="viz-panel-content file-graph-content">
+                <FileGraph data={data.fileGraph} loading={data.fileGraphLoading} />
+              </div>
+            </div>
+          )
+
         default:
           return (
             <div className="empty-column">
@@ -390,7 +411,7 @@ export function CanvasRenderer({
           )
       }
     },
-    [data.commits, selection.selectedCommit, handlers]
+    [data.commits, data.fileGraph, data.fileGraphLoading, selection.selectedCommit, handlers]
   )
 
   // Render an editor panel based on column config

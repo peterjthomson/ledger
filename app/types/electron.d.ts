@@ -408,6 +408,25 @@ export interface TechTreeData {
   }
 }
 
+// ========================================
+// FileGraph Types (Code Treemap)
+// ========================================
+
+export interface FileNode {
+  name: string
+  path: string
+  lines: number
+  language: string | null
+  isDirectory: boolean
+  children?: FileNode[]
+}
+
+export interface FileGraphData {
+  root: FileNode
+  totalLines: number
+  languages: { language: string; lines: number; color: string }[]
+}
+
 export interface ElectronAPI {
   selectRepo: () => Promise<string | null>
   getRepoPath: () => Promise<string | null>
@@ -557,6 +576,8 @@ export interface ElectronAPI {
   clearCustomTheme: () => Promise<{ success: boolean }>
   // Tech tree operations
   getMergedBranchTree: (limit?: number) => Promise<TechTreeData>
+  // FileGraph operations
+  getFileGraph: () => Promise<FileGraphData>
   // Canvas operations
   getCanvases: () => Promise<CanvasConfig[]>
   saveCanvases: (canvases: CanvasConfig[]) => Promise<{ success: boolean }>

@@ -77,6 +77,8 @@ import {
   getSiblingRepos,
   // Tech Tree
   getMergedBranchTree,
+  // FileGraph
+  scanFileGraph,
 } from './git-service'
 import {
   getLastRepoPath,
@@ -704,6 +706,15 @@ app.whenReady().then(() => {
       return await getMergedBranchTree(limit)
     } catch (_error) {
       return { masterBranch: 'main', nodes: [], stats: { minLoc: 0, maxLoc: 1, minFiles: 0, maxFiles: 1, minAge: 0, maxAge: 1 } }
+    }
+  })
+
+  // FileGraph handlers
+  ipcMain.handle('get-file-graph', async () => {
+    try {
+      return await scanFileGraph()
+    } catch (_error) {
+      return { root: { name: '', path: '', lines: 0, language: null, isDirectory: true, children: [] }, totalLines: 0, languages: [] }
     }
   })
 
