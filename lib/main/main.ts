@@ -75,6 +75,8 @@ import {
   mergePR,
   // Repo operations
   getSiblingRepos,
+  // Tech Tree
+  getMergedBranchTree,
 } from './git-service'
 import {
   getLastRepoPath,
@@ -693,6 +695,15 @@ app.whenReady().then(() => {
       return await mergePR(prNumber, mergeMethod)
     } catch (error) {
       return { success: false, message: (error as Error).message }
+    }
+  })
+
+  // Tech Tree handlers
+  ipcMain.handle('get-merged-branch-tree', async (_, limit?: number) => {
+    try {
+      return await getMergedBranchTree(limit)
+    } catch (_error) {
+      return { masterBranch: 'main', nodes: [], stats: { minLoc: 0, maxLoc: 1, minFiles: 0, maxFiles: 1, minAge: 0, maxAge: 1 } }
     }
   })
 

@@ -1282,6 +1282,20 @@ export default function App() {
     },
     onDoubleClickUncommitted: handleRadarUncommittedClick,
     onContextMenuUncommitted: (e, status) => handleContextMenu(e, 'uncommitted', status),
+    // Tech tree handlers - navigate to branch detail
+    onSelectTechTreeNode: (branchName: string) => {
+      // Find the branch by name (strip prefix if needed for merged branches)
+      const branch = branches.find(b => 
+        b.name === branchName || 
+        b.name.endsWith(`/${branchName}`) ||
+        branchName.endsWith(b.name)
+      )
+      if (branch) {
+        // Switch to Focus canvas and show branch detail
+        setActiveCanvas('focus')
+        handleSidebarFocus('branch', branch)
+      }
+    },
     // Editor content - renders actual panels
     renderEditorContent,
     // Special panel triggers
@@ -1293,7 +1307,7 @@ export default function App() {
   }), [
     formatRelativeTime, formatDate, handleRadarItemClick, handleRadarPRClick, handleRadarBranchClick,
     handleRadarWorktreeClick, handleRadarStashClick, handleContextMenu, handleSelectCommit, navigateToEditor,
-    renderEditorContent, setActiveCanvas, workingStatus, handleRadarUncommittedClick, setStatus, refresh
+    renderEditorContent, setActiveCanvas, workingStatus, handleRadarUncommittedClick, setStatus, refresh, branches, handleSidebarFocus
   ])
 
   const canvasUIState: CanvasUIState = useMemo(() => ({

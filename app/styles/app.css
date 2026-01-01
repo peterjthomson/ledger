@@ -6810,3 +6810,480 @@ body,
     display: none;
   }
 }
+
+/* ========================================
+   Tech Tree - StarCraft-Inspired Visualization
+   ======================================== */
+
+.tech-tree-container {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  min-height: 500px;
+  background: #0a0c10;
+  overflow: auto;
+}
+
+/* Grid background pattern */
+.tech-tree-grid {
+  position: absolute;
+  inset: 0;
+  background-image: 
+    linear-gradient(rgba(30, 40, 60, 0.3) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(30, 40, 60, 0.3) 1px, transparent 1px);
+  background-size: 40px 40px;
+  pointer-events: none;
+}
+
+/* CRT scanline overlay effect */
+.tech-tree-scanlines {
+  position: absolute;
+  inset: 0;
+  background: repeating-linear-gradient(
+    0deg,
+    transparent,
+    transparent 2px,
+    rgba(0, 0, 0, 0.15) 2px,
+    rgba(0, 0, 0, 0.15) 4px
+  );
+  pointer-events: none;
+  z-index: 10;
+}
+
+.tech-tree-svg {
+  position: absolute;
+  top: 0;
+  left: 0;
+  pointer-events: none;
+}
+
+/* Connector line pulse animation for XL nodes */
+.tech-tree-connector-pulse {
+  animation: connector-pulse 2s ease-in-out infinite;
+}
+
+@keyframes connector-pulse {
+  0%, 100% { opacity: 0.8; }
+  50% { opacity: 1; }
+}
+
+/* Master node pulsing glow */
+.tech-tree-master-node {
+  animation: master-pulse 3s ease-in-out infinite;
+}
+
+@keyframes master-pulse {
+  0%, 100% { 
+    filter: url(#glow-master);
+    stroke-width: 3;
+  }
+  50% { 
+    filter: url(#glow-master);
+    stroke-width: 4;
+  }
+}
+
+.tech-tree-master-text {
+  fill: #ffc040;
+  font-size: 14px;
+  font-weight: 700;
+  font-family: 'SF Mono', 'Fira Code', monospace;
+  text-shadow: 0 0 10px rgba(255, 192, 64, 0.6);
+}
+
+/* Node overlays container */
+.tech-tree-nodes {
+  position: absolute;
+  top: 0;
+  left: 0;
+  pointer-events: none;
+}
+
+/* Individual node */
+.tech-tree-node {
+  position: absolute;
+  background: linear-gradient(135deg, #141820 0%, #0d1015 100%);
+  border: 2px solid var(--node-color, #c0c8d0);
+  border-radius: 8px;
+  cursor: pointer;
+  pointer-events: auto;
+  transition: all 0.2s ease;
+  box-shadow: 
+    0 0 12px var(--node-glow, rgba(192, 200, 208, 0.3)),
+    inset 0 1px 0 rgba(255, 255, 255, 0.05);
+  overflow: hidden;
+}
+
+.tech-tree-node:hover {
+  transform: translateY(-2px);
+  box-shadow: 
+    0 0 20px var(--node-glow, rgba(192, 200, 208, 0.4)),
+    0 4px 12px rgba(0, 0, 0, 0.3),
+    inset 0 1px 0 rgba(255, 255, 255, 0.08);
+  border-color: var(--node-color, #c0c8d0);
+}
+
+.tech-tree-node.selected {
+  border-width: 2px;
+  box-shadow: 
+    0 0 30px var(--node-glow, rgba(192, 200, 208, 0.6)),
+    0 0 60px var(--node-glow, rgba(192, 200, 208, 0.3)),
+    inset 0 1px 0 rgba(255, 255, 255, 0.1);
+}
+
+/* Size tier variations */
+.tech-tree-node-tier-xs {
+  opacity: 0.7;
+}
+
+.tech-tree-node-tier-sm {
+  opacity: 0.85;
+}
+
+.tech-tree-node-tier-md {
+  opacity: 0.95;
+}
+
+.tech-tree-node-tier-lg {
+  border-width: 3px;
+}
+
+.tech-tree-node-tier-xl {
+  border-width: 3px;
+  box-shadow: 
+    0 0 20px var(--node-glow, rgba(192, 200, 208, 0.4)),
+    0 0 40px var(--node-glow, rgba(192, 200, 208, 0.25)),
+    inset 0 1px 0 rgba(255, 255, 255, 0.1);
+}
+
+/* Node content layouts */
+.tech-tree-node-content {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  padding: 6px 8px;
+  color: #e0e4e8;
+}
+
+.tech-tree-node-xs {
+  flex-direction: row;
+  align-items: center;
+  gap: 6px;
+  padding: 0 8px;
+}
+
+.tech-tree-node-sm .tech-tree-node-header,
+.tech-tree-node-md .tech-tree-node-header,
+.tech-tree-node-lg .tech-tree-node-header,
+.tech-tree-node-xl .tech-tree-node-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.tech-tree-node-icon {
+  font-size: 1.1em;
+  flex-shrink: 0;
+}
+
+.tech-tree-node-name {
+  flex: 1;
+  font-weight: 500;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-family: 'SF Mono', 'Fira Code', Consolas, monospace;
+}
+
+.tech-tree-node-divider {
+  height: 1px;
+  margin: 4px 0;
+  opacity: 0.5;
+}
+
+.tech-tree-node-divider-double {
+  height: 2px;
+  background: linear-gradient(90deg, transparent, var(--node-color, #c0c8d0), transparent) !important;
+}
+
+.tech-tree-node-stats {
+  display: flex;
+  gap: 8px;
+  font-size: 0.9em;
+  opacity: 0.9;
+}
+
+.stat-add {
+  color: #60d060;
+}
+
+.stat-del {
+  color: #ff6060;
+}
+
+.stat-files {
+  color: #80a0c0;
+}
+
+.tech-tree-node-meta {
+  display: flex;
+  gap: 4px;
+  font-size: 0.85em;
+  color: #808890;
+  margin-top: auto;
+}
+
+.tech-tree-node-time {
+  color: #6080a0;
+}
+
+.tech-tree-node-author {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tech-tree-badges {
+  display: flex;
+  gap: 2px;
+  margin-left: auto;
+}
+
+.tech-tree-badge {
+  font-size: 0.85em;
+  cursor: help;
+}
+
+.tech-tree-node-pr {
+  font-size: 0.8em;
+  color: #56c8ff;
+  font-weight: 500;
+  margin-top: 2px;
+}
+
+/* Progress bar for XL nodes */
+.tech-tree-progress-bar {
+  position: relative;
+  height: 8px;
+  background: #1a1a20;
+  border-radius: 4px;
+  margin: 4px 0;
+  overflow: hidden;
+}
+
+.tech-tree-progress-add {
+  height: 100%;
+  background: linear-gradient(90deg, #40a040, #60d060);
+  border-radius: 4px;
+}
+
+.tech-tree-progress-label {
+  position: absolute;
+  right: 4px;
+  top: 50%;
+  transform: translateY(-50%);
+  font-size: 7px;
+  color: #a0a8b0;
+  text-shadow: 0 0 2px #000;
+}
+
+/* Legend */
+.tech-tree-legend {
+  position: fixed;
+  bottom: 16px;
+  right: 16px;
+  background: rgba(10, 12, 16, 0.95);
+  border: 1px solid rgba(100, 120, 140, 0.3);
+  border-radius: 8px;
+  padding: 12px 16px;
+  z-index: 20;
+  backdrop-filter: blur(8px);
+}
+
+.tech-tree-legend-title {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: #606870;
+  margin-bottom: 8px;
+}
+
+.tech-tree-legend-items {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 12px;
+}
+
+.tech-tree-legend-item {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.tech-tree-legend-icon {
+  font-size: 12px;
+}
+
+.tech-tree-legend-label {
+  font-size: 10px;
+  color: #a0a8b0;
+  text-transform: capitalize;
+}
+
+/* Loading / Error / Empty states */
+.tech-tree-loading,
+.tech-tree-error,
+.tech-tree-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  min-height: 400px;
+  gap: 16px;
+  color: #606870;
+  background: #0a0c10;
+}
+
+.tech-tree-loading-spinner {
+  width: 32px;
+  height: 32px;
+  border: 2px solid #1a2030;
+  border-top-color: #56c8ff;
+  border-radius: 50%;
+  animation: tech-tree-spin 1s linear infinite;
+}
+
+@keyframes tech-tree-spin {
+  to { transform: rotate(360deg); }
+}
+
+.tech-tree-error-icon {
+  font-size: 32px;
+  color: #ff9640;
+}
+
+.tech-tree-empty-icon {
+  font-size: 48px;
+  opacity: 0.3;
+}
+
+.tech-tree-empty-hint {
+  font-size: 12px;
+  color: #505860;
+  margin-top: -8px;
+}
+
+.tech-tree-retry {
+  padding: 8px 16px;
+  background: #1a2030;
+  border: 1px solid #3a4050;
+  border-radius: 6px;
+  color: #a0a8b0;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.tech-tree-retry:hover {
+  background: #2a3040;
+  border-color: #56c8ff;
+  color: #e0e8f0;
+}
+
+/* Draggable canvas */
+.tech-tree-container.dragging {
+  cursor: grabbing;
+  user-select: none;
+}
+
+.tech-tree-container:not(.dragging) {
+  cursor: grab;
+}
+
+.tech-tree-canvas {
+  position: relative;
+  min-width: 100%;
+  min-height: 100%;
+}
+
+/* Master node HTML content overlay */
+.tech-tree-master-content {
+  position: absolute;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+  gap: 8px;
+}
+
+.tech-tree-master-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.tech-tree-master-icon {
+  font-size: 18px;
+  color: #ffc040;
+  text-shadow: 0 0 10px rgba(255, 192, 64, 0.6);
+}
+
+.tech-tree-master-name {
+  font-size: 16px;
+  font-weight: 700;
+  color: #ffc040;
+  font-family: 'SF Mono', 'Fira Code', monospace;
+  text-shadow: 0 0 10px rgba(255, 192, 64, 0.5);
+}
+
+.tech-tree-master-stats {
+  display: flex;
+  gap: 16px;
+}
+
+.tech-tree-master-stat {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+}
+
+.tech-tree-master-stat-value {
+  font-size: 14px;
+  font-weight: 600;
+  color: #e0e4e8;
+  font-family: 'SF Mono', 'Fira Code', monospace;
+}
+
+.tech-tree-master-stat-label {
+  font-size: 9px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: #808890;
+}
+
+/* Drag hint */
+.tech-tree-drag-hint {
+  position: fixed;
+  bottom: 16px;
+  left: 16px;
+  font-size: 11px;
+  color: #505860;
+  background: rgba(10, 12, 16, 0.8);
+  padding: 6px 12px;
+  border-radius: 4px;
+  border: 1px solid rgba(100, 120, 140, 0.2);
+  pointer-events: none;
+  z-index: 5;
+}
+
+/* Nodes container for HTML overlays */
+.tech-tree-nodes {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}

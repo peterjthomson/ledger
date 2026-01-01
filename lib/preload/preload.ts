@@ -105,6 +105,8 @@ const electronAPI = {
   getPRFileDiff: (prNumber: number, filePath: string) => ipcRenderer.invoke('get-pr-file-diff', prNumber, filePath),
   commentOnPR: (prNumber: number, body: string) => ipcRenderer.invoke('comment-on-pr', prNumber, body),
   mergePR: (prNumber: number, mergeMethod?: 'merge' | 'squash' | 'rebase') => ipcRenderer.invoke('merge-pr', prNumber, mergeMethod),
+  // Tech tree operations
+  getMergedBranchTree: (limit?: number) => ipcRenderer.invoke('get-merged-branch-tree', limit),
   // Theme operations
   getThemeMode: () => ipcRenderer.invoke('get-theme-mode'),
   getSelectedThemeId: () => ipcRenderer.invoke('get-selected-theme-id'),

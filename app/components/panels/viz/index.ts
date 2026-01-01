@@ -7,3 +7,6 @@ export type { GitGraphProps } from './GitGraph'
 
 export { ContributorChart } from './ContributorChart'
 export type { ContributorChartProps } from './ContributorChart'
+
+export { TechTreeChart } from './TechTreeChart'
+export type { TechTreeChartProps } from './TechTreeChart'

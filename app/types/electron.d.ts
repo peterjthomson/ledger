@@ -343,6 +343,71 @@ export interface RepoInfo {
   isCurrent: boolean
 }
 
+// ========================================
+// Tech Tree Types
+// ========================================
+
+export type TechTreeSizeTier = 'xs' | 'sm' | 'md' | 'lg' | 'xl'
+
+export type TechTreeBranchType = 
+  | 'feature'
+  | 'fix'
+  | 'chore'
+  | 'refactor'
+  | 'docs'
+  | 'test'
+  | 'release'
+  | 'unknown'
+
+export interface TechTreeNodeStats {
+  linesAdded: number
+  linesRemoved: number
+  filesChanged: number
+  filesAdded: number
+  filesRemoved: number
+  commitCount: number
+  daysSinceMerge: number
+}
+
+export interface TechTreeNode {
+  id: string
+  branchName: string
+  commitHash: string
+  mergeCommitHash: string
+  author: string
+  mergeDate: string
+  message: string
+  prNumber?: number
+  stats: TechTreeNodeStats
+  // Computed tier (populated by git service)
+  sizeTier: TechTreeSizeTier
+  branchType: TechTreeBranchType
+  // Badge flags (percentile-based, computed by git service)
+  badges: {
+    massive: boolean     // Top 10% by total LOC
+    destructive: boolean // Top 15% by lines removed
+    additive: boolean    // Top 15% by lines added
+    multiFile: boolean   // Top 20% by files changed
+    surgical: boolean    // Bottom 10% by LOC (tiny changes)
+    ancient: boolean     // Top 15% oldest
+    fresh: boolean       // Top 15% newest
+  }
+}
+
+export interface TechTreeData {
+  masterBranch: string
+  nodes: TechTreeNode[]
+  // Global stats for normalization
+  stats: {
+    minLoc: number
+    maxLoc: number
+    minFiles: number
+    maxFiles: number
+    minAge: number
+    maxAge: number
+  }
+}
+
 export interface ElectronAPI {
   selectRepo: () => Promise<string | null>
   getRepoPath: () => Promise<string | null>
@@ -490,6 +555,8 @@ export interface ElectronAPI {
     cssVars: Record<string, string>
   } | null>
   clearCustomTheme: () => Promise<{ success: boolean }>
+  // Tech tree operations
+  getMergedBranchTree: (limit?: number) => Promise<TechTreeData>
   // Canvas operations
   getCanvases: () => Promise<CanvasConfig[]>
   saveCanvases: (canvases: CanvasConfig[]) => Promise<{ success: boolean }>

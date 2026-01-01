@@ -2664,6 +2664,306 @@ export async function getContributorStats(
   }
 }
 
+// ========================================
+// Tech Tree - Merged Branch Visualization
+// ========================================
+
+export type TechTreeSizeTier = 'xs' | 'sm' | 'md' | 'lg' | 'xl'
+export type TechTreeBranchType = 'feature' | 'fix' | 'chore' | 'refactor' | 'docs' | 'test' | 'release' | 'unknown'
+
+export interface TechTreeNodeStats {
+  linesAdded: number
+  linesRemoved: number
+  filesChanged: number
+  filesAdded: number
+  filesRemoved: number
+  commitCount: number
+  daysSinceMerge: number
+}
+
+export interface TechTreeNode {
+  id: string
+  branchName: string
+  commitHash: string
+  mergeCommitHash: string
+  author: string
+  mergeDate: string
+  message: string
+  prNumber?: number
+  stats: TechTreeNodeStats
+  sizeTier: TechTreeSizeTier
+  branchType: TechTreeBranchType
+  badges: {
+    massive: boolean
+    destructive: boolean
+    additive: boolean
+    multiFile: boolean
+    surgical: boolean
+    ancient: boolean
+    fresh: boolean
+  }
+}
+
+export interface TechTreeData {
+  masterBranch: string
+  nodes: TechTreeNode[]
+  stats: {
+    minLoc: number
+    maxLoc: number
+    minFiles: number
+    maxFiles: number
+    minAge: number
+    maxAge: number
+  }
+}
+
+// Determine branch type from branch name prefix
+function getBranchType(branchName: string): TechTreeBranchType {
+  const lower = branchName.toLowerCase()
+  if (lower.startsWith('feature/') || lower.startsWith('feat/')) return 'feature'
+  if (lower.startsWith('fix/') || lower.startsWith('bugfix/') || lower.startsWith('hotfix/')) return 'fix'
+  if (lower.startsWith('chore/') || lower.startsWith('deps/') || lower.startsWith('build/')) return 'chore'
+  if (lower.startsWith('refactor/')) return 'refactor'
+  if (lower.startsWith('docs/') || lower.startsWith('doc/')) return 'docs'
+  if (lower.startsWith('test/') || lower.startsWith('tests/')) return 'test'
+  if (lower.startsWith('release/') || lower.startsWith('v')) return 'release'
+  return 'unknown'
+}
+
+// Extract branch name and PR number from merge commit message
+function parseMergeCommitMessage(message: string): { branchName: string; prNumber?: number } {
+  // GitHub PR merge: "Merge pull request #123 from owner/branch-name"
+  const prMatch = message.match(/Merge pull request #(\d+) from [^/]+\/(.+)/)
+  if (prMatch) {
+    return { branchName: prMatch[2], prNumber: parseInt(prMatch[1], 10) }
+  }
+
+  // Standard git merge: "Merge branch 'branch-name'"
+  const branchMatch = message.match(/Merge branch '([^']+)'/)
+  if (branchMatch) {
+    return { branchName: branchMatch[1] }
+  }
+
+  // Alternative format: "Merge branch-name into master"
+  const intoMatch = message.match(/Merge (\S+) into/)
+  if (intoMatch) {
+    return { branchName: intoMatch[1] }
+  }
+
+  // Fallback: use first line of message
+  return { branchName: message.split('\n')[0].slice(0, 50) }
+}
+
+// Assign size tiers based on percentiles
+function assignSizeTiers(nodes: TechTreeNode[]): void {
+  if (nodes.length === 0) return
+
+  // Sort by total LOC
+  const sorted = [...nodes].sort((a, b) => {
+    const aLoc = a.stats.linesAdded + a.stats.linesRemoved
+    const bLoc = b.stats.linesAdded + b.stats.linesRemoved
+    return aLoc - bLoc
+  })
+
+  const n = sorted.length
+  sorted.forEach((node, index) => {
+    const percentile = index / n
+    let tier: TechTreeSizeTier
+    if (percentile < 0.10) tier = 'xs'
+    else if (percentile < 0.30) tier = 'sm'
+    else if (percentile < 0.60) tier = 'md'
+    else if (percentile < 0.85) tier = 'lg'
+    else tier = 'xl'
+
+    // Find the original node and update its tier
+    const originalNode = nodes.find(n => n.id === node.id)
+    if (originalNode) {
+      originalNode.sizeTier = tier
+    }
+  })
+}
+
+// Assign badges based on percentiles
+function assignBadges(nodes: TechTreeNode[]): void {
+  if (nodes.length === 0) return
+
+  // Sort nodes by different metrics to find percentiles
+  const byLoc = [...nodes].sort((a, b) =>
+    (a.stats.linesAdded + a.stats.linesRemoved) - (b.stats.linesAdded + b.stats.linesRemoved)
+  )
+  const byAdded = [...nodes].sort((a, b) => a.stats.linesAdded - b.stats.linesAdded)
+  const byRemoved = [...nodes].sort((a, b) => a.stats.linesRemoved - b.stats.linesRemoved)
+  const byFiles = [...nodes].sort((a, b) => a.stats.filesChanged - b.stats.filesChanged)
+  const byAge = [...nodes].sort((a, b) => a.stats.daysSinceMerge - b.stats.daysSinceMerge)
+
+  const n = nodes.length
+
+  // Helper to check if node is in top X%
+  const isInTopPercentile = (sorted: TechTreeNode[], node: TechTreeNode, topPercent: number): boolean => {
+    const idx = sorted.findIndex(n => n.id === node.id)
+    return idx >= n * (1 - topPercent)
+  }
+
+  // Helper to check if node is in bottom X%
+  const isInBottomPercentile = (sorted: TechTreeNode[], node: TechTreeNode, bottomPercent: number): boolean => {
+    const idx = sorted.findIndex(n => n.id === node.id)
+    return idx < n * bottomPercent
+  }
+
+  for (const node of nodes) {
+    node.badges = {
+      massive: isInTopPercentile(byLoc, node, 0.10),        // Top 10% by total LOC
+      destructive: isInTopPercentile(byRemoved, node, 0.15), // Top 15% by lines removed
+      additive: isInTopPercentile(byAdded, node, 0.15),     // Top 15% by lines added
+      multiFile: isInTopPercentile(byFiles, node, 0.20),    // Top 20% by files changed
+      surgical: isInBottomPercentile(byLoc, node, 0.10),    // Bottom 10% by LOC
+      ancient: isInTopPercentile(byAge, node, 0.15),        // Top 15% oldest (highest daysSinceMerge)
+      fresh: isInBottomPercentile(byAge, node, 0.15),       // Bottom 15% newest (lowest daysSinceMerge)
+    }
+  }
+}
+
+// Get merged branch tree for tech tree visualization
+export async function getMergedBranchTree(limit: number = 50): Promise<TechTreeData> {
+  if (!git) throw new Error('No repository selected')
+
+  // Detect master branch name
+  let masterBranch = 'main'
+  try {
+    const branches = await git.branch()
+    if (branches.all.includes('master')) masterBranch = 'master'
+    else if (branches.all.includes('main')) masterBranch = 'main'
+  } catch {
+    // Default to main
+  }
+
+  try {
+    // Get merge commits on the main branch
+    // Format: hash|author_date|author_name|subject
+    const format = '%H|%ai|%an|%s'
+    const output = await git.raw([
+      'log',
+      masterBranch,
+      '--first-parent',
+      '--merges',
+      `--format=${format}`,
+      '-n',
+      limit.toString(),
+    ])
+
+    const lines = output.trim().split('\n').filter(Boolean)
+    const nodes: TechTreeNode[] = []
+    const now = Date.now()
+
+    for (const line of lines) {
+      const [mergeCommitHash, dateStr, author, message] = line.split('|')
+      if (!mergeCommitHash || !message) continue
+
+      const { branchName, prNumber } = parseMergeCommitMessage(message)
+
+      // Get diff stats for this merge commit
+      let linesAdded = 0
+      let linesRemoved = 0
+      let filesChanged = 0
+      let filesAdded = 0
+      let filesRemoved = 0
+      const commitCount = 1
+
+      try {
+        // Get stat info for the merge commit
+        const statOutput = await git.raw([
+          'show',
+          '--stat',
+          '--format=',
+          mergeCommitHash,
+        ])
+        const statLines = statOutput.trim().split('\n')
+        const summaryLine = statLines[statLines.length - 1]
+
+        // Parse: "3 files changed, 10 insertions(+), 5 deletions(-)"
+        const filesMatch = summaryLine.match(/(\d+) files? changed/)
+        const addMatch = summaryLine.match(/(\d+) insertions?\(\+\)/)
+        const delMatch = summaryLine.match(/(\d+) deletions?\(-\)/)
+
+        filesChanged = filesMatch ? parseInt(filesMatch[1]) : 0
+        linesAdded = addMatch ? parseInt(addMatch[1]) : 0
+        linesRemoved = delMatch ? parseInt(delMatch[1]) : 0
+
+        // Count new/deleted files from the stat output
+        for (const sl of statLines) {
+          if (sl.includes('(new)') || sl.includes('create mode')) filesAdded++
+          if (sl.includes('(gone)') || sl.includes('delete mode')) filesRemoved++
+        }
+      } catch {
+        // Ignore stat errors
+      }
+
+      // Calculate days since merge
+      const mergeDate = new Date(dateStr)
+      const daysSinceMerge = Math.floor((now - mergeDate.getTime()) / (1000 * 60 * 60 * 24))
+
+      nodes.push({
+        id: mergeCommitHash.slice(0, 8),
+        branchName,
+        commitHash: mergeCommitHash,
+        mergeCommitHash,
+        author,
+        mergeDate: dateStr,
+        message,
+        prNumber,
+        stats: {
+          linesAdded,
+          linesRemoved,
+          filesChanged,
+          filesAdded,
+          filesRemoved,
+          commitCount,
+          daysSinceMerge,
+        },
+        sizeTier: 'md', // Will be assigned by assignSizeTiers
+        branchType: getBranchType(branchName),
+        badges: {
+          massive: false,
+          destructive: false,
+          additive: false,
+          multiFile: false,
+          surgical: false,
+          ancient: false,
+          fresh: false,
+        },
+      })
+    }
+
+    // Compute percentile-based tiers and badges
+    assignSizeTiers(nodes)
+    assignBadges(nodes)
+
+    // Calculate global stats
+    const allLoc = nodes.map(n => n.stats.linesAdded + n.stats.linesRemoved)
+    const allFiles = nodes.map(n => n.stats.filesChanged)
+    const allAge = nodes.map(n => n.stats.daysSinceMerge)
+
+    return {
+      masterBranch,
+      nodes,
+      stats: {
+        minLoc: Math.min(...allLoc, 0),
+        maxLoc: Math.max(...allLoc, 1),
+        minFiles: Math.min(...allFiles, 0),
+        maxFiles: Math.max(...allFiles, 1),
+        minAge: Math.min(...allAge, 0),
+        maxAge: Math.max(...allAge, 1),
+      },
+    }
+  } catch {
+    return {
+      masterBranch,
+      nodes: [],
+      stats: { minLoc: 0, maxLoc: 1, minFiles: 0, maxFiles: 1, minAge: 0, maxAge: 1 },
+    }
+  }
+}
+
 // Diff file info
 export interface DiffFile {
   path: string

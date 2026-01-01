@@ -22,6 +22,7 @@ const PANEL_OPTIONS: Record<SlotType, { value: PanelType; label: string }[]> = {
   viz: [
     { value: 'git-graph', label: 'Git Graph' },
     { value: 'timeline', label: 'Timeline' },
+    { value: 'tech-tree', label: 'Tech Tree' },
   ],
 }
 
