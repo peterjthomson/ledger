@@ -157,11 +157,10 @@ export const slackNotificationsPlugin: ServicePlugin = {
     const webhookUrl = await context.storage.get<string>('webhookUrl')
     if (!webhookUrl) {
       context.logger.warn('No Slack webhook URL configured')
-      context.api.showNotification({
-        title: 'Slack Notifications',
-        body: 'Please configure your Slack webhook URL in plugin settings',
-        type: 'warning',
-      })
+      context.api.showNotification(
+        'Slack Notifications: Please configure your Slack webhook URL in plugin settings',
+        'warning'
+      )
     } else {
       context.logger.info('Slack webhook configured')
     }

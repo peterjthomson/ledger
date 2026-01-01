@@ -52,6 +52,7 @@ export type {
 
   // Context and services
   PluginContext,
+  PluginEvents,
   PluginStorage,
   PluginLogger,
   PluginSubscriptions,

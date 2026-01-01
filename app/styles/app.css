@@ -232,6 +232,96 @@ body,
   color: var(--accent);
 }
 
+/* Repo Switcher */
+.repo-switcher {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  -webkit-app-region: no-drag;
+}
+
+.repo-chip {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 10px;
+  background: var(--bg-primary);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  font-family: 'JetBrains Mono', 'SF Mono', Monaco, monospace;
+  font-size: 11px;
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: all 0.15s ease;
+  position: relative;
+}
+
+.repo-chip:hover {
+  background: var(--bg-secondary);
+  border-color: var(--accent-dim);
+}
+
+.repo-chip.active {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: white;
+  font-weight: 500;
+}
+
+.repo-chip.active:hover {
+  background: var(--accent-dim);
+  border-color: var(--accent-dim);
+}
+
+.repo-chip.switching {
+  opacity: 0.6;
+  pointer-events: none;
+}
+
+.repo-chip-name {
+  max-width: 120px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.repo-chip-close {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 14px;
+  height: 14px;
+  margin-left: 2px;
+  margin-right: -4px;
+  padding: 0;
+  background: rgba(0, 0, 0, 0.1);
+  border: none;
+  border-radius: 50%;
+  color: inherit;
+  cursor: pointer;
+  opacity: 0.7;
+  transition: all 0.15s ease;
+}
+
+.repo-chip-close:hover {
+  background: rgba(0, 0, 0, 0.2);
+  opacity: 1;
+}
+
+.repo-chip.add {
+  padding: 4px 8px;
+  background: transparent;
+  border-style: dashed;
+  color: var(--text-tertiary);
+}
+
+.repo-chip.add:hover {
+  background: var(--bg-secondary);
+  border-color: var(--accent);
+  border-style: solid;
+  color: var(--accent);
+}
+
 .header-actions {
   display: flex;
   gap: 8px;

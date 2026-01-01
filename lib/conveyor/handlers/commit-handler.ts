@@ -8,7 +8,9 @@ import {
   getBranchDiff,
   commitChanges,
   pullCurrentBranch,
+  getRepoPath,
 } from '@/lib/main/git-service'
+import { emitGitCommit, emitGitPull } from '@/lib/events'
 
 export const registerCommitHandlers = () => {
   handle('get-commit-history', async (limit?: number) => {
@@ -61,7 +63,12 @@ export const registerCommitHandlers = () => {
 
   handle('commit-changes', async (message: string, description?: string, force?: boolean) => {
     try {
-      return await commitChanges(message, description, force)
+      const result = await commitChanges(message, description, force)
+      if (result.success && result.hash) {
+        const path = getRepoPath()
+        if (path) emitGitCommit(path, result.hash, message)
+      }
+      return result
     } catch (error) {
       return { success: false, message: (error as Error).message }
     }
@@ -69,7 +76,14 @@ export const registerCommitHandlers = () => {
 
   handle('pull-current-branch', async () => {
     try {
-      return await pullCurrentBranch()
+      const result = await pullCurrentBranch()
+      if (result.success) {
+        const path = getRepoPath()
+        // Note: The actual branch name is handled internally by pullCurrentBranch
+        // We emit 'current' as a placeholder - the event is mainly for triggering refresh
+        if (path) emitGitPull(path, 'current')
+      }
+      return result
     } catch (error) {
       return { success: false, message: (error as Error).message }
     }

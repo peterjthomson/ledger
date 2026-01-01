@@ -7,11 +7,15 @@ import {
   removeWorktree,
   createWorktree,
 } from '@/lib/main/git-service'
+import { agentEvents } from '@/lib/plugins/agent-events'
 
 export const registerWorktreeHandlers = () => {
   handle('get-worktrees', async () => {
     try {
-      return await getEnhancedWorktrees()
+      const worktrees = await getEnhancedWorktrees()
+      // Update agent event tracking with current worktree state
+      agentEvents.updateFromWorktrees(worktrees)
+      return worktrees
     } catch (error) {
       return { error: (error as Error).message }
     }

@@ -13,8 +13,9 @@
  * - SQLite (persistent): Survives restarts, backed by database
  */
 
-import type { PluginContext, PluginStorage, PluginLogger, PluginAPI } from './plugin-types'
+import type { PluginContext, PluginStorage, PluginLogger, PluginAPI, PluginEvents } from './plugin-types'
 import { hasPermission } from './plugin-permissions'
+import { agentEvents } from './agent-events'
 
 // ============================================================================
 // Types
@@ -346,6 +347,59 @@ export function createPluginAPI(
 }
 
 // ============================================================================
+// Events Factory
+// ============================================================================
+
+/**
+ * Create events interface for a plugin.
+ * Provides access to AgentEvents system for subscribing to agent-related events.
+ *
+ * Supported event types:
+ * - agent:detected - New agent worktree found
+ * - agent:removed - Agent worktree removed
+ * - agent:active - Agent showing file changes
+ * - agent:idle - Agent stopped (5 min threshold)
+ * - agent:stale - Agent inactive (1 hour threshold)
+ * - agent:commit - Agent made a commit
+ * - agent:push - Agent pushed changes
+ * - agent:pr-created - Agent created a PR
+ * - agent:conflict - Agent has merge conflicts
+ * - agent:behind - Agent branch behind main
+ * - '*' - Subscribe to all agent events
+ */
+export function createPluginEvents(pluginId: string): PluginEvents {
+  const logger = createPluginLogger(pluginId)
+
+  return {
+    on(type: string, callback: (event: unknown) => void): () => void {
+      // For agent events, delegate to agentEvents system
+      if (type.startsWith('agent:') || type === '*') {
+        // Cast to AgentEventType - all agent:* events are supported
+        return agentEvents.on(type as Parameters<typeof agentEvents.on>[0], callback)
+      }
+
+      // For other event types, log a warning (future expansion)
+      logger.warn(`Event type "${type}" is not yet supported for plugins`)
+      return () => {} // No-op unsubscribe
+    },
+
+    once(type: string, callback: (event: unknown) => void): () => void {
+      let unsubscribe: (() => void) | null = null
+
+      const wrappedCallback = (event: unknown) => {
+        callback(event)
+        if (unsubscribe) {
+          unsubscribe()
+        }
+      }
+
+      unsubscribe = this.on(type, wrappedCallback)
+      return unsubscribe
+    },
+  }
+}
+
+// ============================================================================
 // Context Factory
 // ============================================================================
 
@@ -362,6 +416,7 @@ export function createPluginContext(
 ): PluginContext {
   const storage = createPluginStorage(pluginId)
   const logger = createPluginLogger(pluginId)
+  const events = createPluginEvents(pluginId)
   const disposeCallbacks: Array<() => void> = []
 
   // Create API - use stubs if no dependencies provided
@@ -378,6 +433,7 @@ export function createPluginContext(
       },
     },
     api,
+    events,
   }
 }
 

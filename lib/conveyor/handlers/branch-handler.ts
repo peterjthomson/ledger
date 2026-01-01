@@ -8,7 +8,9 @@ import {
   pushBranch,
   checkoutRemoteBranch,
   pullBranch,
+  getRepoPath,
 } from '@/lib/main/git-service'
+import { emitGitCheckout, emitGitPush, emitGitPull } from '@/lib/events'
 
 export const registerBranchHandlers = () => {
   handle('get-branches', async () => {
@@ -37,7 +39,12 @@ export const registerBranchHandlers = () => {
 
   handle('checkout-branch', async (branchName: string) => {
     try {
-      return await checkoutBranch(branchName)
+      const result = await checkoutBranch(branchName)
+      if (result.success) {
+        const path = getRepoPath()
+        if (path) emitGitCheckout(path, branchName)
+      }
+      return result
     } catch (error) {
       return { success: false, message: (error as Error).message }
     }
@@ -53,7 +60,12 @@ export const registerBranchHandlers = () => {
 
   handle('push-branch', async (branchName?: string, setUpstream?: boolean) => {
     try {
-      return await pushBranch(branchName, setUpstream ?? true)
+      const result = await pushBranch(branchName, setUpstream ?? true)
+      if (result.success) {
+        const path = getRepoPath()
+        if (path && branchName) emitGitPush(path, branchName)
+      }
+      return result
     } catch (error) {
       return { success: false, message: (error as Error).message }
     }
@@ -61,7 +73,14 @@ export const registerBranchHandlers = () => {
 
   handle('checkout-remote-branch', async (remoteBranch: string) => {
     try {
-      return await checkoutRemoteBranch(remoteBranch)
+      const result = await checkoutRemoteBranch(remoteBranch)
+      if (result.success) {
+        const path = getRepoPath()
+        // Extract local branch name from remote (e.g., origin/main -> main)
+        const localBranch = remoteBranch.split('/').slice(1).join('/')
+        if (path) emitGitCheckout(path, localBranch)
+      }
+      return result
     } catch (error) {
       return { success: false, message: (error as Error).message }
     }
@@ -69,7 +88,13 @@ export const registerBranchHandlers = () => {
 
   handle('pull-branch', async (remoteBranch: string) => {
     try {
-      return await pullBranch(remoteBranch)
+      const result = await pullBranch(remoteBranch)
+      if (result.success) {
+        const path = getRepoPath()
+        const localBranch = remoteBranch.split('/').slice(1).join('/')
+        if (path) emitGitPull(path, localBranch)
+      }
+      return result
     } catch (error) {
       return { success: false, message: (error as Error).message }
     }

@@ -49,6 +49,8 @@ import {
   PluginWidgetSlot,
   pluginComponentRegistry,
 } from './components/plugins'
+import { RepoSwitcher } from './components/RepoSwitcher'
+import { useRepoSwitched, useGitCheckout, useGitCommit, useGitPush, useGitPull, useGitStash } from './hooks/use-ledger-events'
 import { registerExampleComponents } from './components/plugins/example-components'
 import {
   pluginManager,
@@ -490,6 +492,71 @@ export default function App() {
     // Only showCheckpoints affects the actual API call behavior
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [showCheckpoints, repoPath])
+
+  // ============================================================================
+  // Event Subscriptions
+  // ============================================================================
+
+  // Auto-refresh when repo is switched (from another window or component)
+  useRepoSwitched(
+    (_fromPath, toPath, _name) => {
+      if (toPath !== repoPath) {
+        setRepoPath(toPath)
+        refresh()
+      }
+    },
+    [repoPath, refresh]
+  )
+
+  // Auto-refresh when git checkout happens
+  useGitCheckout(
+    (path, _branch) => {
+      if (path === repoPath) {
+        refresh()
+      }
+    },
+    [repoPath, refresh]
+  )
+
+  // Auto-refresh when git commit happens
+  useGitCommit(
+    (path, _hash, _message) => {
+      if (path === repoPath) {
+        refresh()
+      }
+    },
+    [repoPath, refresh]
+  )
+
+  // Auto-refresh when git push happens
+  useGitPush(
+    (path, _branch) => {
+      if (path === repoPath) {
+        refresh()
+      }
+    },
+    [repoPath, refresh]
+  )
+
+  // Auto-refresh when git pull happens
+  useGitPull(
+    (path, _branch) => {
+      if (path === repoPath) {
+        refresh()
+      }
+    },
+    [repoPath, refresh]
+  )
+
+  // Auto-refresh when stash operations happen
+  useGitStash(
+    (path, _action) => {
+      if (path === repoPath) {
+        refresh()
+      }
+    },
+    [repoPath, refresh]
+  )
 
   // Fetch diff when a commit is selected
   const handleSelectCommit = useCallback(async (commit: GraphCommit) => {
@@ -1526,29 +1593,13 @@ export default function App() {
       {/* Header */}
       <header className="ledger-header">
         <div className="header-left">
-          {repoPath && (
-            <span
-              className="repo-path clickable"
-              title={githubUrl || repoPath}
-              onClick={async () => {
-                if (githubUrl) {
-                  await window.conveyor.pr.openPullRequest(githubUrl)
-                } else {
-                  // Try to get GitHub URL fresh
-                  const url = await window.conveyor.pr.getGitHubUrl()
-                  if (url) {
-                    setGithubUrl(url)
-                    await window.conveyor.pr.openPullRequest(url)
-                  } else {
-                    setStatus({ type: 'error', message: 'No GitHub URL found for this repo' })
-                  }
-                }
-              }}
-              style={{ cursor: 'pointer' }}
-            >
-              {repoPath.split('/').slice(-2).join('/')}
-            </span>
-          )}
+          <RepoSwitcher
+            currentPath={repoPath}
+            onRepoChange={(path) => {
+              setRepoPath(path)
+              refresh()
+            }}
+          />
         </div>
         <div className="header-actions">
           {repoPath && (
@@ -1571,47 +1622,16 @@ export default function App() {
               </button>
             </div>
           )}
-          {!repoPath ? (
-            <button onClick={selectRepo} className="btn btn-secondary">
-              <svg
-                className="btn-icon-svg"
-                viewBox="0 0 16 16"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="1.2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              >
-                <path d="M1.5 3.5a1 1 0 0 1 1-1h3.59a1 1 0 0 1 .7.3l1.42 1.4h5.29a1 1 0 0 1 1 1v7.3a1 1 0 0 1-1 1h-11a1 1 0 0 1-1-1v-9z" />
-              </svg>
-              Select Repository
+          {repoPath && (
+            <button
+              onClick={refresh}
+              disabled={loading || switching}
+              className="view-toggle-btn active"
+              title="Refresh"
+            >
+              <span className={`view-icon ${loading || switching ? 'spinning' : ''}`}>↻</span>
+              <span className="view-label">{loading ? 'Loading' : switching ? 'Switching' : 'Refresh'}</span>
             </button>
-          ) : (
-            <div className="view-toggle">
-              <button onClick={selectRepo} className="view-toggle-btn" title="Change Repository">
-                <svg
-                  className="view-icon-svg"
-                  viewBox="0 0 16 16"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="1.2"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                >
-                  <path d="M1.5 3.5a1 1 0 0 1 1-1h3.59a1 1 0 0 1 .7.3l1.42 1.4h5.29a1 1 0 0 1 1 1v7.3a1 1 0 0 1-1 1h-11a1 1 0 0 1-1-1v-9z" />
-                </svg>
-                <span className="view-label">Change</span>
-              </button>
-              <button
-                onClick={refresh}
-                disabled={loading || switching}
-                className="view-toggle-btn active"
-                title="Refresh"
-              >
-                <span className={`view-icon ${loading || switching ? 'spinning' : ''}`}>↻</span>
-                <span className="view-label">{loading ? 'Loading' : switching ? 'Switching' : 'Refresh'}</span>
-              </button>
-            </div>
           )}
         </div>
       </header>

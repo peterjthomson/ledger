@@ -17,16 +17,21 @@ import {
   ChevronLeft,
   AlertCircle,
   Sliders,
-  FolderGit2,
+  Plus,
+  Trash2,
+  Github,
+  Link,
+  Package,
+  Loader2,
   type LucideIcon,
 } from 'lucide-react'
 import { usePluginStore } from '@/app/stores/plugin-store'
 import { pluginManager } from '@/lib/plugins'
+import { pluginLoader, pluginRegistry, type PluginSource } from '@/lib/plugins/plugin-loader'
 import type { Plugin, PluginType, PluginRegistration } from '@/lib/plugins/plugin-types'
 import { PluginConfigEditor } from './PluginConfigEditor'
-import { RepositoryManagerPanel } from '@/app/components/RepositoryManagerPanel'
 
-type TabId = 'all' | 'app' | 'panel' | 'widget' | 'service' | 'repositories'
+type TabId = 'all' | 'app' | 'panel' | 'widget' | 'service'
 
 const tabs: { id: TabId; label: string; icon: LucideIcon }[] = [
   { id: 'all', label: 'All Plugins', icon: Puzzle },
@@ -34,7 +39,6 @@ const tabs: { id: TabId; label: string; icon: LucideIcon }[] = [
   { id: 'panel', label: 'Panels', icon: Terminal },
   { id: 'widget', label: 'Widgets', icon: Bot },
   { id: 'service', label: 'Services', icon: Settings },
-  { id: 'repositories', label: 'Repositories', icon: FolderGit2 },
 ]
 
 const typeColors: Record<PluginType, string> = {
@@ -44,6 +48,8 @@ const typeColors: Record<PluginType, string> = {
   service: 'var(--color-orange)',
 }
 
+type InstallSourceType = 'github' | 'url' | 'npm'
+
 export function PluginSettingsPanel() {
   const settingsOpen = usePluginStore((s) => s.settingsOpen)
   const closeSettings = usePluginStore((s) => s.closeSettings)
@@ -52,6 +58,16 @@ export function PluginSettingsPanel() {
   const [activeTab, setActiveTab] = useState<TabId>('all')
   const [togglingId, setTogglingId] = useState<string | null>(null)
   const [configuringPlugin, setConfiguringPlugin] = useState<Plugin | null>(null)
+
+  // Install dialog state
+  const [showInstallDialog, setShowInstallDialog] = useState(false)
+  const [installSource, setInstallSource] = useState<InstallSourceType>('github')
+  const [installUrl, setInstallUrl] = useState('')
+  const [isInstalling, setIsInstalling] = useState(false)
+  const [installError, setInstallError] = useState<string | null>(null)
+
+  // Uninstall state
+  const [uninstallingId, setUninstallingId] = useState<string | null>(null)
 
   // Sync registrations from plugin manager
   // Note: Using getState() directly instead of the selector to avoid dependency issues
@@ -121,6 +137,49 @@ export function PluginSettingsPanel() {
     setConfiguringPlugin(null)
   }
 
+  const handleInstall = async () => {
+    if (!installUrl.trim()) return
+
+    setIsInstalling(true)
+    setInstallError(null)
+
+    try {
+      const source: PluginSource = {
+        type: installSource === 'github' ? 'git' : installSource,
+        location: installUrl.trim(),
+      }
+
+      const result = await pluginLoader.install(source, { autoEnable: true })
+
+      if (result.success) {
+        setShowInstallDialog(false)
+        setInstallUrl('')
+      } else {
+        setInstallError(result.error ?? 'Failed to install plugin')
+      }
+    } catch (error) {
+      setInstallError(error instanceof Error ? error.message : 'Unknown error')
+    } finally {
+      setIsInstalling(false)
+    }
+  }
+
+  const handleUninstall = async (pluginId: string) => {
+    setUninstallingId(pluginId)
+    try {
+      await pluginLoader.uninstall(pluginId)
+    } catch (error) {
+      console.error('Failed to uninstall plugin:', error)
+    } finally {
+      setUninstallingId(null)
+    }
+  }
+
+  const isRemotePlugin = (pluginId: string): boolean => {
+    const installed = pluginRegistry.get(pluginId)
+    return installed !== null && installed.source.type !== 'builtin'
+  }
+
   if (!settingsOpen) return null
 
   return (
@@ -144,7 +203,17 @@ export function PluginSettingsPanel() {
               </h2>
             </>
           ) : (
-            <h2>Plugin Manager</h2>
+            <>
+              <h2>Plugin Manager</h2>
+              <button
+                className="plugin-install-button"
+                onClick={() => setShowInstallDialog(true)}
+                title="Install plugin"
+              >
+                <Plus size={14} />
+                Install Plugin
+              </button>
+            </>
           )}
           <button className="plugin-settings-close" onClick={closeSettings}>
             <X size={16} />
@@ -172,11 +241,8 @@ export function PluginSettingsPanel() {
                 ))}
               </div>
 
-              {/* Content based on active tab */}
-              {activeTab === 'repositories' ? (
-                // Repository Manager View
-                <RepositoryManagerPanel />
-              ) : filteredPlugins.length === 0 ? (
+              {/* Plugin List */}
+              {filteredPlugins.length === 0 ? (
                 <div className="plugin-empty-state">
                   <div className="plugin-empty-state-icon">
                     <Puzzle size={32} />
@@ -195,8 +261,11 @@ export function PluginSettingsPanel() {
                       key={registration.plugin.id}
                       registration={registration}
                       isToggling={togglingId === registration.plugin.id}
+                      isUninstalling={uninstallingId === registration.plugin.id}
+                      canUninstall={isRemotePlugin(registration.plugin.id)}
                       onToggle={() => handleToggle(registration.plugin.id, registration.enabled)}
                       onConfigure={() => handleConfigure(registration.plugin)}
+                      onUninstall={() => handleUninstall(registration.plugin.id)}
                     />
                   ))}
                 </div>
@@ -204,6 +273,116 @@ export function PluginSettingsPanel() {
             </>
           )}
         </div>
+
+        {/* Install Plugin Dialog */}
+        {showInstallDialog && (
+          <div
+            className="plugin-install-overlay"
+            onClick={() => !isInstalling && setShowInstallDialog(false)}
+          >
+            <div className="plugin-install-dialog" onClick={(e) => e.stopPropagation()}>
+              <div className="plugin-install-header">
+                <h3>Install Plugin</h3>
+                <button
+                  className="plugin-settings-close"
+                  onClick={() => setShowInstallDialog(false)}
+                  disabled={isInstalling}
+                >
+                  <X size={16} />
+                </button>
+              </div>
+
+              <div className="plugin-install-content">
+                <div className="plugin-install-source-tabs">
+                  <button
+                    className={`plugin-install-source-tab ${installSource === 'github' ? 'active' : ''}`}
+                    onClick={() => setInstallSource('github')}
+                    disabled={isInstalling}
+                  >
+                    <Github size={14} />
+                    GitHub
+                  </button>
+                  <button
+                    className={`plugin-install-source-tab ${installSource === 'url' ? 'active' : ''}`}
+                    onClick={() => setInstallSource('url')}
+                    disabled={isInstalling}
+                  >
+                    <Link size={14} />
+                    URL
+                  </button>
+                  <button
+                    className={`plugin-install-source-tab ${installSource === 'npm' ? 'active' : ''}`}
+                    onClick={() => setInstallSource('npm')}
+                    disabled={isInstalling}
+                  >
+                    <Package size={14} />
+                    NPM
+                  </button>
+                </div>
+
+                <div className="plugin-install-input-wrapper">
+                  <input
+                    type="text"
+                    className="plugin-install-input"
+                    placeholder={
+                      installSource === 'github'
+                        ? 'https://github.com/user/repo'
+                        : installSource === 'url'
+                          ? 'https://example.com/plugin/manifest.json'
+                          : 'package-name'
+                    }
+                    value={installUrl}
+                    onChange={(e) => setInstallUrl(e.target.value)}
+                    disabled={isInstalling}
+                    onKeyDown={(e) => e.key === 'Enter' && handleInstall()}
+                  />
+                </div>
+
+                {installError && (
+                  <div className="plugin-install-error">
+                    <AlertCircle size={14} />
+                    {installError}
+                  </div>
+                )}
+
+                <p className="plugin-install-hint">
+                  {installSource === 'github'
+                    ? 'Enter a GitHub repository URL containing a ledger-plugin.json manifest.'
+                    : installSource === 'url'
+                      ? 'Enter a direct URL to the plugin manifest JSON file.'
+                      : 'Enter the NPM package name of the Ledger plugin.'}
+                </p>
+              </div>
+
+              <div className="plugin-install-actions">
+                <button
+                  className="plugin-config-button secondary"
+                  onClick={() => setShowInstallDialog(false)}
+                  disabled={isInstalling}
+                >
+                  Cancel
+                </button>
+                <button
+                  className="plugin-config-button primary"
+                  onClick={handleInstall}
+                  disabled={isInstalling || !installUrl.trim()}
+                >
+                  {isInstalling ? (
+                    <>
+                      <Loader2 size={14} className="plugin-spinner" />
+                      Installing...
+                    </>
+                  ) : (
+                    <>
+                      <Plus size={14} />
+                      Install
+                    </>
+                  )}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   )
@@ -212,11 +391,22 @@ export function PluginSettingsPanel() {
 interface PluginCardProps {
   registration: PluginRegistration
   isToggling: boolean
+  isUninstalling: boolean
+  canUninstall: boolean
   onToggle: () => void
   onConfigure: () => void
+  onUninstall: () => void
 }
 
-function PluginCard({ registration, isToggling, onToggle, onConfigure }: PluginCardProps) {
+function PluginCard({
+  registration,
+  isToggling,
+  isUninstalling,
+  canUninstall,
+  onToggle,
+  onConfigure,
+  onUninstall,
+}: PluginCardProps) {
   const { plugin, enabled, error } = registration
   const hasSettings = plugin.settings && plugin.settings.length > 0
 
@@ -289,6 +479,16 @@ function PluginCard({ registration, isToggling, onToggle, onConfigure }: PluginC
             title="Configure plugin settings"
           >
             <Sliders size={14} />
+          </button>
+        )}
+        {canUninstall && (
+          <button
+            className="plugin-card-uninstall-button"
+            onClick={onUninstall}
+            disabled={isUninstalling}
+            title="Uninstall plugin"
+          >
+            {isUninstalling ? <Loader2 size={14} className="plugin-spinner" /> : <Trash2 size={14} />}
           </button>
         )}
         <button

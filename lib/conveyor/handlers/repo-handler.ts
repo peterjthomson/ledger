@@ -3,6 +3,7 @@ import { handle } from '@/lib/main/shared'
 import { setRepoPath, getRepoPath, initializeLegacySync } from '@/lib/main/git-service'
 import { getLastRepoPath, saveLastRepoPath, getRecentRepos, addRecentRepo, removeRecentRepo } from '@/lib/main/settings-service'
 import { getRepositoryManager } from '@/lib/repositories'
+import { emitRepoOpened, emitRepoClosed, emitRepoSwitched } from '@/lib/events'
 
 // Check for --repo command line argument (for testing)
 const repoArgIndex = process.argv.findIndex((arg) => arg.startsWith('--repo='))
@@ -31,6 +32,7 @@ export const registerRepoHandlers = () => {
     }
 
     const selectedPath = result.filePaths[0]
+    const previousPath = getRepoPath()
 
     // Use RepositoryManager for the new architecture
     const manager = getRepositoryManager()
@@ -39,11 +41,25 @@ export const registerRepoHandlers = () => {
       // Also update legacy global state for backward compatibility
       setRepoPath(ctx.path)
       saveLastRepoPath(ctx.path)
+
+      // Emit events
+      emitRepoOpened(ctx.path)
+      if (previousPath && previousPath !== ctx.path) {
+        emitRepoSwitched(previousPath, ctx.path)
+      }
+
       return ctx.path
     } catch (error) {
       // Fall back to legacy behavior if RepositoryManager fails
       setRepoPath(selectedPath)
       saveLastRepoPath(selectedPath)
+
+      // Emit events
+      emitRepoOpened(selectedPath)
+      if (previousPath && previousPath !== selectedPath) {
+        emitRepoSwitched(previousPath, selectedPath)
+      }
+
       return selectedPath
     }
   })
@@ -110,6 +126,7 @@ export const registerRepoHandlers = () => {
    */
   handle('switch-repository', async (id: string): Promise<{ success: boolean; path?: string; error?: string }> => {
     const manager = getRepositoryManager()
+    const previousPath = getRepoPath()
 
     const success = manager.setActive(id)
     if (!success) {
@@ -120,6 +137,10 @@ export const registerRepoHandlers = () => {
     if (active) {
       setRepoPath(active.path)
       saveLastRepoPath(active.path)
+
+      // Emit switch event
+      emitRepoSwitched(previousPath, active.path)
+
       return { success: true, path: active.path }
     }
 
@@ -132,9 +153,19 @@ export const registerRepoHandlers = () => {
   handle('close-repository', (id: string): { success: boolean; error?: string } => {
     const manager = getRepositoryManager()
 
+    // Get the repo path before closing
+    const repos = manager.getSummary()
+    const repoToClose = repos.find(r => r.id === id)
+    const closingPath = repoToClose?.path
+
     const success = manager.close(id)
     if (!success) {
       return { success: false, error: 'Repository not found' }
+    }
+
+    // Emit close event
+    if (closingPath) {
+      emitRepoClosed(closingPath)
     }
 
     // Update legacy state
@@ -142,6 +173,10 @@ export const registerRepoHandlers = () => {
     setRepoPath(active?.path || null)
     if (active) {
       saveLastRepoPath(active.path)
+      // If there's a new active repo after close, emit switch
+      if (closingPath && repoToClose?.isActive) {
+        emitRepoSwitched(closingPath, active.path)
+      }
     }
 
     return { success: true }
@@ -152,12 +187,20 @@ export const registerRepoHandlers = () => {
    */
   handle('open-repository', async (repoPath: string): Promise<{ success: boolean; id?: string; error?: string }> => {
     const manager = getRepositoryManager()
+    const previousPath = getRepoPath()
 
     try {
       const ctx = await manager.open(repoPath)
       setRepoPath(ctx.path)
       saveLastRepoPath(ctx.path)
       addRecentRepo(ctx.path)
+
+      // Emit events
+      emitRepoOpened(ctx.path)
+      if (previousPath && previousPath !== ctx.path) {
+        emitRepoSwitched(previousPath, ctx.path)
+      }
+
       return { success: true, id: ctx.id }
     } catch (error) {
       return { success: false, error: error instanceof Error ? error.message : 'Failed to open repository' }

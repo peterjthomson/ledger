@@ -8,7 +8,9 @@ import {
   popStash,
   dropStash,
   stashToBranch,
+  getRepoPath,
 } from '@/lib/main/git-service'
+import { emitGitStash } from '@/lib/events'
 
 export const registerStashHandlers = () => {
   handle('get-stashes', async () => {
@@ -45,7 +47,12 @@ export const registerStashHandlers = () => {
 
   handle('apply-stash', async (stashIndex: number) => {
     try {
-      return await applyStash(stashIndex)
+      const result = await applyStash(stashIndex)
+      if (result.success) {
+        const path = getRepoPath()
+        if (path) emitGitStash(path, 'apply')
+      }
+      return result
     } catch (error) {
       return { success: false, message: (error as Error).message }
     }
@@ -53,7 +60,12 @@ export const registerStashHandlers = () => {
 
   handle('pop-stash', async (stashIndex: number) => {
     try {
-      return await popStash(stashIndex)
+      const result = await popStash(stashIndex)
+      if (result.success) {
+        const path = getRepoPath()
+        if (path) emitGitStash(path, 'pop')
+      }
+      return result
     } catch (error) {
       return { success: false, message: (error as Error).message }
     }
@@ -61,7 +73,12 @@ export const registerStashHandlers = () => {
 
   handle('drop-stash', async (stashIndex: number) => {
     try {
-      return await dropStash(stashIndex)
+      const result = await dropStash(stashIndex)
+      if (result.success) {
+        const path = getRepoPath()
+        if (path) emitGitStash(path, 'drop')
+      }
+      return result
     } catch (error) {
       return { success: false, message: (error as Error).message }
     }

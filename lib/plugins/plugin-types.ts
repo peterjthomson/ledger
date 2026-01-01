@@ -394,6 +394,23 @@ export interface PluginContext {
   subscriptions: PluginSubscriptions
   /** Access to Ledger APIs */
   api: PluginAPI
+  /** Subscribe to events from Ledger and agent systems */
+  events: PluginEvents
+}
+
+export interface PluginEvents {
+  /**
+   * Subscribe to events. Supports both LedgerEvents (repo:*, git:*) and AgentEvents (agent:*).
+   * @param type Event type or '*' for all events
+   * @param callback Handler function
+   * @returns Unsubscribe function
+   */
+  on(type: string, callback: (event: unknown) => void): () => void
+
+  /**
+   * Subscribe to an event once. Automatically unsubscribes after first event.
+   */
+  once(type: string, callback: (event: unknown) => void): () => void
 }
 
 export interface PluginStorage {

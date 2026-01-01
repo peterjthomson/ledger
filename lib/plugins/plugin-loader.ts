@@ -143,19 +143,19 @@ class PluginLoader {
       // Fetch and validate manifest
       const manifest = await this.fetchManifest(source)
       if (!manifest) {
-        return { success: false, message: 'Failed to fetch plugin manifest' }
+        return { success: false, error: 'Failed to fetch plugin manifest' }
       }
 
       // Check if already installed
       if (pluginRegistry.get(manifest.id)) {
-        return { success: false, message: 'Plugin already installed' }
+        return { success: false, error: 'Plugin already installed' }
       }
 
       // Validate required permissions
       if (manifest.permissions?.length && !options.skipConfirmation) {
         const approved = await this.requestPermissions(manifest)
         if (!approved) {
-          return { success: false, message: 'Permission denied by user' }
+          return { success: false, error: 'Permission denied by user' }
         }
       }
 
@@ -273,7 +273,7 @@ class PluginLoader {
   async update(pluginId: string): Promise<PluginInstallResult> {
     const entry = pluginRegistry.get(pluginId)
     if (!entry) {
-      return { success: false, message: 'Plugin not installed' }
+      return { success: false, error: 'Plugin not installed' }
     }
 
     // Uninstall current version

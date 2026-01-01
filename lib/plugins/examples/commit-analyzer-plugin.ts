@@ -78,6 +78,7 @@ export const commitAnalyzerPlugin: Plugin = {
   id: 'commit-analyzer',
   name: 'Commit Analyzer',
   version: '0.1.0',
+  type: 'service',
   description: 'Analyzes commits to categorize and summarize changes',
   author: 'Ledger Team',
 
