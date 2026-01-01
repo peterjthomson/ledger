@@ -6,7 +6,7 @@
  * them to actual React components.
  */
 
-import React, { createContext, useContext, useState, useCallback, type ReactNode, type ComponentType } from 'react'
+import React, { createContext, useContext, useState, useCallback, useMemo, type ReactNode, type ComponentType } from 'react'
 import type {
   PluginAppProps,
   PluginPanelProps,
@@ -63,25 +63,30 @@ interface PluginComponentProviderProps {
 export function PluginComponentProvider({ children }: PluginComponentProviderProps) {
   const [registry] = useState(() => new Map<string, ComponentRegistration>())
 
+  // Note: registry is created once via useState initializer, so its reference never changes.
+  // Empty dependency arrays ensure these callbacks are stable across renders.
   const register = useCallback(
     (id: string, type: PluginComponentType, component: ComponentRegistration['component']) => {
       registry.set(id, { type, component })
     },
-    [registry]
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    []
   )
 
   const unregister = useCallback(
     (id: string) => {
       registry.delete(id)
     },
-    [registry]
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    []
   )
 
   const getComponent = useCallback(
     (id: string): ComponentRegistration | null => {
       return registry.get(id) ?? null
     },
-    [registry]
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    []
   )
 
   const getAppComponent = useCallback(
@@ -92,7 +97,8 @@ export function PluginComponentProvider({ children }: PluginComponentProviderPro
       }
       return null
     },
-    [registry]
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    []
   )
 
   const getPanelComponent = useCallback(
@@ -103,7 +109,8 @@ export function PluginComponentProvider({ children }: PluginComponentProviderPro
       }
       return null
     },
-    [registry]
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    []
   )
 
   const getWidgetComponent = useCallback(
@@ -114,17 +121,24 @@ export function PluginComponentProvider({ children }: PluginComponentProviderPro
       }
       return null
     },
-    [registry]
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    []
   )
 
-  const value: PluginComponentContextValue = {
-    register,
-    unregister,
-    getComponent,
-    getAppComponent,
-    getPanelComponent,
-    getWidgetComponent,
-  }
+  // Memoize context value to prevent unnecessary re-renders of consumers
+  // All callbacks are stable (empty deps), so this only computes once
+  const value = useMemo<PluginComponentContextValue>(
+    () => ({
+      register,
+      unregister,
+      getComponent,
+      getAppComponent,
+      getPanelComponent,
+      getWidgetComponent,
+    }),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    []
+  )
 
   return (
     <PluginComponentContext.Provider value={value}>

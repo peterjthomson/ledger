@@ -17,14 +17,16 @@ import {
   ChevronLeft,
   AlertCircle,
   Sliders,
+  FolderGit2,
   type LucideIcon,
 } from 'lucide-react'
 import { usePluginStore } from '@/app/stores/plugin-store'
 import { pluginManager } from '@/lib/plugins'
 import type { Plugin, PluginType, PluginRegistration } from '@/lib/plugins/plugin-types'
 import { PluginConfigEditor } from './PluginConfigEditor'
+import { RepositoryManagerPanel } from '@/app/components/RepositoryManagerPanel'
 
-type TabId = 'all' | 'app' | 'panel' | 'widget' | 'service'
+type TabId = 'all' | 'app' | 'panel' | 'widget' | 'service' | 'repositories'
 
 const tabs: { id: TabId; label: string; icon: LucideIcon }[] = [
   { id: 'all', label: 'All Plugins', icon: Puzzle },
@@ -32,6 +34,7 @@ const tabs: { id: TabId; label: string; icon: LucideIcon }[] = [
   { id: 'panel', label: 'Panels', icon: Terminal },
   { id: 'widget', label: 'Widgets', icon: Bot },
   { id: 'service', label: 'Services', icon: Settings },
+  { id: 'repositories', label: 'Repositories', icon: FolderGit2 },
 ]
 
 const typeColors: Record<PluginType, string> = {
@@ -53,20 +56,36 @@ export function PluginSettingsPanel() {
   // Sync registrations from plugin manager
   // Note: Using getState() directly instead of the selector to avoid dependency issues
   // Zustand selectors for functions can return new references on each render
+  // CRITICAL: Debounce ALL syncRegistrations calls (including initial) to batch plugin events
+  // Without this, each plugin activation triggers a separate store update causing re-render loops
   useEffect(() => {
+    let syncTimeout: ReturnType<typeof setTimeout> | null = null
+    let isMounted = true
+
     const syncRegistrations = () => {
-      usePluginStore.getState().setRegistrations(pluginManager.getAllRegistrations())
+      // Debounce to batch multiple events into single update
+      if (syncTimeout) clearTimeout(syncTimeout)
+      syncTimeout = setTimeout(() => {
+        if (!isMounted) return
+        usePluginStore.getState().setRegistrations(pluginManager.getAllRegistrations())
+        syncTimeout = null
+      }, 0)
     }
 
-    syncRegistrations()
-
-    // Subscribe to plugin events
+    // IMPORTANT: Subscribe to events FIRST to prevent race conditions
+    // If we sync first and events fire during sync, they would be missed
     const unsubActivated = pluginManager.on('activated', syncRegistrations)
     const unsubDeactivated = pluginManager.on('deactivated', syncRegistrations)
     const unsubRegistered = pluginManager.on('registered', syncRegistrations)
     const unsubUnregistered = pluginManager.on('unregistered', syncRegistrations)
 
+    // NOW do initial sync - events are now being collected and debounced
+    // This allows all plugin registrations/activations to complete before syncing
+    syncRegistrations()
+
     return () => {
+      isMounted = false
+      if (syncTimeout) clearTimeout(syncTimeout)
       unsubActivated()
       unsubDeactivated()
       unsubRegistered()
@@ -153,8 +172,11 @@ export function PluginSettingsPanel() {
                 ))}
               </div>
 
-              {/* Plugin List */}
-              {filteredPlugins.length === 0 ? (
+              {/* Content based on active tab */}
+              {activeTab === 'repositories' ? (
+                // Repository Manager View
+                <RepositoryManagerPanel />
+              ) : filteredPlugins.length === 0 ? (
                 <div className="plugin-empty-state">
                   <div className="plugin-empty-state-icon">
                     <Puzzle size={32} />

@@ -285,7 +285,8 @@ export default function App() {
     )
 
     setTitlebarActions(actions.length > 0 ? <>{actions}</> : null)
-  }, [repoPath, viewMode, mainPanelView, sidebarVisible, mainVisible, detailVisible, setTitlebarActions])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [repoPath, viewMode, mainPanelView, sidebarVisible, mainVisible, detailVisible])
 
   // Initialize plugin system
   useEffect(() => {
@@ -409,7 +410,7 @@ export default function App() {
     }
   }
 
-  const refresh = async () => {
+  const refresh = useCallback(async () => {
     setLoading(true)
     setError(null)
     setPrError(null)
@@ -485,7 +486,10 @@ export default function App() {
     } finally {
       setLoading(false)
     }
-  }
+    // Note: State setters from useState/stores are stable and don't need to be in deps
+    // Only showCheckpoints affects the actual API call behavior
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [showCheckpoints, repoPath])
 
   // Fetch diff when a commit is selected
   const handleSelectCommit = useCallback(async (commit: GraphCommit) => {

@@ -13,10 +13,13 @@ interface VSCodeTheme {
 
 interface Settings {
   lastRepoPath?: string;
+  recentRepos?: string[];
   viewMode?: ViewMode;
   themeMode?: ThemeMode;
   customTheme?: VSCodeTheme;
 }
+
+const MAX_RECENT_REPOS = 10;
 
 const settingsPath = path.join(app.getPath('userData'), 'ledger-settings.json');
 
@@ -58,6 +61,47 @@ export function saveLastRepoPath(repoPath: string): void {
 export function clearLastRepoPath(): void {
   const settings = loadSettings();
   delete settings.lastRepoPath;
+  saveSettings(settings);
+}
+
+// ============================================================================
+// Recent Repositories
+// ============================================================================
+
+export function getRecentRepos(): string[] {
+  const settings = loadSettings();
+  // Filter out paths that no longer exist
+  return (settings.recentRepos || []).filter((repoPath) => fs.existsSync(repoPath));
+}
+
+export function addRecentRepo(repoPath: string): void {
+  const settings = loadSettings();
+  let recent = settings.recentRepos || [];
+
+  // Remove if already exists (will re-add at front)
+  recent = recent.filter((p) => p !== repoPath);
+
+  // Add to front
+  recent.unshift(repoPath);
+
+  // Trim to max
+  recent = recent.slice(0, MAX_RECENT_REPOS);
+
+  settings.recentRepos = recent;
+  saveSettings(settings);
+}
+
+export function removeRecentRepo(repoPath: string): void {
+  const settings = loadSettings();
+  if (settings.recentRepos) {
+    settings.recentRepos = settings.recentRepos.filter((p) => p !== repoPath);
+    saveSettings(settings);
+  }
+}
+
+export function clearRecentRepos(): void {
+  const settings = loadSettings();
+  delete settings.recentRepos;
   saveSettings(settings);
 }
 

@@ -31,8 +31,11 @@ export function PluginAppContainer({
     return createFullPluginContext(plugin.id)
   }, [plugin.id])
 
-  // Get the component
-  const Component = pluginComponentRegistry.getApp(plugin.component)
+  // Get the component - memoize to prevent re-renders from new references
+  const Component = useMemo(
+    () => pluginComponentRegistry.getApp(plugin.component),
+    [plugin.component]
+  )
 
   // Error boundary reset
   const handleRetry = () => {
@@ -192,21 +195,29 @@ interface PluginWidgetSlotProps {
   data?: unknown
 }
 
-export function PluginWidgetSlot({ slot, data }: PluginWidgetSlotProps) {
+export const PluginWidgetSlot = React.memo(function PluginWidgetSlot({ slot, data }: PluginWidgetSlotProps) {
   const repoPath = useRepositoryStore((s) => s.repoPath)
-  const widgets = pluginManager.getWidgetsForSlot(slot)
 
-  if (widgets.length === 0) {
+  // Memoize widget lookup to prevent new array references on every render
+  const widgets = useMemo(() => pluginManager.getWidgetsForSlot(slot), [slot])
+
+  // Memoize widget components and contexts to prevent re-renders
+  const widgetConfigs = useMemo(() => {
+    return widgets.map((widget) => ({
+      widget,
+      Component: pluginComponentRegistry.getWidget(widget.component),
+      context: createFullPluginContext(widget.id),
+    }))
+  }, [widgets])
+
+  if (widgetConfigs.length === 0) {
     return null
   }
 
   return (
     <div className="plugin-widget-slot" data-slot={slot}>
-      {widgets.map((widget) => {
-        const Component = pluginComponentRegistry.getWidget(widget.component)
+      {widgetConfigs.map(({ widget, Component, context }) => {
         if (!Component) return null
-
-        const context = createFullPluginContext(widget.id)
 
         return (
           <div key={widget.id} className="plugin-widget">
@@ -223,18 +234,23 @@ export function PluginWidgetSlot({ slot, data }: PluginWidgetSlotProps) {
       })}
     </div>
   )
-}
+})
 
 // ============================================================================
 // Helpers
 // ============================================================================
 
 /**
- * Build plugin context dependencies from stores.
- * This connects the plugin API to real Ledger functionality.
+ * Cached plugin context dependencies.
+ * Since all accessors use getState() which reads current state,
+ * we can cache this object at module level and reuse it.
  */
-function buildContextDependencies(): PluginContextDependencies {
-  return {
+let cachedDependencies: PluginContextDependencies | null = null
+
+function getContextDependencies(): PluginContextDependencies {
+  if (cachedDependencies) return cachedDependencies
+
+  cachedDependencies = {
     // Repository store accessors
     getRepoPath: () => useRepositoryStore.getState().repoPath,
     getCurrentBranch: () => useRepositoryStore.getState().currentBranch,
@@ -283,15 +299,29 @@ function buildContextDependencies(): PluginContextDependencies {
       },
     },
   }
+
+  return cachedDependencies
 }
+
+/**
+ * Cache of plugin contexts by ID.
+ * Since deps are cached, we can also cache the resulting contexts.
+ */
+const pluginContextCache = new Map<string, PluginContext>()
 
 /**
  * Create a plugin context with full API access.
  * Uses the consolidated context factory with real dependencies.
+ * Results are cached by plugin ID for stable references.
  */
 function createFullPluginContext(pluginId: string): PluginContext {
-  const deps = buildContextDependencies()
-  return createPluginContext(pluginId, deps)
+  let context = pluginContextCache.get(pluginId)
+  if (context) return context
+
+  const deps = getContextDependencies()
+  context = createPluginContext(pluginId, deps)
+  pluginContextCache.set(pluginId, context)
+  return context
 }
 
 function PluginLoadingState() {

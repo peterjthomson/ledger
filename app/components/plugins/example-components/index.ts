@@ -23,12 +23,16 @@ import './example-plugin-styles.css'
 
 // App Components
 export { TeamDashboardApp } from './TeamDashboardApp'
+export { AIReviewApp } from './AIReviewApp'
 
 // Panel Components
 export { PRReviewQueuePanel } from './PRReviewQueuePanel'
+export { AIChatPanel } from './AIChatPanel'
+export { StandupNotesPanel } from './StandupNotesPanel'
 
 // Widget Components
 export { BranchHealthWidget } from './BranchHealthWidget'
+export { CommitSuggesterWidget } from './CommitSuggesterWidget'
 
 /**
  * Register all example components with the plugin system.
@@ -44,11 +48,27 @@ export function registerExampleComponents(
     registry.register('TeamDashboardApp', 'app', TeamDashboardApp)
   })
 
+  import('./AIReviewApp').then(({ AIReviewApp }) => {
+    registry.register('AIReviewApp', 'app', AIReviewApp)
+  })
+
   import('./PRReviewQueuePanel').then(({ PRReviewQueuePanel }) => {
     registry.register('PRReviewQueuePanel', 'panel', PRReviewQueuePanel)
   })
 
   import('./BranchHealthWidget').then(({ BranchHealthWidget }) => {
     registry.register('BranchHealthWidget', 'widget', BranchHealthWidget)
+  })
+
+  import('./AIChatPanel').then(({ AIChatPanel }) => {
+    registry.register('AIChatPanel', 'panel', AIChatPanel)
+  })
+
+  import('./StandupNotesPanel').then(({ StandupNotesPanel }) => {
+    registry.register('StandupNotesPanel', 'panel', StandupNotesPanel)
+  })
+
+  import('./CommitSuggesterWidget').then(({ CommitSuggesterWidget }) => {
+    registry.register('CommitSuggesterWidget', 'widget', CommitSuggesterWidget)
   })
 }

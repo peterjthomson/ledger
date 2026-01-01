@@ -39,6 +39,9 @@ class PluginManager {
   private eventListeners: Map<PluginEventType, Set<EventCallback>> = new Map()
   private runningTasks: Map<string, TaskHandle[]> = new Map()
 
+  // Cache for getAllRegistrations to prevent returning new array references
+  private registrationsCache: PluginRegistration[] | null = null
+
   // ============================================================================
   // Registration
   // ============================================================================
@@ -65,6 +68,7 @@ class PluginManager {
       enabled: false,
     })
 
+    this.registrationsCache = null  // Invalidate cache
     this.emit('registered', plugin.id)
     console.log(`[PluginManager] Registered ${plugin.type} plugin: ${plugin.name} (${plugin.id})`)
   }
@@ -84,6 +88,7 @@ class PluginManager {
     }
 
     this.plugins.delete(id)
+    this.registrationsCache = null  // Invalidate cache
     this.emit('unregistered', id)
     console.log(`[PluginManager] Unregistered plugin: ${id}`)
   }
@@ -161,6 +166,7 @@ class PluginManager {
       registration.enabled = true
       registration.activatedAt = new Date()
       registration.error = undefined
+      this.registrationsCache = null  // Invalidate cache
       this.emit('activated', id)
       console.log(`[PluginManager] Activated plugin: ${id}`)
     } catch (error) {
@@ -200,6 +206,7 @@ class PluginManager {
 
       registration.enabled = false
       registration.activatedAt = undefined
+      this.registrationsCache = null  // Invalidate cache
       this.emit('deactivated', id)
       console.log(`[PluginManager] Deactivated plugin: ${id}`)
     } catch (error) {
@@ -278,7 +285,11 @@ class PluginManager {
   }
 
   getAllRegistrations(): PluginRegistration[] {
-    return Array.from(this.plugins.values())
+    // Return cached array to prevent new references on every call
+    if (this.registrationsCache === null) {
+      this.registrationsCache = Array.from(this.plugins.values())
+    }
+    return this.registrationsCache
   }
 
   getActive(): Plugin[] {

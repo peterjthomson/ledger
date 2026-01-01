@@ -5,7 +5,6 @@
  * Shows icons for each active app plugin plus the base Ledger app.
  */
 
-import { useMemo } from 'react'
 import {
   GitBranch,
   Settings,
@@ -62,11 +61,8 @@ export function PluginSidebar({ className = '' }: PluginSidebarProps) {
   const activeAppId = usePluginStore((s) => s.activeAppId)
   const setActiveApp = usePluginStore((s) => s.setActiveApp)
   const openSettings = usePluginStore((s) => s.openSettings)
-  const appPlugins = usePluginStore(selectAppPlugins)
-
-  const sortedPlugins = useMemo(() => {
-    return [...appPlugins].sort((a, b) => (a.iconOrder ?? 100) - (b.iconOrder ?? 100))
-  }, [appPlugins])
+  // selectAppPlugins returns a memoized, already-sorted array
+  const sortedPlugins = usePluginStore(selectAppPlugins)
 
   const getIcon = (iconName: string): LucideIcon => {
     return iconMap[iconName.toLowerCase()] ?? Puzzle

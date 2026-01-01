@@ -2,20 +2,21 @@
  * PR Review Queue Panel Component
  *
  * Floating panel showing PRs needing review with urgency indicators.
+ * Uses real PR data from the plugin context API.
  */
 
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect, useCallback } from 'react'
 import {
   Clock,
   GitPullRequest,
   User,
   MessageSquare,
   ExternalLink,
-  Check,
-  X,
-  Filter,
+  RefreshCw,
+  AlertCircle,
 } from 'lucide-react'
 import type { PluginPanelProps } from '@/lib/plugins/plugin-types'
+import type { PullRequest } from '@/lib/types'
 import './example-plugin-styles.css'
 
 interface ReviewQueueItem {
@@ -29,82 +30,132 @@ interface ReviewQueueItem {
   additions: number
   deletions: number
   comments: number
-  reviewers: string[]
+  reviewDecision: string | null
+  isDraft: boolean
+  url: string
 }
 
-// Mock data
-const mockQueue: ReviewQueueItem[] = [
-  {
-    id: 142,
-    title: 'feat: Add user authentication flow',
-    author: 'alice',
-    branch: 'feature/auth',
-    baseBranch: 'main',
-    waitingHours: 48,
-    urgency: 'critical',
-    additions: 450,
-    deletions: 23,
-    comments: 3,
-    reviewers: ['bob'],
-  },
-  {
-    id: 141,
-    title: 'fix: Resolve memory leak in event handler',
-    author: 'bob',
-    branch: 'fix/memory-leak',
-    baseBranch: 'main',
-    waitingHours: 26,
-    urgency: 'high',
-    additions: 12,
-    deletions: 45,
-    comments: 1,
-    reviewers: [],
-  },
-  {
-    id: 140,
-    title: 'refactor: Extract validation utilities',
-    author: 'carol',
-    branch: 'refactor/validation',
-    baseBranch: 'main',
-    waitingHours: 8,
-    urgency: 'medium',
-    additions: 180,
-    deletions: 95,
-    comments: 0,
-    reviewers: ['alice'],
-  },
-  {
-    id: 139,
-    title: 'docs: Update API documentation',
-    author: 'dan',
-    branch: 'docs/api',
-    baseBranch: 'main',
-    waitingHours: 2,
-    urgency: 'low',
-    additions: 85,
-    deletions: 12,
-    comments: 0,
-    reviewers: [],
-  },
-]
+function calculateUrgency(waitingHours: number): 'low' | 'medium' | 'high' | 'critical' {
+  if (waitingHours >= 72) return 'critical'
+  if (waitingHours >= 24) return 'high'
+  if (waitingHours >= 8) return 'medium'
+  return 'low'
+}
+
+function calculateWaitingHours(createdAt: string): number {
+  const created = new Date(createdAt)
+  const now = new Date()
+  return Math.floor((now.getTime() - created.getTime()) / (1000 * 60 * 60))
+}
 
 export function PRReviewQueuePanel({ context, data, onClose }: PluginPanelProps) {
-  const [queue] = useState<ReviewQueueItem[]>(mockQueue)
-  const [filter, setFilter] = useState<'all' | 'mine' | 'unassigned'>('all')
+  const [pullRequests, setPullRequests] = useState<PullRequest[]>([])
+  const [loading, setLoading] = useState(true)
+  const [filter, setFilter] = useState<'all' | 'needs-review' | 'changes-requested' | 'approved'>('all')
 
+  // Load PR data
+  useEffect(() => {
+    const loadPRs = async () => {
+      setLoading(true)
+      try {
+        const prs = await context.api.getPullRequests()
+        setPullRequests(prs)
+      } catch (error) {
+        console.error('Failed to load PRs:', error)
+      } finally {
+        setLoading(false)
+      }
+    }
+    loadPRs()
+  }, [context.api])
+
+  // Convert to queue items with urgency
+  const queue = useMemo((): ReviewQueueItem[] => {
+    return pullRequests
+      .filter((pr) => !pr.isDraft) // Exclude drafts from review queue
+      .map((pr) => {
+        const waitingHours = calculateWaitingHours(pr.createdAt)
+        return {
+          id: pr.number,
+          title: pr.title,
+          author: pr.author,
+          branch: pr.branch,
+          baseBranch: pr.baseBranch,
+          waitingHours,
+          urgency: calculateUrgency(waitingHours),
+          additions: pr.additions,
+          deletions: pr.deletions,
+          comments: pr.comments,
+          reviewDecision: pr.reviewDecision,
+          isDraft: pr.isDraft,
+          url: pr.url,
+        }
+      })
+      .sort((a, b) => b.waitingHours - a.waitingHours) // Sort by longest waiting first
+  }, [pullRequests])
+
+  // Filter queue
   const filteredQueue = useMemo(() => {
     switch (filter) {
-      case 'mine':
-        // Would filter by current user
-        return queue.filter((pr) => pr.reviewers.length > 0)
-      case 'unassigned':
-        return queue.filter((pr) => pr.reviewers.length === 0)
+      case 'needs-review':
+        return queue.filter(
+          (pr) => !pr.reviewDecision || pr.reviewDecision === 'REVIEW_REQUIRED'
+        )
+      case 'changes-requested':
+        return queue.filter((pr) => pr.reviewDecision === 'CHANGES_REQUESTED')
+      case 'approved':
+        return queue.filter((pr) => pr.reviewDecision === 'APPROVED')
       default:
         return queue
     }
   }, [queue, filter])
 
-  const urgentCount = queue.filter((pr) => pr.urgency === 'critical' || pr.urgency === 'high').length
+  // Calculate stats
+  const stats = useMemo(() => {
+    const urgentCount = queue.filter(
+      (pr) => pr.urgency === 'critical' || pr.urgency === 'high'
+    ).length
+
+    const avgWait =
+      queue.length > 0
+        ? Math.round(queue.reduce((sum, pr) => sum + pr.waitingHours, 0) / queue.length)
+        : 0
+
+    const oldest = queue.length > 0 ? Math.max(...queue.map((pr) => pr.waitingHours)) : 0
+
+    const needsReview = queue.filter(
+      (pr) => !pr.reviewDecision || pr.reviewDecision === 'REVIEW_REQUIRED'
+    ).length
+
+    return { urgentCount, avgWait, oldest, needsReview }
+  }, [queue])
+
+  // Refresh handler
+  const handleRefresh = useCallback(async () => {
+    setLoading(true)
+    try {
+      const prs = await (context.api.refreshPullRequests?.() || context.api.getPullRequests())
+      setPullRequests(prs)
+    } catch (error) {
+      console.error('Failed to refresh PRs:', error)
+    } finally {
+      setLoading(false)
+    }
+  }, [context.api])
+
+  if (loading && pullRequests.length === 0) {
+    return (
+      <div className="pr-queue-panel">
+        <div className="pr-queue-header">
+          <div className="pr-queue-count">Loading...</div>
+        </div>
+        <div className="pr-queue-loading">
+          <RefreshCw size={24} className="spinning" />
+          <span>Loading pull requests...</span>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className="pr-queue-panel">
@@ -112,29 +163,29 @@ export function PRReviewQueuePanel({ context, data, onClose }: PluginPanelProps)
       <div className="pr-queue-header">
         <div className="pr-queue-count">
           {filteredQueue.length} PRs
-          {urgentCount > 0 && (
-            <span style={{ color: 'var(--error)', marginLeft: 8 }}>
-              ({urgentCount} urgent)
-            </span>
+          {stats.urgentCount > 0 && (
+            <span className="pr-queue-urgent-count">({stats.urgentCount} urgent)</span>
           )}
         </div>
-        <div className="pr-queue-filters">
+        <div className="pr-queue-actions">
           <select
             value={filter}
             onChange={(e) => setFilter(e.target.value as typeof filter)}
-            style={{
-              padding: '4px 8px',
-              borderRadius: 4,
-              border: '1px solid var(--border)',
-              background: 'var(--bg-primary)',
-              color: 'var(--text-primary)',
-              fontSize: 12,
-            }}
+            className="pr-queue-filter"
           >
             <option value="all">All PRs</option>
-            <option value="mine">Assigned to me</option>
-            <option value="unassigned">Unassigned</option>
+            <option value="needs-review">Needs Review</option>
+            <option value="changes-requested">Changes Requested</option>
+            <option value="approved">Approved</option>
           </select>
+          <button
+            className="pr-queue-refresh"
+            onClick={handleRefresh}
+            disabled={loading}
+            title="Refresh"
+          >
+            <RefreshCw size={14} className={loading ? 'spinning' : ''} />
+          </button>
         </div>
       </div>
 
@@ -145,39 +196,32 @@ export function PRReviewQueuePanel({ context, data, onClose }: PluginPanelProps)
         ))}
 
         {filteredQueue.length === 0 && (
-          <div
-            style={{
-              padding: 40,
-              textAlign: 'center',
-              color: 'var(--text-tertiary)',
-            }}
-          >
-            <GitPullRequest size={32} style={{ marginBottom: 12, opacity: 0.5 }} />
-            <p style={{ margin: 0 }}>No PRs match this filter</p>
+          <div className="pr-queue-empty">
+            <GitPullRequest size={32} />
+            <p>
+              {queue.length === 0 ? 'No open pull requests' : 'No PRs match this filter'}
+            </p>
           </div>
         )}
       </div>
 
       {/* Quick Stats Footer */}
-      <div
-        style={{
-          padding: '12px 16px',
-          borderTop: '1px solid var(--border)',
-          display: 'flex',
-          justifyContent: 'space-between',
-          fontSize: 11,
-          color: 'var(--text-tertiary)',
-        }}
-      >
-        <span>Avg wait: 21h</span>
-        <span>Oldest: 48h</span>
-        <span>Your reviews: 2</span>
+      <div className="pr-queue-footer">
+        <span>Avg wait: {formatWaitTime(stats.avgWait)}</span>
+        <span>Oldest: {formatWaitTime(stats.oldest)}</span>
+        <span>Need review: {stats.needsReview}</span>
       </div>
     </div>
   )
 }
 
 function PRQueueItem({ pr }: { pr: ReviewQueueItem }) {
+  const handleOpenPR = useCallback(() => {
+    if (pr.url) {
+      window.open(pr.url, '_blank')
+    }
+  }, [pr.url])
+
   return (
     <div className="pr-queue-item">
       <div className={`pr-queue-urgency ${pr.urgency}`} />
@@ -186,11 +230,11 @@ function PRQueueItem({ pr }: { pr: ReviewQueueItem }) {
           #{pr.id} {pr.title}
         </h4>
         <div className="pr-queue-meta">
-          <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+          <span className="pr-queue-author">
             <User size={10} />
             {pr.author}
           </span>
-          <span>→ {pr.baseBranch}</span>
+          <span className="pr-queue-branch">{pr.branch} → {pr.baseBranch}</span>
           <span
             className={`pr-queue-waiting ${pr.urgency === 'critical' ? 'critical' : pr.urgency === 'high' ? 'warning' : ''}`}
           >
@@ -198,63 +242,34 @@ function PRQueueItem({ pr }: { pr: ReviewQueueItem }) {
             {formatWaitTime(pr.waitingHours)}
           </span>
         </div>
-        <div
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: 12,
-            marginTop: 8,
-          }}
-        >
-          <span
-            style={{
-              fontFamily: "'JetBrains Mono', monospace",
-              fontSize: 11,
-            }}
-          >
-            <span style={{ color: 'var(--success)' }}>+{pr.additions}</span>
+        <div className="pr-queue-stats">
+          <span className="pr-queue-diff">
+            <span className="diff-add">+{pr.additions}</span>
             {' / '}
-            <span style={{ color: 'var(--error)' }}>-{pr.deletions}</span>
+            <span className="diff-del">-{pr.deletions}</span>
           </span>
           {pr.comments > 0 && (
-            <span
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: 4,
-                fontSize: 11,
-                color: 'var(--text-secondary)',
-              }}
-            >
+            <span className="pr-queue-comments">
               <MessageSquare size={10} />
               {pr.comments}
             </span>
           )}
-          {pr.reviewers.length > 0 && (
-            <span
-              style={{
-                fontSize: 11,
-                color: 'var(--text-tertiary)',
-              }}
-            >
-              Reviewers: {pr.reviewers.join(', ')}
+          {pr.reviewDecision && (
+            <span className={`pr-queue-review-status ${pr.reviewDecision.toLowerCase().replace('_', '-')}`}>
+              {pr.reviewDecision === 'APPROVED' && 'Approved'}
+              {pr.reviewDecision === 'CHANGES_REQUESTED' && 'Changes Requested'}
+              {pr.reviewDecision === 'REVIEW_REQUIRED' && 'Review Required'}
             </span>
           )}
         </div>
       </div>
-      <div
-        style={{
-          display: 'flex',
-          flexDirection: 'column',
-          gap: 4,
-        }}
-      >
+      <div className="pr-queue-actions-col">
         <button
-          className="plugin-button primary"
-          style={{ padding: '4px 8px', fontSize: 11 }}
+          className="pr-queue-open-button"
+          onClick={handleOpenPR}
           title="Open in browser"
         >
-          <ExternalLink size={12} />
+          <ExternalLink size={14} />
         </button>
       </div>
     </div>
@@ -262,7 +277,7 @@ function PRQueueItem({ pr }: { pr: ReviewQueueItem }) {
 }
 
 function formatWaitTime(hours: number): string {
-  if (hours < 1) return 'Just now'
+  if (hours < 1) return '<1h'
   if (hours < 24) return `${hours}h`
   const days = Math.floor(hours / 24)
   const remainingHours = hours % 24

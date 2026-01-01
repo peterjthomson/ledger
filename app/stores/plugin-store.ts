@@ -80,7 +80,25 @@ export const usePluginStore = createAppStore<PluginState & PluginActions>(
     closeAllPanels: () => set({ openPanels: [] }),
 
     // Registry
-    setRegistrations: (registrations) => set({ registrations }),
+    // CRITICAL: Check both reference AND shallow equality to prevent unnecessary updates
+    // During plugin initialization, getAllRegistrations() may return new array references
+    // even when the content is identical, which would trigger cascading re-renders
+    setRegistrations: (registrations) => {
+      const current = get().registrations
+      // Fast path: same reference
+      if (registrations === current) return
+      // Shallow comparison: same length and same plugin IDs with same enabled states
+      if (
+        registrations.length === current.length &&
+        registrations.every((reg, i) =>
+          reg.plugin.id === current[i]?.plugin.id &&
+          reg.enabled === current[i]?.enabled
+        )
+      ) {
+        return
+      }
+      set({ registrations })
+    },
 
     // Settings
     openSettings: (pluginId) =>
@@ -106,19 +124,45 @@ export const selectActiveApp = (state: PluginState): AppPlugin | null => {
   return reg?.plugin as AppPlugin | null
 }
 
+// Memoized selector for app plugins - returns same reference if input unchanged
+let cachedAppPlugins: AppPlugin[] = []
+let cachedAppPluginsInput: PluginRegistration[] = []
+
 export const selectAppPlugins = (state: PluginState): AppPlugin[] => {
-  return state.registrations
+  // Return cached result if registrations haven't changed
+  if (state.registrations === cachedAppPluginsInput) {
+    return cachedAppPlugins
+  }
+
+  cachedAppPluginsInput = state.registrations
+  cachedAppPlugins = state.registrations
     .filter((r) => r.enabled && r.plugin.type === 'app')
     .map((r) => r.plugin as AppPlugin)
     .sort((a, b) => (a.iconOrder ?? 100) - (b.iconOrder ?? 100))
+
+  return cachedAppPlugins
 }
 
+// Memoized selector for open panels - returns same reference if inputs unchanged
+let cachedOpenPanels: Array<OpenPanel & { plugin: PanelPlugin }> = []
+let cachedOpenPanelsInput: OpenPanel[] = []
+let cachedOpenPanelsRegs: PluginRegistration[] = []
+
 export const selectOpenPanels = (state: PluginState): Array<OpenPanel & { plugin: PanelPlugin }> => {
-  return state.openPanels
+  // Return cached result if inputs haven't changed
+  if (state.openPanels === cachedOpenPanelsInput && state.registrations === cachedOpenPanelsRegs) {
+    return cachedOpenPanels
+  }
+
+  cachedOpenPanelsInput = state.openPanels
+  cachedOpenPanelsRegs = state.registrations
+  cachedOpenPanels = state.openPanels
     .map((panel) => {
       const reg = state.registrations.find((r) => r.plugin.id === panel.pluginId)
       if (!reg || reg.plugin.type !== 'panel') return null
       return { ...panel, plugin: reg.plugin as PanelPlugin }
     })
     .filter((p): p is OpenPanel & { plugin: PanelPlugin } => p !== null)
+
+  return cachedOpenPanels
 }
