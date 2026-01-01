@@ -23,10 +23,10 @@ Ledger is a macOS desktop app for viewing git branches, worktrees, and pull requ
 
 ```
 lib/main/main.ts         # IPC handlers, app lifecycle
-lib/main/git-service.ts  # All git operations (~3300 lines)
+lib/main/git-service.ts  # All git operations (large)
 lib/preload/preload.ts   # API exposed to renderer
-app/app.tsx              # Main React component (~2600 lines)
-app/styles/app.css       # All styling (~5000 lines)
+app/app.tsx              # Main React component (large)
+app/styles/app.css       # All styling (large)
 app/types/electron.d.ts  # TypeScript types for IPC
 app/components/          # UI components (panels, canvas, window)
 ```
@@ -104,22 +104,11 @@ Run with `npm test` (builds first) or `npm run test:headed`.
 
 ## Git Operations Available
 
-| Operation | Function | Notes |
-|-----------|----------|-------|
-| List branches | `getBranchesWithMetadata()` | Includes commit counts, dates |
-| List worktrees | `getEnhancedWorktrees()` | With agent detection |
-| List PRs | `getPullRequests()` | Via `gh pr list` |
-| Switch branch | `checkoutBranch()` | Auto-stashes first |
-| Checkout remote | `checkoutRemoteBranch()` | Creates tracking branch |
-| Checkout PR | `checkoutPRBranch()` | Uses `gh pr checkout`, handles forks |
-| Open in browser | `openBranchInGitHub()` | GitHub URL |
-| Fetch | `pullBranch()` | git fetch remote branch |
-| Stage/Unstage | `stageFile()`, `unstageFile()` | Individual files |
-| Commit | `commitChanges()` | With message and description |
-| View diff | `getCommitDiff()`, `getFileDiff()` | Full diff parsing |
-| Stash ops | `applyStash()`, `popStash()`, etc. | Full stash management |
-| PR details | `getPRDetail()` | Full PR info with comments |
-| **Leapfrog stash** | `applyStashToBranch()` | Apply stash to different branch via worktrees |
+This list is intentionally **non-exhaustive**. The canonical contract is:
+
+- `app/types/electron.d.ts` (renderer-facing `window.electronAPI`)
+- `lib/main/git-service.ts` (git operations)
+- `lib/main/settings-service.ts` (persistent settings: themes, canvases, etc.)
 
 ## Error Handling
 

@@ -48,7 +48,9 @@ interface Settings {
   activeCanvasId?: string;
 }
 
-const settingsPath = path.join(app.getPath('userData'), 'ledger-settings.json');
+// Allow tests (and power users) to override the settings location to avoid coupling to
+// the real user profile / machine-specific paths.
+const settingsPath = process.env.LEDGER_SETTINGS_PATH || path.join(app.getPath('userData'), 'ledger-settings.json');
 
 function loadSettings(): Settings {
   try {
@@ -64,6 +66,8 @@ function loadSettings(): Settings {
 
 function saveSettings(settings: Settings): void {
   try {
+    // Ensure parent directory exists (important when LEDGER_SETTINGS_PATH points to a temp location)
+    fs.mkdirSync(path.dirname(settingsPath), { recursive: true });
     fs.writeFileSync(settingsPath, JSON.stringify(settings, null, 2));
   } catch (error) {
     console.error('Failed to save settings:', error);

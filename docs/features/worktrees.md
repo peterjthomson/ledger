@@ -16,7 +16,9 @@ Ledger automatically detects which AI agent created a worktree:
 |-------|---------------|---------|
 | **Cursor** | `~/.cursor/worktrees/` | "Cursor 1: context" |
 | **Claude** | `~/.claude/worktrees/` | "Claude 1: context" |
+| **Conductor** | `~/conductor/workspaces/` | "Conductor 1: context" |
 | **Gemini** | `~/.gemini/worktrees/` | "Gemini 1: context" |
+| **Junie** | `~/.junie/worktrees/` | "Junie 1: context" |
 | **Unknown** | Other paths | Folder name |
 
 ### Smart Display Names
@@ -46,28 +48,11 @@ Each worktree shows:
 
 ## Data Model
 
-```typescript
-interface EnhancedWorktree {
-  path: string;              // "/Users/me/.cursor/worktrees/abc123"
-  head: string;              // Commit hash
-  branch: string | null;     // "feature/auth" or null if detached
-  bare: boolean;             // Bare repo flag
-  
-  // Agent metadata
-  agent: 'cursor' | 'claude' | 'gemini' | 'junie' | 'unknown';
-  agentIndex: number;        // 1, 2, 3... per agent type
-  contextHint: string;       // "AuthController"
-  displayName: string;       // "Cursor 1: AuthController"
-  
-  // Diff statistics
-  changedFileCount: number;  // 3
-  additions: number;         // 42
-  deletions: number;         // 17
-  
-  // Ordering
-  lastModified: string;      // ISO timestamp
-}
-```
+Canonical types live in `app/types/electron.d.ts` (renderer-facing API contract):
+
+- `Worktree`
+- `WorktreeAgent`
+- `WorktreeActivityStatus`
 
 ## Actions
 

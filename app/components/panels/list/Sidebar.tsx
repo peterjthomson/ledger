@@ -300,7 +300,7 @@ export function Sidebar({
   const allExpanded = Object.values(sections).every(v => v)
 
   return (
-    <div className="sidebar-panel">
+    <div className="sidebar-panel" data-testid="sidebar-panel">
       {/* Header - click to expand/collapse all */}
       <div 
         className="sidebar-header clickable"
@@ -317,7 +317,7 @@ export function Sidebar({
       {/* Sections */}
       <div className="sidebar-sections">
         {/* PRs Section */}
-        <div className="sidebar-section">
+        <div className="sidebar-section" data-testid="sidebar-section-prs">
           <SectionHeader
             sectionKey="prs"
             sectionIcon="⬡"
@@ -348,7 +348,7 @@ export function Sidebar({
         </div>
 
         {/* Branches Section */}
-        <div className="sidebar-section">
+        <div className="sidebar-section" data-testid="sidebar-section-branches">
           <SectionHeader
             sectionKey="branches"
             sectionIcon="⎇"
@@ -380,7 +380,7 @@ export function Sidebar({
         </div>
 
         {/* Remotes Section */}
-        <div className="sidebar-section">
+        <div className="sidebar-section" data-testid="sidebar-section-remotes">
           <SectionHeader
             sectionKey="remotes"
             sectionIcon="◈"
@@ -410,7 +410,7 @@ export function Sidebar({
         </div>
 
         {/* Worktrees Section */}
-        <div className="sidebar-section">
+        <div className="sidebar-section" data-testid="sidebar-section-worktrees">
           <SectionHeader
             sectionKey="worktrees"
             sectionIcon="⊙"
@@ -442,7 +442,7 @@ export function Sidebar({
         </div>
 
         {/* Stashes Section */}
-        <div className="sidebar-section">
+        <div className="sidebar-section" data-testid="sidebar-section-stashes">
           <SectionHeader
             sectionKey="stashes"
             sectionIcon="⊡"
@@ -475,7 +475,7 @@ export function Sidebar({
         </div>
 
         {/* Repos Section */}
-        <div className="sidebar-section">
+        <div className="sidebar-section" data-testid="sidebar-section-repos">
           <SectionHeader
             sectionKey="repos"
             sectionIcon="⌂"

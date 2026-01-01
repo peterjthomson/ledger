@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useCallback, useRef } from 'react'
+import { useState, useEffect, useMemo, useCallback, useRef, type ReactNode } from 'react'
 import type {
   Branch,
   Worktree,
@@ -145,7 +145,7 @@ export default function App() {
 
   // Titlebar actions for panel toggles and settings button
   useEffect(() => {
-    const actions: JSX.Element[] = []
+    const actions: ReactNode[] = []
 
     // Add Radar mode editor toggle
     if (repoPath && viewMode === 'radar') {
@@ -385,7 +385,7 @@ export default function App() {
 
   // Handle sidebar item focus (single click)
   const handleSidebarFocus = useCallback(
-    (type: SidebarFocusType, data: PullRequest | Branch | Worktree | StashEntry | WorkingStatus) => {
+    (type: SidebarFocusType, data: PullRequest | Branch | Worktree | StashEntry | WorkingStatus | RepoInfo) => {
       setSelectedCommit(null) // Clear commit selection when focusing sidebar item
       setCommitDiff(null)
       setSidebarFocus({ type, data })
@@ -1240,8 +1240,8 @@ export default function App() {
     // Branch handlers
     onSelectBranch: (branch) => handleRadarItemClick(branch.isRemote ? 'remote' : 'branch', branch),
     onDoubleClickBranch: handleRadarBranchClick,
-    onContextMenuLocalBranch: (e, branch) => handleContextMenu(e, 'branch', branch),
-    onContextMenuRemoteBranch: (e, branch) => handleContextMenu(e, 'remote', branch),
+    onContextMenuLocalBranch: (e, branch) => handleContextMenu(e, 'local-branch', branch),
+    onContextMenuRemoteBranch: (e, branch) => handleContextMenu(e, 'remote-branch', branch),
     onCreateBranch: () => setShowNewBranchModal(true),
     // Worktree handlers
     onSelectWorktree: (wt) => handleRadarItemClick('worktree', wt),
@@ -1251,7 +1251,8 @@ export default function App() {
     // Stash handlers
     onSelectStash: (stash) => handleRadarItemClick('stash', stash),
     onDoubleClickStash: handleRadarStashClick,
-    onContextMenuStash: (e, stash) => handleContextMenu(e, 'stash', stash as unknown as Worktree),
+    // Stash context menus aren't wired yet (avoid coupling tests/types to an unimplemented menu)
+    onContextMenuStash: undefined,
     // Repo handlers
     onSelectRepo: (repo) => handleRadarItemClick('repo', repo),
     onDoubleClickRepo: async (repo) => {
@@ -1399,11 +1400,12 @@ export default function App() {
       )}
 
       {/* Header */}
-      <header className="ledger-header">
+      <header className="ledger-header" data-testid="app-header">
         <div className="header-left">
           {repoPath && (
             <span
               className="repo-path clickable"
+              data-testid="repo-path"
               title={githubUrl || repoPath}
               onClick={async () => {
                 if (githubUrl) {
@@ -1434,6 +1436,7 @@ export default function App() {
                   className={`view-toggle-btn ${viewMode === canvas.id ? 'active' : ''}`}
                   onClick={() => setActiveCanvas(canvas.id)}
                   title={canvas.name}
+                  data-testid={`view-toggle-${canvas.id}`}
                 >
                   <span className="view-icon">{canvas.icon || '◻'}</span>
                   <span className="view-label">{canvas.name}</span>
@@ -1442,7 +1445,7 @@ export default function App() {
             </div>
           )}
           {!repoPath ? (
-            <button onClick={selectRepo} className="btn btn-secondary">
+            <button onClick={selectRepo} className="btn btn-secondary" data-testid="select-repo-header">
               <svg
                 className="btn-icon-svg"
                 viewBox="0 0 16 16"
@@ -1458,7 +1461,12 @@ export default function App() {
             </button>
           ) : (
             <div className="view-toggle">
-              <button onClick={selectRepo} className="view-toggle-btn" title="Change Repository">
+              <button
+                onClick={selectRepo}
+                className="view-toggle-btn"
+                title="Change Repository"
+                data-testid="change-repo-button"
+              >
                 <svg
                   className="view-icon-svg"
                   viewBox="0 0 16 16"
@@ -1477,6 +1485,7 @@ export default function App() {
                 disabled={loading || switching}
                 className="view-toggle-btn active"
                 title="Refresh"
+                data-testid="refresh-button"
               >
                 <span className={`view-icon ${loading || switching ? 'spinning' : ''}`}>↻</span>
                 <span className="view-label">{loading ? 'Loading' : switching ? 'Switching' : 'Refresh'}</span>
@@ -1496,11 +1505,11 @@ export default function App() {
 
       {/* Empty State */}
       {!repoPath && (
-        <div className="empty-state">
-          <div className="empty-icon">◈</div>
+        <div className="empty-state" data-testid="empty-state">
+          <div className="empty-icon" data-testid="empty-icon">◈</div>
           <h2>Welcome to Ledger</h2>
           <p>Select a git repository to view your branches, worktrees and pull requests</p>
-          <button onClick={selectRepo} className="btn btn-large btn-primary">
+          <button onClick={selectRepo} className="btn btn-large btn-primary" data-testid="select-repo-empty">
             <svg
               className="btn-icon-svg"
               viewBox="0 0 16 16"
@@ -1519,7 +1528,7 @@ export default function App() {
 
       {/* Main Content - Canvas Renderer for ALL canvases */}
       {repoPath && !error && (
-        <main className="ledger-content canvas-mode">
+        <main className="ledger-content canvas-mode" data-testid="main-content">
           <CanvasRenderer
             data={canvasData}
             selection={canvasSelection}

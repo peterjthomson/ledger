@@ -61,24 +61,10 @@ gh auth login
 
 ## Data Model
 
-```typescript
-interface PullRequest {
-  number: number;              // 123
-  title: string;               // "Add authentication"
-  author: string;              // "octocat"
-  branch: string;              // "feature/auth"
-  baseBranch: string;          // "main"
-  url: string;                 // "https://github.com/..."
-  createdAt: string;           // ISO timestamp
-  updatedAt: string;           // ISO timestamp
-  additions: number;           // 142
-  deletions: number;           // 38
-  reviewDecision: string | null;  // "APPROVED" | "CHANGES_REQUESTED" | "REVIEW_REQUIRED"
-  labels: string[];            // ["bug", "priority-high"]
-  isDraft: boolean;            // false
-  comments: number;            // 5
-}
-```
+Canonical types live in `app/types/electron.d.ts` (renderer-facing API contract):
+
+- `PullRequest`
+- `PullRequestsResult`
 
 ## Actions
 
@@ -88,18 +74,15 @@ Opens the PR on GitHub in your default browser.
 
 ### Check Out PR (Right-click → Check Out)
 
-Fetches and checks out the PR branch:
+Checks out the PR branch using GitHub CLI:
 
 ```
 User right-clicks PR #123 → "Check Out"
     │
     ├─► Auto-stash current changes (if any)
     │
-    ├─► Fetch PR branch from origin
-    │       git fetch origin feature/auth
-    │
-    ├─► Create local tracking branch
-    │       git checkout -b feature/auth origin/feature/auth
+    ├─► gh pr checkout 123
+    │       (handles forks/remotes + creates a local tracking branch)
     │
     └─► Show success toast
 ```
@@ -217,9 +200,6 @@ When a PR is selected:
 
 ## Future Enhancements
 
-- [ ] Create PR from current branch
-- [ ] Review PR inline
-- [ ] Merge PR from Ledger
 - [ ] Show PR checks status
 - [ ] GitLab/Bitbucket support
 

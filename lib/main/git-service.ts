@@ -260,6 +260,16 @@ function detectAgent(worktreePath: string): WorktreeAgent {
     return 'claude'
   }
 
+  // Gemini might use ~/.gemini/worktrees/
+  if (worktreePath.includes('/.gemini/worktrees/')) {
+    return 'gemini'
+  }
+
+  // Junie might use ~/.junie/worktrees/ or similar
+  if (worktreePath.includes('/.junie/worktrees/') || worktreePath.includes('/junie-worktrees/')) {
+    return 'junie'
+  }
+
   // Conductor - runs multiple Claude Code agents in parallel
   // Uses ~/conductor/workspaces/{repo-name}/{task-name}/ pattern
   if (worktreePath.includes('/conductor/workspaces/')) {

@@ -1,8 +1,8 @@
 # Roadmap
 
-## Current Version: 0.1.0
+This roadmap is **capability-based** (not version-based) to avoid coupling docs to release numbers.
 
-### ✅ Completed Features
+### ✅ Shipped / Working Today
 
 **Branch Management**
 - [x] Branch listing (local + remote) with metadata
@@ -50,7 +50,7 @@
 
 ---
 
-## v0.2.0 - Planned
+## Next
 
 ### Branch Management
 - [ ] Delete local branch (with confirmation)
@@ -69,7 +69,7 @@
 
 ---
 
-## v0.3.0 - Planned
+## Later
 
 ### Enhanced Commit View
 - [ ] Syntax highlighting in diffs
@@ -84,7 +84,7 @@
 
 ---
 
-## v0.4.0 - Planned
+## Future
 
 ### Multi-Repo Support
 - [ ] Recent repositories list

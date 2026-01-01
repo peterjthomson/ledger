@@ -23,7 +23,7 @@ const electronAPI = {
   // Pull requests
   getPullRequests: () => ipcRenderer.invoke('get-pull-requests'),
   openPullRequest: (url: string) => ipcRenderer.invoke('open-pull-request', url),
-  createPullRequest: (options: { title: string; body?: string; baseBranch?: string; draft?: boolean; web?: boolean }) =>
+  createPullRequest: (options: { title: string; body?: string; headBranch?: string; baseBranch?: string; draft?: boolean; web?: boolean }) =>
     ipcRenderer.invoke('create-pull-request', options),
   checkoutPRBranch: (prNumber: number) => ipcRenderer.invoke('checkout-pr-branch', prNumber),
   // Remote operations

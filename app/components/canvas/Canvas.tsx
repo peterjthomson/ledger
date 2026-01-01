@@ -67,7 +67,7 @@ export function Canvas({
   }, [])
 
   return (
-    <div className="canvas-layout" data-canvas-id={canvas.id}>
+    <div className="canvas-layout" data-canvas-id={canvas.id} data-testid={`canvas-layout-${canvas.id}`}>
       {visibleColumns.map((column, index) => {
         const isLast = index === visibleColumns.length - 1
         // If no flex column exists, make last column fill remaining space

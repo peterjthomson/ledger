@@ -104,20 +104,14 @@ ledger/
 
 All IPC is via `ipcMain.handle` / `ipcRenderer.invoke` (async request/response).
 
-| Channel | Direction | Purpose |
-|---------|-----------|---------|
-| `select-repo` | R→M | Open folder dialog |
-| `load-saved-repo` | R→M | Load last used repo |
-| `get-branches-with-metadata` | R→M | Fetch all branches + metadata |
-| `get-worktrees` | R→M | Fetch worktree list |
-| `get-pull-requests` | R→M | Fetch open PRs via gh CLI |
-| `checkout-branch` | R→M | Switch to local branch |
-| `checkout-remote-branch` | R→M | Checkout remote as local |
-| `checkout-pr-branch` | R→M | Checkout PR branch |
-| `open-worktree` | R→M | Open folder in Finder |
-| `open-pull-request` | R→M | Open PR URL in browser |
-| `open-branch-in-github` | R→M | Open branch on GitHub |
-| `pull-branch` | R→M | Fetch remote branch |
+**Canonical source of truth:** `app/types/electron.d.ts` defines the renderer-facing `window.electronAPI` contract (method names + return types). `lib/preload/preload.ts` maps those methods to IPC channels, and `lib/main/main.ts` implements the handlers.
+
+Because the IPC surface evolves frequently (staging, stashes, PR review, themes, canvases, etc.), this doc intentionally does **not** attempt to keep an exhaustive channel list in sync. If you need to add/verify an API:
+
+1. Update `app/types/electron.d.ts`
+2. Update `lib/preload/preload.ts`
+3. Update `lib/main/main.ts`
+4. Implement logic in `lib/main/git-service.ts` / `lib/main/settings-service.ts`
 
 ## State Management
 

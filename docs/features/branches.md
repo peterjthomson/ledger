@@ -123,22 +123,10 @@ If PR Preview detects merge conflicts, it shows:
 
 ## Data Model
 
-```typescript
-interface Branch {
-  name: string;           // "feature/auth"
-  current: boolean;       // true if HEAD
-  commit: string;         // "a1b2c3d..."
-  label: string;          // Display label
-  isRemote: boolean;      // Starts with "remotes/"
-  
-  // Extended metadata (computed)
-  lastCommitDate?: string;   // "2024-12-26T10:30:00Z"
-  firstCommitDate?: string;  // "2024-12-20T09:00:00Z"
-  commitCount?: number;      // 15
-  isLocalOnly?: boolean;     // Not on remote
-  isMerged?: boolean;        // Merged into main
-}
-```
+Canonical types live in `app/types/electron.d.ts` (renderer-facing API contract):
+
+- `Branch`
+- `BranchesResult`
 
 ## Git Commands Used
 

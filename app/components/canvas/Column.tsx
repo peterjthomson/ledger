@@ -104,6 +104,7 @@ export function Column({
     <div
       ref={columnRef}
       className={`canvas-column ${isDragging ? 'dragging' : ''} ${isDragOver ? 'drag-over' : ''}`}
+      data-testid={`canvas-column-${column.panel}`}
       data-slot={column.slotType}
       data-panel={column.panel}
       data-column-id={column.id}

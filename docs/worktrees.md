@@ -99,7 +99,14 @@ Neither WorktreeWise nor gtr understands this shift. They treat worktrees as dev
 
 ## Implementation Plan
 
-### Phase 1: Core Worktree Actions (v0.2.0)
+> Note: The code blocks in this section are **illustrative pseudo-code** for communicating intent. The canonical implementation lives in:
+> - `lib/main/git-service.ts` (git operations)
+> - `lib/main/main.ts` (IPC handlers)
+> - `app/types/electron.d.ts` (renderer-facing API contract)
+>
+> This keeps docs from “asserting the implementation” and reduces drift.
+
+### Phase 1: Core Worktree Actions
 
 **Goal:** Match basic WorktreeWise/gtr functionality with Ledger's visual polish.
 
@@ -129,52 +136,10 @@ Neither WorktreeWise nor gtr understands this shift. They treat worktrees as dev
 └─────────────────────────────────────────────────────┘
 ```
 
-**Implementation:**
-
-```typescript
-// lib/main/git-service.ts
-export async function createWorktree(options: {
-  branch: string;
-  isNewBranch: boolean;
-  folderName: string;
-  basePath: string;
-  copyFiles?: string[];
-  postCreateCommand?: string;
-}): Promise<{ success: boolean; message: string; path?: string }> {
-  if (!git) throw new Error('No repository selected');
-  
-  const worktreePath = path.join(options.basePath, options.folderName);
-  
-  try {
-    // Create worktree
-    if (options.isNewBranch) {
-      await git.raw(['worktree', 'add', '-b', options.branch, worktreePath]);
-    } else {
-      await git.raw(['worktree', 'add', worktreePath, options.branch]);
-    }
-    
-    // Copy config files
-    if (options.copyFiles?.length) {
-      for (const file of options.copyFiles) {
-        const src = path.join(repoPath!, file);
-        const dest = path.join(worktreePath, file);
-        if (fs.existsSync(src)) {
-          await fs.promises.copyFile(src, dest);
-        }
-      }
-    }
-    
-    // Run post-create command
-    if (options.postCreateCommand) {
-      await execAsync(options.postCreateCommand, { cwd: worktreePath });
-    }
-    
-    return { success: true, message: `Created worktree at ${worktreePath}`, path: worktreePath };
-  } catch (error) {
-    return { success: false, message: (error as Error).message };
-  }
-}
-```
+**Implementation notes (non-exhaustive):**
+- **Entry points**: `createWorktree()` in `lib/main/git-service.ts`, invoked via IPC from `lib/main/main.ts`
+- **Return shape**: prefer `{ success, message, path? }`-style results (see `app/types/electron.d.ts`)
+- **Post-create hooks/config copying**: if/when added, treat as optional enhancements (avoid baking exact CLI strings into docs)
 
 #### 1.2 Remove Worktree
 
@@ -197,37 +162,9 @@ export async function createWorktree(options: {
 └─────────────────────────────────────────────────────┘
 ```
 
-**Implementation:**
-
-```typescript
-export async function removeWorktree(
-  worktreePath: string,
-  options?: { force?: boolean; deleteBranch?: boolean }
-): Promise<{ success: boolean; message: string }> {
-  if (!git) throw new Error('No repository selected');
-  
-  try {
-    // Get branch name before removal
-    const worktrees = await getWorktrees();
-    const wt = worktrees.find(w => w.path === worktreePath);
-    const branchName = wt?.branch;
-    
-    // Remove worktree
-    const args = ['worktree', 'remove', worktreePath];
-    if (options?.force) args.push('--force');
-    await git.raw(args);
-    
-    // Optionally delete branch
-    if (options?.deleteBranch && branchName) {
-      await git.branch(['-D', branchName]);
-    }
-    
-    return { success: true, message: `Removed worktree at ${worktreePath}` };
-  } catch (error) {
-    return { success: false, message: (error as Error).message };
-  }
-}
-```
+**Implementation notes (non-exhaustive):**
+- **Entry point**: `removeWorktree()` in `lib/main/git-service.ts`
+- **UI**: should always confirm destructive actions, and default to safe behavior
 
 #### 1.3 Prune Worktrees
 
@@ -235,39 +172,12 @@ export async function removeWorktree(
 - Column header menu: "Prune Stale Worktrees"
 - Shows count of stale worktrees before pruning
 
-**Implementation:**
-
-```typescript
-export async function pruneWorktrees(): Promise<{ success: boolean; message: string; pruned: number }> {
-  if (!git) throw new Error('No repository selected');
-  
-  try {
-    // Get count before
-    const before = await git.raw(['worktree', 'list', '--porcelain']);
-    const countBefore = (before.match(/^worktree /gm) || []).length;
-    
-    // Prune
-    await git.raw(['worktree', 'prune']);
-    
-    // Get count after
-    const after = await git.raw(['worktree', 'list', '--porcelain']);
-    const countAfter = (after.match(/^worktree /gm) || []).length;
-    
-    const pruned = countBefore - countAfter;
-    return { 
-      success: true, 
-      message: pruned > 0 ? `Pruned ${pruned} stale worktree(s)` : 'No stale worktrees found',
-      pruned 
-    };
-  } catch (error) {
-    return { success: false, message: (error as Error).message, pruned: 0 };
-  }
-}
-```
+**Implementation notes (non-exhaustive):**
+- Prefer returning *counts + summary*, but don’t lock docs to a specific algorithm or message text.
 
 ---
 
-### Phase 2: Editor & AI Integration (v0.2.5)
+### Phase 2: Editor & AI Integration
 
 **Goal:** Make Ledger the launchpad for AI-assisted development.
 
@@ -349,7 +259,7 @@ export async function launchAITool(
 
 ---
 
-### Phase 3: Worktree Settings (v0.3.0)
+### Phase 3: Worktree Settings
 
 #### 3.1 Per-Project Configuration
 

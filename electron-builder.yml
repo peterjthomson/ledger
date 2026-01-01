@@ -67,7 +67,8 @@ mac:
   extendInfo:
     - NSDocumentsFolderUsageDescription: Ledger needs access to read git repositories.
     - NSDownloadsFolderUsageDescription: Ledger needs access to read git repositories.
-  notarize: true
+  # Skip flakey in-process notarization, use dedicated CLI tool to allow for better monitoring
+  notarize: false
 dmg:
   artifactName: ${productName}-${version}-${arch}.${ext}
   title: ${productName}
@@ -81,6 +82,7 @@ appImage:
   artifactName: ${name}-${version}.${ext}
 npmRebuild: false
 publish:
+  # Skip suto publishing to GitHub and upload manually once notarization is complete.
   provider: github
   owner: peterjthomson
   repo: ledger

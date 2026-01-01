@@ -151,7 +151,7 @@ app.whenReady().then(() => {
     try {
       return await getBranches()
     } catch (error) {
-      return { error: (error as Error).message }
+      return { current: '', branches: [], error: (error as Error).message }
     }
   })
 
@@ -160,7 +160,7 @@ app.whenReady().then(() => {
     try {
       return await getBranchesBasic()
     } catch (error) {
-      return { error: (error as Error).message }
+      return { current: '', branches: [], error: (error as Error).message }
     }
   })
 
@@ -168,7 +168,7 @@ app.whenReady().then(() => {
     try {
       return await getBranchesWithMetadata()
     } catch (error) {
-      return { error: (error as Error).message }
+      return { current: '', branches: [], error: (error as Error).message }
     }
   })
 
@@ -253,6 +253,7 @@ app.whenReady().then(() => {
       options: {
         title: string
         body?: string
+        headBranch?: string
         baseBranch?: string
         draft?: boolean
         web?: boolean
@@ -294,7 +295,7 @@ app.whenReady().then(() => {
     try {
       return await getWorkingStatus()
     } catch (_error) {
-      return { hasChanges: false, files: [], stagedCount: 0, unstagedCount: 0 }
+      return { hasChanges: false, files: [], stagedCount: 0, unstagedCount: 0, additions: 0, deletions: 0 }
     }
   })
 
@@ -396,7 +397,7 @@ app.whenReady().then(() => {
     try {
       return await convertWorktreeToBranch(worktreePath)
     } catch (_error) {
-      return null
+      return { success: false, message: 'Failed to convert worktree to branch' }
     }
   })
 
