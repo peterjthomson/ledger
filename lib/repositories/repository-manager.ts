@@ -1,4 +1,4 @@
-import { RepositoryContext, createRepositoryContext } from './repository-context'
+import { RepositoryContext, RepositoryType, createRepositoryContext } from './repository-context'
 
 /**
  * RepositoryManager - Singleton managing multiple repository contexts
@@ -25,7 +25,8 @@ export class RepositoryManager {
   private static instance: RepositoryManager | null = null
 
   private contexts: Map<string, RepositoryContext> = new Map()
-  private pathIndex: Map<string, string> = new Map() // path -> id for fast lookup
+  private pathIndex: Map<string, string> = new Map() // path -> id for fast lookup (local repos only)
+  private remoteIndex: Map<string, string> = new Map() // fullName -> id for fast lookup (remote repos only)
   private activeId: string | null = null
 
   // Safety: Epoch counter for detecting stale operations
@@ -69,7 +70,8 @@ export class RepositoryManager {
   private syncLegacyState(): void {
     if (this.legacySyncCallback) {
       const active = this.getActive()
-      this.legacySyncCallback(active?.path || null)
+      // Only sync local repos (remote repos have null path)
+      this.legacySyncCallback(active?.path ?? null)
     }
   }
 
@@ -141,9 +143,11 @@ export class RepositoryManager {
     // Create new context
     const context = await createRepositoryContext(repoPath)
 
-    // Store in both maps
+    // Store in maps
     this.contexts.set(context.id, context)
-    this.pathIndex.set(context.path, context.id)
+    if (context.path) {
+      this.pathIndex.set(context.path, context.id)
+    }
 
     if (makeActive) {
       // SAFETY: Increment epoch when switching repos
@@ -241,7 +245,13 @@ export class RepositoryManager {
     const wasActive = this.activeId === id
 
     this.contexts.delete(id)
-    this.pathIndex.delete(context.path)
+    // Remove from appropriate index
+    if (context.path) {
+      this.pathIndex.delete(context.path)
+    }
+    if (context.remote?.fullName) {
+      this.remoteIndex.delete(context.remote.fullName)
+    }
 
     if (wasActive) {
       // SAFETY: Increment epoch when active repo changes
@@ -302,9 +312,11 @@ export class RepositoryManager {
   getSummary(): Array<{
     id: string
     name: string
-    path: string
+    path: string | null
     isActive: boolean
     provider: string
+    type: RepositoryType
+    remote: { owner: string; repo: string; fullName: string } | null
   }> {
     return this.list().map((ctx) => ({
       id: ctx.id,
@@ -312,7 +324,59 @@ export class RepositoryManager {
       path: ctx.path,
       isActive: ctx.id === this.activeId,
       provider: ctx.metadata.provider,
+      type: ctx.type,
+      remote: ctx.remote,
     }))
+  }
+
+  /**
+   * Add a remote repository (API-only, no local clone)
+   *
+   * @param context - Pre-created remote repository context
+   * @param makeActive - Whether to make this the active repo (default: true)
+   * @returns The repository context
+   */
+  addRemote(context: RepositoryContext, makeActive: boolean = true): RepositoryContext {
+    // Check if already open by remote fullName
+    if (context.remote?.fullName) {
+      const existingId = this.remoteIndex.get(context.remote.fullName)
+      if (existingId) {
+        const existing = this.contexts.get(existingId)!
+        existing.lastAccessed = new Date()
+
+        if (makeActive && this.activeId !== existingId) {
+          this._switchEpoch++
+          this.activeId = existingId
+          this.syncLegacyState()
+          this.notifyChange()
+        }
+
+        return existing
+      }
+    }
+
+    // Store in maps
+    this.contexts.set(context.id, context)
+    if (context.remote?.fullName) {
+      this.remoteIndex.set(context.remote.fullName, context.id)
+    }
+
+    if (makeActive) {
+      this._switchEpoch++
+      this.activeId = context.id
+      this.syncLegacyState()
+    }
+
+    this.notifyChange()
+    return context
+  }
+
+  /**
+   * Get a remote repository context by fullName (owner/repo)
+   */
+  getByRemote(fullName: string): RepositoryContext | null {
+    const id = this.remoteIndex.get(fullName)
+    return id ? this.contexts.get(id) || null : null
   }
 }
 

@@ -6,9 +6,26 @@ import {
   unstageAll,
   discardFileChanges,
   getFileDiff,
+  getWorkingStatus,
 } from '@/lib/main/git-service'
 
 export const registerStagingHandlers = () => {
+  handle('get-staging-status', async () => {
+    try {
+      return await getWorkingStatus()
+    } catch (error) {
+      // Return empty status object instead of null to prevent UI crashes
+      console.error('[staging-handler] get-staging-status error:', error)
+      return {
+        hasChanges: false,
+        files: [],
+        stagedCount: 0,
+        unstagedCount: 0,
+        additions: 0,
+        deletions: 0,
+      }
+    }
+  })
   handle('stage-file', async (filePath: string) => {
     try {
       return await stageFile(filePath)

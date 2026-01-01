@@ -15,7 +15,13 @@ import {
 
 export const registerPRHandlers = () => {
   handle('get-pull-requests', async () => {
-    return await getPullRequests()
+    try {
+      return await getPullRequests()
+    } catch (error) {
+      // Return empty result for remote repos or on error
+      console.error('[pr-handler] get-pull-requests error:', error)
+      return { prs: [], error: (error as Error).message }
+    }
   })
 
   handle('open-pull-request', async (url: string) => {

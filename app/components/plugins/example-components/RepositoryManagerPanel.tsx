@@ -18,16 +18,28 @@ import {
   Github,
   FolderGit2,
   ChevronRight,
+  Globe,
+  Download,
+  Cloud,
+  Link,
 } from 'lucide-react'
 import type { PluginPanelProps } from '@/lib/plugins/plugin-types'
 import './example-plugin-styles.css'
 
+interface RemoteInfo {
+  owner: string
+  repo: string
+  fullName: string
+}
+
 interface RepositorySummary {
   id: string
   name: string
-  path: string
+  path: string | null
   isActive: boolean
   provider: string
+  type: 'local' | 'remote'
+  remote: RemoteInfo | null
 }
 
 export function RepositoryManagerPanel({ context, onClose }: PluginPanelProps) {
@@ -36,6 +48,12 @@ export function RepositoryManagerPanel({ context, onClose }: PluginPanelProps) {
   const [loading, setLoading] = useState(true)
   const [switching, setSwitching] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [cloneUrl, setCloneUrl] = useState('')
+  const [cloning, setCloning] = useState(false)
+  const [showCloneInput, setShowCloneInput] = useState(false)
+  const [connectInput, setConnectInput] = useState('')
+  const [connecting, setConnecting] = useState(false)
+  const [showConnectInput, setShowConnectInput] = useState(false)
 
   // Load repositories
   const loadRepos = useCallback(async () => {
@@ -68,7 +86,7 @@ export function RepositoryManagerPanel({ context, onClose }: PluginPanelProps) {
       setError(null)
       try {
         const result = await window.conveyor.repo.switchRepository(id)
-        if (result.success && result.path) {
+        if (result.success) {
           context.api.refresh()
           await loadRepos()
           onClose() // Close panel after switch
@@ -155,13 +173,73 @@ export function RepositoryManagerPanel({ context, onClose }: PluginPanelProps) {
     []
   )
 
-  const getProviderIcon = (provider: string) => {
-    switch (provider.toLowerCase()) {
+  // Clone a remote repository
+  const handleClone = useCallback(async () => {
+    if (!cloneUrl.trim()) return
+
+    setCloning(true)
+    setError(null)
+    try {
+      const result = await window.conveyor.repo.cloneRepository(cloneUrl.trim())
+      if (result.success && result.path) {
+        context.api.refresh()
+        await loadRepos()
+        setCloneUrl('')
+        setShowCloneInput(false)
+        onClose() // Close panel after successful clone
+      } else {
+        setError(result.error || 'Failed to clone repository')
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to clone repository')
+    } finally {
+      setCloning(false)
+    }
+  }, [cloneUrl, context, loadRepos, onClose])
+
+  // Connect to a remote repository (API-only, no download)
+  const handleConnect = useCallback(async () => {
+    if (!connectInput.trim()) return
+
+    setConnecting(true)
+    setError(null)
+    try {
+      const result = await window.conveyor.repo.connectRemoteRepository(connectInput.trim())
+      if (result.success) {
+        context.api.refresh()
+        await loadRepos()
+        setConnectInput('')
+        setShowConnectInput(false)
+        onClose() // Close panel after successful connection
+      } else {
+        setError(result.error || 'Failed to connect to repository')
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to connect to repository')
+    } finally {
+      setConnecting(false)
+    }
+  }, [connectInput, context, loadRepos, onClose])
+
+  const getRepoIcon = (repo: RepositorySummary) => {
+    // Remote repos get a cloud icon
+    if (repo.type === 'remote') {
+      return <Cloud size={14} className="repo-manager-remote-icon" />
+    }
+    // Local repos show provider icon
+    switch (repo.provider.toLowerCase()) {
       case 'github':
         return <Github size={14} />
       default:
         return <FolderGit2 size={14} />
     }
+  }
+
+  const getRepoSubtitle = (repo: RepositorySummary) => {
+    if (repo.type === 'remote' && repo.remote) {
+      return repo.remote.fullName
+    }
+    return repo.path || ''
   }
 
   const getRepoName = (path: string) => {
@@ -216,16 +294,17 @@ export function RepositoryManagerPanel({ context, onClose }: PluginPanelProps) {
             {openRepos.map((repo) => (
               <div
                 key={repo.id}
-                className={`repo-manager-item ${repo.isActive ? 'active' : ''}`}
+                className={`repo-manager-item ${repo.isActive ? 'active' : ''} ${repo.type === 'remote' ? 'remote' : ''}`}
                 onClick={() => !repo.isActive && handleSwitch(repo.id)}
               >
-                <div className="repo-manager-item-icon">{getProviderIcon(repo.provider)}</div>
+                <div className="repo-manager-item-icon">{getRepoIcon(repo)}</div>
                 <div className="repo-manager-item-content">
                   <div className="repo-manager-item-name">
                     {repo.name}
+                    {repo.type === 'remote' && <span className="repo-manager-remote-badge">Remote</span>}
                     {repo.isActive && <span className="repo-manager-active-badge">Active</span>}
                   </div>
-                  <div className="repo-manager-item-path">{repo.path}</div>
+                  <div className="repo-manager-item-path">{getRepoSubtitle(repo)}</div>
                 </div>
                 <div className="repo-manager-item-actions">
                   {switching === repo.id ? (
@@ -257,13 +336,91 @@ export function RepositoryManagerPanel({ context, onClose }: PluginPanelProps) {
         )}
       </div>
 
-      {/* Add Repository Button */}
+      {/* Add Repository Buttons */}
       <div className="repo-manager-add-section">
         <button className="repo-manager-add-button" onClick={handleOpenNew}>
           <Plus size={16} />
-          <span>Open Repository...</span>
+          <span>Open Local Repository...</span>
+        </button>
+        <button
+          className="repo-manager-add-button"
+          onClick={() => {
+            setShowConnectInput(!showConnectInput)
+            setShowCloneInput(false)
+          }}
+        >
+          <Link size={16} />
+          <span>Connect to GitHub (API only)</span>
+        </button>
+        <button
+          className="repo-manager-add-button"
+          onClick={() => {
+            setShowCloneInput(!showCloneInput)
+            setShowConnectInput(false)
+          }}
+        >
+          <Download size={16} />
+          <span>Clone Repository</span>
         </button>
       </div>
+
+      {/* Connect Input (API-only) */}
+      {showConnectInput && (
+        <div className="repo-manager-clone-section repo-manager-connect-section">
+          <div className="repo-manager-clone-input-wrapper">
+            <input
+              type="text"
+              className="repo-manager-clone-input"
+              placeholder="owner/repo or https://github.com/owner/repo"
+              value={connectInput}
+              onChange={(e) => setConnectInput(e.target.value)}
+              onKeyDown={(e) => e.key === 'Enter' && handleConnect()}
+              disabled={connecting}
+              autoFocus
+            />
+            <button
+              className="repo-manager-clone-submit repo-manager-connect-submit"
+              onClick={handleConnect}
+              disabled={!connectInput.trim() || connecting}
+              title="Connect to repository"
+            >
+              {connecting ? <RefreshCw size={16} className="spinning" /> : <Link size={16} />}
+            </button>
+          </div>
+          <div className="repo-manager-clone-hint">
+            Monitor PRs, branches, and commits without downloading. Requires GitHub CLI (gh).
+          </div>
+        </div>
+      )}
+
+      {/* Clone Input */}
+      {showCloneInput && (
+        <div className="repo-manager-clone-section">
+          <div className="repo-manager-clone-input-wrapper">
+            <input
+              type="text"
+              className="repo-manager-clone-input"
+              placeholder="https://github.com/user/repo.git"
+              value={cloneUrl}
+              onChange={(e) => setCloneUrl(e.target.value)}
+              onKeyDown={(e) => e.key === 'Enter' && handleClone()}
+              disabled={cloning}
+              autoFocus
+            />
+            <button
+              className="repo-manager-clone-submit"
+              onClick={handleClone}
+              disabled={!cloneUrl.trim() || cloning}
+              title="Clone repository"
+            >
+              {cloning ? <RefreshCw size={16} className="spinning" /> : <Download size={16} />}
+            </button>
+          </div>
+          <div className="repo-manager-clone-hint">
+            Enter a Git URL (HTTPS or SSH) and select where to clone
+          </div>
+        </div>
+      )}
 
       {/* Recent Repositories */}
       {recentRepos.length > 0 && (

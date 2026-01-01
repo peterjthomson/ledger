@@ -17,7 +17,10 @@ export const registerWorktreeHandlers = () => {
       agentEvents.updateFromWorktrees(worktrees)
       return worktrees
     } catch (error) {
-      return { error: (error as Error).message }
+      // Return empty array for remote repos or on error
+      // This prevents UI errors when array methods are called on the result
+      console.error('[worktree-handler] get-worktrees error:', error)
+      return []
     }
   })
 

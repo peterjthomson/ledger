@@ -1,8 +1,12 @@
 import { dialog } from 'electron'
+import { simpleGit } from 'simple-git'
+import * as path from 'path'
+import { execSync } from 'child_process'
 import { handle } from '@/lib/main/shared'
 import { setRepoPath, getRepoPath, initializeLegacySync } from '@/lib/main/git-service'
 import { getLastRepoPath, saveLastRepoPath, getRecentRepos, addRecentRepo, removeRecentRepo } from '@/lib/main/settings-service'
 import { getRepositoryManager } from '@/lib/repositories'
+import { parseGitHubRepo, createRemoteRepositoryContext } from '@/lib/repositories/repository-context'
 import { emitRepoOpened, emitRepoClosed, emitRepoSwitched } from '@/lib/events'
 
 // Check for --repo command line argument (for testing)
@@ -12,9 +16,11 @@ const testRepoPath = repoArgIndex !== -1 ? process.argv[repoArgIndex].split('=')
 export interface RepositorySummary {
   id: string
   name: string
-  path: string
+  path: string | null
   isActive: boolean
   provider: string
+  type: 'local' | 'remote'
+  remote: { owner: string; repo: string; fullName: string } | null
 }
 
 export const registerRepoHandlers = () => {
@@ -117,8 +123,13 @@ export const registerRepoHandlers = () => {
    * Get list of all open repositories
    */
   handle('list-repositories', (): RepositorySummary[] => {
-    const manager = getRepositoryManager()
-    return manager.getSummary()
+    try {
+      const manager = getRepositoryManager()
+      return manager.getSummary()
+    } catch (error) {
+      console.error('[repo-handler] list-repositories error:', error)
+      return [] // Return empty array on error instead of throwing
+    }
   })
 
   /**
@@ -135,13 +146,19 @@ export const registerRepoHandlers = () => {
 
     const active = manager.getActive()
     if (active) {
-      setRepoPath(active.path)
-      saveLastRepoPath(active.path)
+      // Only sync legacy state for local repos (remote repos have null path)
+      if (active.path) {
+        setRepoPath(active.path)
+        saveLastRepoPath(active.path)
+      } else {
+        setRepoPath(null)
+      }
 
-      // Emit switch event
-      emitRepoSwitched(previousPath, active.path)
+      // Emit switch event (use fullName for remote repos)
+      const activePath = active.path || active.remote?.fullName || null
+      emitRepoSwitched(previousPath, activePath)
 
-      return { success: true, path: active.path }
+      return { success: true, path: active.path ?? undefined }
     }
 
     return { success: false, error: 'Failed to switch repository' }
@@ -153,10 +170,11 @@ export const registerRepoHandlers = () => {
   handle('close-repository', (id: string): { success: boolean; error?: string } => {
     const manager = getRepositoryManager()
 
-    // Get the repo path before closing
+    // Get the repo info before closing
     const repos = manager.getSummary()
     const repoToClose = repos.find(r => r.id === id)
-    const closingPath = repoToClose?.path
+    // Use path for local repos, fullName for remote repos
+    const closingPath = repoToClose?.path || repoToClose?.remote?.fullName || null
 
     const success = manager.close(id)
     if (!success) {
@@ -170,13 +188,14 @@ export const registerRepoHandlers = () => {
 
     // Update legacy state
     const active = manager.getActive()
-    setRepoPath(active?.path || null)
-    if (active) {
+    setRepoPath(active?.path ?? null)
+    if (active && active.path) {
       saveLastRepoPath(active.path)
-      // If there's a new active repo after close, emit switch
-      if (closingPath && repoToClose?.isActive) {
-        emitRepoSwitched(closingPath, active.path)
-      }
+    }
+    // If there's a new active repo after close, emit switch
+    if (active && closingPath && repoToClose?.isActive) {
+      const activePath = active.path || active.remote?.fullName || null
+      emitRepoSwitched(closingPath, activePath)
     }
 
     return { success: true }
@@ -226,5 +245,130 @@ export const registerRepoHandlers = () => {
    */
   handle('remove-recent-repository', (repoPath: string): void => {
     removeRecentRepo(repoPath)
+  })
+
+  /**
+   * Connect to a remote GitHub repository (API-only, no clone)
+   * Uses `gh` CLI to validate and fetch repo info
+   */
+  handle('connect-remote-repository', async (repoInput: string): Promise<{
+    success: boolean
+    id?: string
+    name?: string
+    fullName?: string
+    error?: string
+  }> => {
+    // Parse the input to extract owner/repo
+    const remoteInfo = parseGitHubRepo(repoInput)
+    if (!remoteInfo) {
+      return { success: false, error: 'Invalid repository format. Use owner/repo or a GitHub URL.' }
+    }
+
+    const { owner, repo, fullName } = remoteInfo
+
+    // Check if already connected
+    const manager = getRepositoryManager()
+    const existing = manager.getByRemote(fullName)
+    if (existing) {
+      manager.setActive(existing.id)
+      return { success: true, id: existing.id, name: repo, fullName }
+    }
+
+    // Use gh CLI to validate the repo exists and get info
+    try {
+      const result = execSync(
+        `gh api repos/${owner}/${repo} --jq '{default_branch: .default_branch, html_url: .html_url}'`,
+        { encoding: 'utf-8', timeout: 30000 }
+      )
+
+      const repoInfo = JSON.parse(result.trim())
+
+      // Create remote repository context
+      const context = createRemoteRepositoryContext(owner, repo, repoInfo)
+
+      // Add to manager
+      manager.addRemote(context, true)
+
+      // Emit event
+      emitRepoOpened(fullName)
+
+      return { success: true, id: context.id, name: repo, fullName }
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Failed to connect to repository'
+
+      // Check for common errors
+      if (message.includes('Could not resolve')) {
+        return { success: false, error: `Repository not found: ${fullName}` }
+      }
+      if (message.includes('gh: command not found') || message.includes('not recognized')) {
+        return { success: false, error: 'GitHub CLI (gh) is not installed. Please install it from https://cli.github.com' }
+      }
+      if (message.includes('not logged in')) {
+        return { success: false, error: 'Not authenticated with GitHub. Run: gh auth login' }
+      }
+
+      return { success: false, error: message }
+    }
+  })
+
+  /**
+   * Clone a remote repository
+   * Shows a folder picker dialog to select destination, then clones the repo
+   */
+  handle('clone-repository', async (gitUrl: string): Promise<{ success: boolean; path?: string; error?: string }> => {
+    // Show folder picker for destination
+    const result = await dialog.showOpenDialog({
+      properties: ['openDirectory', 'createDirectory'],
+      title: 'Select Clone Destination',
+      buttonLabel: 'Clone Here',
+    })
+
+    if (result.canceled || result.filePaths.length === 0) {
+      return { success: false, error: 'Clone cancelled' }
+    }
+
+    const destDir = result.filePaths[0]
+
+    // Extract repo name from URL for the folder name
+    let repoName = 'repository'
+    try {
+      // Handle both https and ssh URLs
+      const match = gitUrl.match(/\/([^/]+?)(\.git)?$/) || gitUrl.match(/:([^/]+?)(\.git)?$/)
+      if (match) {
+        repoName = match[1]
+      }
+    } catch {
+      // Use default name
+    }
+
+    const clonePath = path.join(destDir, repoName)
+
+    try {
+      // Clone the repository
+      const git = simpleGit()
+      await git.clone(gitUrl, clonePath)
+
+      // Open the cloned repository
+      const manager = getRepositoryManager()
+      const previousPath = getRepoPath()
+      const ctx = await manager.open(clonePath)
+
+      setRepoPath(ctx.path)
+      saveLastRepoPath(ctx.path)
+      addRecentRepo(ctx.path)
+
+      // Emit events
+      emitRepoOpened(ctx.path)
+      if (previousPath && previousPath !== ctx.path) {
+        emitRepoSwitched(previousPath, ctx.path)
+      }
+
+      return { success: true, path: ctx.path }
+    } catch (error) {
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Failed to clone repository'
+      }
+    }
   })
 }

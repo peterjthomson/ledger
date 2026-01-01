@@ -53,8 +53,11 @@ export function AIChatPanel({ context, repoPath, onClose }: PluginPanelProps) {
           context.api.getBranches(),
           context.api.getCurrentBranch(),
         ])
-        setCommits(commitsData.slice(0, 50))
-        setBranches(branchesData)
+        // Ensure we always set arrays (API might return null/undefined on error)
+        const commits = Array.isArray(commitsData) ? commitsData : []
+        const branches = Array.isArray(branchesData) ? branchesData : []
+        setCommits(commits.slice(0, 50))
+        setBranches(branches)
         setCurrentBranch(branch || 'main')
       } catch (error) {
         console.error('Failed to load repo context:', error)

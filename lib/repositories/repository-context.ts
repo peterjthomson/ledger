@@ -8,6 +8,11 @@ import { v4 as uuidv4 } from 'uuid'
 export type RepositoryProvider = 'github' | 'gitlab' | 'bitbucket' | 'azure' | 'local'
 
 /**
+ * Repository type - local (cloned) or remote (API-only)
+ */
+export type RepositoryType = 'local' | 'remote'
+
+/**
  * Metadata about a repository that can be cached
  */
 export interface RepositoryMetadata {
@@ -19,21 +24,32 @@ export interface RepositoryMetadata {
 }
 
 /**
+ * Remote repository info (for API-only access)
+ */
+export interface RemoteRepoInfo {
+  owner: string
+  repo: string
+  fullName: string  // owner/repo
+}
+
+/**
  * Complete context for a repository instance
  *
  * This replaces the global `let git` and `let repoPath` variables
  * in git-service.ts. Each repository gets its own context with:
  * - Unique ID for tracking
- * - Path to the repository
- * - SimpleGit instance (no more global!)
+ * - Path to the repository (or null for remote)
+ * - SimpleGit instance (or null for remote)
  * - Metadata for display and caching
  */
 export interface RepositoryContext {
   id: string                    // UUID for this context
-  path: string                  // Filesystem path to repo root
-  name: string                  // Display name (folder name by default)
-  git: SimpleGit                // SimpleGit instance for this repo
+  type: RepositoryType          // 'local' or 'remote'
+  path: string | null           // Filesystem path (null for remote repos)
+  name: string                  // Display name
+  git: SimpleGit | null         // SimpleGit instance (null for remote repos)
   metadata: RepositoryMetadata
+  remote: RemoteRepoInfo | null // Remote info (for remote repos)
   lastAccessed: Date
 }
 
@@ -87,9 +103,11 @@ export const getDefaultBranch = async (git: SimpleGit): Promise<string> => {
   // Check for common defaults
   try {
     const branches = await git.branchLocal()
-    if (branches.all.includes('main')) return 'main'
-    if (branches.all.includes('master')) return 'master'
-    if (branches.all.length > 0) return branches.all[0]
+    // Safety: branches.all might be undefined in some edge cases
+    const allBranches = branches?.all ?? []
+    if (allBranches.includes('main')) return 'main'
+    if (allBranches.includes('master')) return 'master'
+    if (allBranches.length > 0) return allBranches[0]
   } catch {
     // Fall through to default
   }
@@ -158,12 +176,104 @@ export const createRepositoryContext = async (repoPath: string): Promise<Reposit
     lastFetched: null,
   }
 
+  // Extract remote info if available
+  let remote: RemoteRepoInfo | null = null
+  if (remoteUrl && provider === 'github') {
+    const match = remoteUrl.match(/github\.com[/:]([^/]+)\/([^/.]+)/)
+    if (match) {
+      remote = {
+        owner: match[1],
+        repo: match[2],
+        fullName: `${match[1]}/${match[2]}`,
+      }
+    }
+  }
+
   return {
     id: uuidv4(),
+    type: 'local',
     path: actualPath,
     name,
     git: simpleGit(actualPath), // Fresh instance at actual root
     metadata,
+    remote,
+    lastAccessed: new Date(),
+  }
+}
+
+/**
+ * Parse a GitHub repository identifier
+ * Supports: owner/repo, https://github.com/owner/repo, git@github.com:owner/repo.git
+ */
+export const parseGitHubRepo = (input: string): RemoteRepoInfo | null => {
+  // Try owner/repo format
+  let match = input.match(/^([a-zA-Z0-9_-]+)\/([a-zA-Z0-9_.-]+)$/)
+  if (match) {
+    return {
+      owner: match[1],
+      repo: match[2].replace(/\.git$/, ''),
+      fullName: `${match[1]}/${match[2].replace(/\.git$/, '')}`,
+    }
+  }
+
+  // Try HTTPS URL
+  match = input.match(/github\.com\/([^/]+)\/([^/.]+)/)
+  if (match) {
+    return {
+      owner: match[1],
+      repo: match[2],
+      fullName: `${match[1]}/${match[2]}`,
+    }
+  }
+
+  // Try SSH URL
+  match = input.match(/github\.com:([^/]+)\/([^/.]+)/)
+  if (match) {
+    return {
+      owner: match[1],
+      repo: match[2],
+      fullName: `${match[1]}/${match[2]}`,
+    }
+  }
+
+  return null
+}
+
+/**
+ * Create a remote repository context (API-only, no local clone)
+ *
+ * @param owner - GitHub owner/org
+ * @param repo - Repository name
+ * @param repoInfo - Repository info from GitHub API
+ * @returns A new RepositoryContext for remote access
+ */
+export const createRemoteRepositoryContext = (
+  owner: string,
+  repo: string,
+  repoInfo: { default_branch: string; html_url: string }
+): RepositoryContext => {
+  const remoteUrl = repoInfo.html_url
+
+  const metadata: RepositoryMetadata = {
+    name: repo,
+    defaultBranch: repoInfo.default_branch || 'main',
+    remoteUrl,
+    provider: 'github',
+    lastFetched: new Date(),
+  }
+
+  return {
+    id: uuidv4(),
+    type: 'remote',
+    path: null,  // No local path for remote repos
+    name: repo,
+    git: null,   // No git instance for remote repos
+    metadata,
+    remote: {
+      owner,
+      repo,
+      fullName: `${owner}/${repo}`,
+    },
     lastAccessed: new Date(),
   }
 }

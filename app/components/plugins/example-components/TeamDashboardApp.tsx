@@ -67,9 +67,10 @@ export function TeamDashboardApp({ context, activeNavItem }: PluginAppProps) {
           context.api.getPullRequests(),
           context.api.getBranches(),
         ])
-        setCommits(commitsData)
-        setPullRequests(prsData)
-        setBranches(branchesData)
+        // Ensure we always set arrays (API might return null/undefined on error)
+        setCommits(Array.isArray(commitsData) ? commitsData : [])
+        setPullRequests(Array.isArray(prsData) ? prsData : [])
+        setBranches(Array.isArray(branchesData) ? branchesData : [])
       } catch (error) {
         console.error('Failed to load dashboard data:', error)
       } finally {
@@ -194,9 +195,10 @@ export function TeamDashboardApp({ context, activeNavItem }: PluginAppProps) {
         context.api.refreshPullRequests?.() || context.api.getPullRequests(),
         context.api.refreshBranches?.() || context.api.getBranches(),
       ])
-      setCommits(commitsData)
-      setPullRequests(prsData)
-      setBranches(branchesData)
+      // Ensure we always set arrays (API might return null/undefined on error)
+      setCommits(Array.isArray(commitsData) ? commitsData : [])
+      setPullRequests(Array.isArray(prsData) ? prsData : [])
+      setBranches(Array.isArray(branchesData) ? branchesData : [])
     } catch (error) {
       console.error('Failed to refresh:', error)
     } finally {

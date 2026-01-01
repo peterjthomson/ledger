@@ -270,7 +270,9 @@ function getContextDependencies(): PluginContextDependencies {
     // IPC functions for refresh
     ipc: {
       getBranches: async () => {
-        const branches = await window.conveyor.branch.getBranches()
+        const result = await window.conveyor.branch.getBranches()
+        // Result is { current, branches } - extract the branches array
+        const branches = result.branches || []
         useRepositoryStore.getState().setBranches(branches)
         return branches
       },

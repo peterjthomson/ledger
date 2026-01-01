@@ -2863,6 +2863,9 @@
 }
 
 .repo-manager-add-section {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
   padding: 16px 20px;
   border-bottom: 1px solid var(--border);
 }
@@ -2888,4 +2891,102 @@
   border-color: var(--accent);
   color: var(--accent);
   background: var(--accent-bg);
+}
+
+/* Clone Remote Repository Section */
+.repo-manager-clone-section {
+  padding: 12px 20px 16px;
+  border-bottom: 1px solid var(--border);
+  background: var(--bg-secondary);
+}
+
+.repo-manager-clone-input-wrapper {
+  display: flex;
+  gap: 8px;
+}
+
+.repo-manager-clone-input {
+  flex: 1;
+  padding: 10px 12px;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  font-size: 13px;
+  font-family: var(--font-mono);
+}
+
+.repo-manager-clone-input:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px var(--accent-bg);
+}
+
+.repo-manager-clone-input::placeholder {
+  color: var(--text-muted);
+}
+
+.repo-manager-clone-input:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.repo-manager-clone-submit {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 10px 14px;
+  border-radius: 6px;
+  border: none;
+  background: var(--accent);
+  color: white;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.repo-manager-clone-submit:hover:not(:disabled) {
+  opacity: 0.9;
+}
+
+.repo-manager-clone-submit:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.repo-manager-clone-hint {
+  margin-top: 8px;
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+/* Connect section (slightly different color for distinction) */
+.repo-manager-connect-section {
+  background: var(--bg-tertiary, var(--bg-secondary));
+}
+
+.repo-manager-connect-submit {
+  background: var(--color-blue, #3b82f6);
+}
+
+/* Remote repository badge */
+.repo-manager-remote-badge {
+  display: inline-flex;
+  align-items: center;
+  margin-left: 6px;
+  padding: 2px 6px;
+  border-radius: 4px;
+  background: var(--color-blue-bg, rgba(59, 130, 246, 0.15));
+  color: var(--color-blue, #3b82f6);
+  font-size: 10px;
+  font-weight: 500;
+}
+
+/* Remote icon color */
+.repo-manager-remote-icon {
+  color: var(--color-blue, #3b82f6);
+}
+
+/* Remote repo item styling */
+.repo-manager-item.remote {
+  border-left: 2px solid var(--color-blue, #3b82f6);
 }

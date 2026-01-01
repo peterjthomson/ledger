@@ -17,7 +17,10 @@ export const registerBranchHandlers = () => {
     try {
       return await getBranches()
     } catch (error) {
-      return { error: (error as Error).message }
+      // Return empty result for remote repos or on error
+      // This prevents UI errors when .filter() is called on the result
+      console.error('[branch-handler] get-branches error:', error)
+      return { current: '', branches: [] }
     }
   })
 
@@ -25,7 +28,9 @@ export const registerBranchHandlers = () => {
     try {
       return await getBranchesBasic()
     } catch (error) {
-      return { error: (error as Error).message }
+      // Return empty result for remote repos or on error
+      console.error('[branch-handler] get-branches-basic error:', error)
+      return { current: '', branches: [] }
     }
   })
 
@@ -33,7 +38,9 @@ export const registerBranchHandlers = () => {
     try {
       return await getBranchesWithMetadata()
     } catch (error) {
-      return { error: (error as Error).message }
+      // Return empty result for remote repos or on error
+      console.error('[branch-handler] get-branches-with-metadata error:', error)
+      return { current: '', branches: [] }
     }
   })
 

@@ -1,7 +1,26 @@
 import { z } from 'zod'
 import { StagingFileDiffSchema, SuccessResultSchema } from './shared-types'
 
+const UncommittedFileSchema = z.object({
+  path: z.string(),
+  status: z.enum(['modified', 'added', 'deleted', 'renamed', 'untracked']),
+  staged: z.boolean(),
+})
+
+const WorkingStatusSchema = z.object({
+  hasChanges: z.boolean(),
+  files: z.array(UncommittedFileSchema),
+  stagedCount: z.number(),
+  unstagedCount: z.number(),
+  additions: z.number(),
+  deletions: z.number(),
+})
+
 export const stagingIpcSchema = {
+  'get-staging-status': {
+    args: z.tuple([]),
+    return: WorkingStatusSchema.nullable(),
+  },
   'stage-file': {
     args: z.tuple([z.string()]),
     return: SuccessResultSchema,

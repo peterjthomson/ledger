@@ -142,6 +142,7 @@ export default function App() {
   const [isResizingDetail, setIsResizingDetail] = useState(false)
   const [draggingColumn, setDraggingColumn] = useState<string | null>(null)
   const [dragOverColumn, setDragOverColumn] = useState<string | null>(null)
+  const [activePluginNavItem, setActivePluginNavItem] = useState<string | undefined>(undefined)
 
   const { setTitle, setTitlebarActions } = useWindowContext()
   const menuRef = useRef<HTMLDivElement>(null)
@@ -328,6 +329,20 @@ export default function App() {
     return plugin?.type === 'app' ? (plugin as AppPlugin) : null
   }, [activeAppId])
 
+  // Reset plugin nav item when switching apps, set to first nav item
+  useEffect(() => {
+    if (activeAppPlugin?.navigation?.length) {
+      setActivePluginNavItem(activeAppPlugin.navigation[0].id)
+    } else {
+      setActivePluginNavItem(undefined)
+    }
+  }, [activeAppPlugin])
+
+  // Handler for plugin navigation
+  const handlePluginNavigate = useCallback((itemId: string) => {
+    setActivePluginNavItem(itemId)
+  }, [])
+
   // Column drag and drop handlers for Radar view
   const handleColumnDragStart = useCallback((e: React.DragEvent, columnId: string) => {
     setDraggingColumn(columnId)
@@ -450,23 +465,21 @@ export default function App() {
         setCurrentBranch(branchResult.current)
       }
 
-      if ('error' in worktreeResult) {
-        setError((prev) => prev || worktreeResult.error)
-      } else {
-        setWorktrees(worktreeResult)
-      }
+      // Worktree handler returns [] on error, so just set whatever we got
+      setWorktrees(Array.isArray(worktreeResult) ? worktreeResult : [])
 
       if (prResult.error) {
         setPrError(prResult.error)
         setPullRequests([])
       } else {
-        setPullRequests(prResult.prs)
+        setPullRequests(prResult.prs || [])
       }
 
-      setCommits(commitResult)
-      setWorkingStatus(statusResult)
-      setGraphCommits(graphResult)
-      setStashes(stashResult)
+      // These handlers return empty arrays/objects on error, add safety checks
+      setCommits(Array.isArray(commitResult) ? commitResult : [])
+      setWorkingStatus(statusResult || { hasChanges: false, files: [], stagedCount: 0, unstagedCount: 0, additions: 0, deletions: 0 })
+      setGraphCommits(Array.isArray(graphResult) ? graphResult : [])
+      setStashes(Array.isArray(stashResult) ? stashResult : [])
 
       // Notify plugins that repository data has been refreshed
       repoRefreshed().catch((err) => console.error('[Plugin Hook] repoRefreshed error:', err))
@@ -476,7 +489,7 @@ export default function App() {
       window.conveyor.branch
         .getBranchesWithMetadata()
         .then((metaResult) => {
-          if (!('error' in metaResult)) {
+          if (!('error' in metaResult) && Array.isArray(metaResult.branches)) {
             setBranches(metaResult.branches)
           }
         })
@@ -1670,7 +1683,11 @@ export default function App() {
       {/* Plugin App Content - shown when a plugin app is active */}
       {repoPath && activeAppPlugin && (
         <main className="ledger-content plugin-app-view">
-          <PluginAppContainer plugin={activeAppPlugin} />
+          <PluginAppContainer
+            plugin={activeAppPlugin}
+            activeNavItem={activePluginNavItem}
+            onNavigate={handlePluginNavigate}
+          />
         </main>
       )}
 
@@ -1950,7 +1967,7 @@ export default function App() {
                       setShowCheckpoints(newValue)
                       try {
                         const graphResult = await window.conveyor.commit.getCommitGraphHistory(100, true, newValue)
-                        setGraphCommits(graphResult)
+                        setGraphCommits(Array.isArray(graphResult) ? graphResult : [])
                       } catch (err) {
                         console.error('Failed to update commit graph:', err)
                         setShowCheckpoints(!newValue)
@@ -2712,7 +2729,7 @@ export default function App() {
                             try {
                               // Reload commits with new filter
                               const graphResult = await window.conveyor.commit.getCommitGraphHistory(100, true, newValue)
-                              setGraphCommits(graphResult)
+                              setGraphCommits(Array.isArray(graphResult) ? graphResult : [])
                             } catch (err) {
                               console.error('Failed to update commit graph:', err)
                               setShowCheckpoints(!newValue)

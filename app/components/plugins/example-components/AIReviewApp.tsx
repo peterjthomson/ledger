@@ -69,8 +69,9 @@ export function AIReviewApp({ context, repoPath, activeNavItem, onNavigate }: Pl
         context.api.getCommits(50),
         context.api.getPullRequests(),
       ])
-      setCommits(commitsData)
-      setPRs(prsData)
+      // Ensure we always set arrays (API might return null/undefined on error)
+      setCommits(Array.isArray(commitsData) ? commitsData : [])
+      setPRs(Array.isArray(prsData) ? prsData : [])
     } catch (error) {
       context.logger.error('Failed to load data:', error)
     } finally {
