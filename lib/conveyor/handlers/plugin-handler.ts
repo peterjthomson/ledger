@@ -36,7 +36,7 @@ export const registerPluginHandlers = () => {
     try {
       return listInstalledPlugins()
     } catch (error) {
-      console.error('Failed to list installed plugins:', error)
+      console.error('[plugin-handler] plugin-list-installed error:', error)
       return []
     }
   })
@@ -46,7 +46,7 @@ export const registerPluginHandlers = () => {
     try {
       return getPluginManifest(pluginPath)
     } catch (error) {
-      console.error('Failed to get plugin manifest:', error)
+      console.error('[plugin-handler] plugin-get-manifest error:', error)
       return null
     }
   })
@@ -93,7 +93,7 @@ export const registerPluginHandlers = () => {
     try {
       return readPluginFile(pluginId, relativePath)
     } catch (error) {
-      console.error('Failed to read plugin file:', error)
+      console.error('[plugin-handler] plugin-read-file error:', error)
       return null
     }
   })

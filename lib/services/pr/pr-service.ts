@@ -10,8 +10,6 @@
  * NOTE: PR operations require GitHub CLI (gh) to be installed and authenticated.
  */
 
-import { exec } from 'child_process'
-import { promisify } from 'util'
 import { RepositoryContext } from '@/lib/repositories'
 import { stashChanges } from '@/lib/services/branch'
 import { safeExec } from '@/lib/utils/safe-exec'
@@ -25,8 +23,6 @@ import {
   MergePROptions,
   CheckoutResult,
 } from './pr-types'
-
-const execAsync = promisify(exec)
 
 /**
  * Get the GitHub remote URL for the repository
@@ -55,17 +51,40 @@ export async function getGitHubUrl(ctx: RepositoryContext): Promise<string | nul
 
 /**
  * Fetch open pull requests using GitHub CLI
+ * Uses safeExec to prevent command injection
  */
 export async function getPullRequests(ctx: RepositoryContext): Promise<PRListResult> {
   try {
     // Use gh CLI to list PRs in JSON format
     // Fetch all open PRs (filtering will happen in UI)
-    const { stdout } = await execAsync(
-      `gh pr list --state open --json number,title,author,headRefName,baseRefName,url,createdAt,updatedAt,additions,deletions,reviewDecision,labels,isDraft,comments`,
+    const result = await safeExec(
+      'gh',
+      [
+        'pr', 'list',
+        '--state', 'open',
+        '--json', 'number,title,author,headRefName,baseRefName,url,createdAt,updatedAt,additions,deletions,reviewDecision,labels,isDraft,comments'
+      ],
       { cwd: ctx.path }
     )
 
-    const rawPRs = JSON.parse(stdout)
+    if (!result.success) {
+      const errorMessage = result.stderr || 'Failed to fetch pull requests'
+
+      // Check for common errors
+      if (errorMessage.includes('gh: command not found') || errorMessage.includes('not recognized')) {
+        return { prs: [], error: 'GitHub CLI (gh) not installed. Install from https://cli.github.com' }
+      }
+      if (errorMessage.includes('not logged in') || errorMessage.includes('authentication')) {
+        return { prs: [], error: 'Not logged in to GitHub CLI. Run: gh auth login' }
+      }
+      if (errorMessage.includes('not a git repository') || errorMessage.includes('no git remotes')) {
+        return { prs: [], error: 'Not a GitHub repository' }
+      }
+
+      return { prs: [], error: errorMessage }
+    }
+
+    const rawPRs = JSON.parse(result.stdout)
 
     // Map to our interface (include all, filtering done in UI)
     const prs: PullRequest[] = rawPRs.map((pr: any) => ({
@@ -282,15 +301,25 @@ export async function mergePullRequest(
 
 /**
  * Get detailed PR information including comments, reviews, files
+ * Uses safeExec to prevent command injection
  */
 export async function getPRDetail(ctx: RepositoryContext, prNumber: number): Promise<PRDetail | null> {
   try {
-    const { stdout } = await execAsync(
-      `gh pr view ${prNumber} --json number,title,body,author,state,reviewDecision,baseRefName,headRefName,additions,deletions,createdAt,updatedAt,url,comments,reviews,files,commits`,
+    const result = await safeExec(
+      'gh',
+      [
+        'pr', 'view', prNumber.toString(),
+        '--json', 'number,title,body,author,state,reviewDecision,baseRefName,headRefName,additions,deletions,createdAt,updatedAt,url,comments,reviews,files,commits'
+      ],
       { cwd: ctx.path }
     )
 
-    const data = JSON.parse(stdout)
+    if (!result.success) {
+      console.error('Error fetching PR detail:', result.stderr)
+      return null
+    }
+
+    const data = JSON.parse(result.stdout)
 
     return {
       number: data.number,
@@ -416,7 +445,7 @@ export async function getPRFileDiff(
     // Parse the unified diff to extract just the file we want
     const lines = fullDiff.split('\n')
     let inTargetFile = false
-    const result: string[] = []
+    const diffLines: string[] = []
 
     for (let i = 0; i < lines.length; i++) {
       const line = lines[i]
@@ -431,11 +460,11 @@ export async function getPRFileDiff(
       }
 
       if (inTargetFile) {
-        result.push(line)
+        diffLines.push(line)
       }
     }
 
-    return result.length > 0 ? result.join('\n') : null
+    return diffLines.length > 0 ? diffLines.join('\n') : null
   } catch (error) {
     console.error('Error fetching PR file diff:', error)
     return null

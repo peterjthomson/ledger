@@ -10,7 +10,6 @@
 
 import * as fs from 'fs'
 import * as path from 'path'
-import { exec } from 'child_process'
 import { promisify } from 'util'
 import { RepositoryContext } from '@/lib/repositories'
 import { stashChanges } from '@/lib/services/branch'
@@ -25,7 +24,6 @@ import {
   WorktreeResult,
 } from './worktree-types'
 
-const execAsync = promisify(exec)
 const statAsync = promisify(fs.stat)
 
 /**
@@ -85,18 +83,21 @@ function detectAgent(worktreePath: string): WorktreeAgent {
 
 /**
  * Get diff stats for a worktree
+ * Uses safeExec to prevent command injection
  */
 async function getWorktreeDiffStats(worktreePath: string): Promise<WorktreeDiffStats & { changedFiles: string[] }> {
   try {
     // Get changed files count and names
-    const { stdout: statusOutput } = await execAsync('git status --porcelain', { cwd: worktreePath })
+    const statusResult = await safeExec('git', ['status', '--porcelain'], { cwd: worktreePath })
+    const statusOutput = statusResult.success ? statusResult.stdout : ''
     const changedFiles = statusOutput
       .split('\n')
       .filter(Boolean)
       .map((line) => line.slice(3))
 
     // Get diff stats (additions/deletions)
-    const { stdout: diffOutput } = await execAsync('git diff --shortstat', { cwd: worktreePath })
+    const diffResult = await safeExec('git', ['diff', '--shortstat'], { cwd: worktreePath })
+    const diffOutput = diffResult.success ? diffResult.stdout : ''
 
     let additions = 0
     let deletions = 0
@@ -149,11 +150,12 @@ function getContextHint(branch: string | null, changedFiles: string[], commitMes
 
 /**
  * Get last commit message for a worktree
+ * Uses safeExec to prevent command injection
  */
 async function getWorktreeCommitMessage(worktreePath: string): Promise<string> {
   try {
-    const { stdout } = await execAsync('git log -1 --format=%s', { cwd: worktreePath })
-    return stdout.trim()
+    const result = await safeExec('git', ['log', '-1', '--format=%s'], { cwd: worktreePath })
+    return result.success ? result.stdout.trim() : ''
   } catch {
     return ''
   }
@@ -366,13 +368,15 @@ export async function convertWorktreeToBranch(
       }
     }
 
-    // Get the diff from the worktree as a patch
-    const { stdout: patchOutput } = await execAsync('git diff HEAD', { cwd: worktreePath })
+    // Get the diff from the worktree as a patch (uses safeExec to prevent injection)
+    const patchResult = await safeExec('git', ['diff', 'HEAD'], { cwd: worktreePath })
+    const patchOutput = patchResult.success ? patchResult.stdout : ''
 
-    // Also get untracked files
-    const { stdout: untrackedOutput } = await execAsync('git ls-files --others --exclude-standard', {
+    // Also get untracked files (uses safeExec to prevent injection)
+    const untrackedResult = await safeExec('git', ['ls-files', '--others', '--exclude-standard'], {
       cwd: worktreePath,
     })
+    const untrackedOutput = untrackedResult.success ? untrackedResult.stdout : ''
     const untrackedFiles = untrackedOutput.split('\n').filter(Boolean)
 
     // Check if there are any changes
@@ -472,13 +476,15 @@ export async function applyWorktreeChanges(
       return { success: false, message: 'Cannot apply from the main repository to itself' }
     }
 
-    // Get the diff from the worktree as a patch
-    const { stdout: patchOutput } = await execAsync('git diff HEAD', { cwd: worktreePath })
+    // Get the diff from the worktree as a patch (uses safeExec to prevent injection)
+    const patchResult = await safeExec('git', ['diff', 'HEAD'], { cwd: worktreePath })
+    const patchOutput = patchResult.success ? patchResult.stdout : ''
 
-    // Also get list of untracked files
-    const { stdout: untrackedOutput } = await execAsync('git ls-files --others --exclude-standard', {
+    // Also get list of untracked files (uses safeExec to prevent injection)
+    const untrackedResult = await safeExec('git', ['ls-files', '--others', '--exclude-standard'], {
       cwd: worktreePath,
     })
+    const untrackedOutput = untrackedResult.success ? untrackedResult.stdout : ''
     const untrackedFiles = untrackedOutput.split('\n').filter(Boolean)
 
     // Check if there are any changes
@@ -563,11 +569,11 @@ export async function removeWorktree(
       return { success: false, message: 'Worktree not found' }
     }
 
-    // Check for uncommitted changes if not forcing
+    // Check for uncommitted changes if not forcing (uses safeExec to prevent injection)
     if (!force) {
       try {
-        const { stdout: statusOutput } = await execAsync('git status --porcelain', { cwd: worktreePath })
-        if (statusOutput.trim()) {
+        const statusResult = await safeExec('git', ['status', '--porcelain'], { cwd: worktreePath })
+        if (statusResult.success && statusResult.stdout.trim()) {
           return { success: false, message: 'Worktree has uncommitted changes. Use force to remove anyway.' }
         }
       } catch {

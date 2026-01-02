@@ -1091,7 +1091,8 @@ export default function App() {
       if (branch.current || switching) return
       handleLocalBranchSwitch(branch)
     },
-    [switching]
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- handleLocalBranchSwitch is stable in behavior
+    [switching, handleLocalBranchSwitch]
   )
 
   // Create a new branch
@@ -1185,7 +1186,8 @@ export default function App() {
 
   const handlePRDoubleClick = useCallback(async (pr: PullRequest) => {
     handlePRViewRemote(pr)
-  }, [])
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- handlePRViewRemote is stable in behavior
+  }, [handlePRViewRemote])
 
   const handleCommitDoubleClick = useCallback(
     async (commit: Commit) => {

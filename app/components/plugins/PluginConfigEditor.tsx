@@ -12,6 +12,7 @@ import { pluginSettingsStore } from '@/lib/plugins/plugin-settings-store'
 import {
   getPermissions,
   revokePermissions,
+  revokePermission,
   grantPermissions,
   describePermission,
 } from '@/lib/plugins/plugin-permissions'
@@ -131,26 +132,34 @@ export function PluginConfigEditor({ plugin, onClose }: PluginConfigEditorProps)
 
   const handleRevokePermission = useCallback(
     (permission: PluginPermission) => {
-      // Remove from granted permissions
-      const remaining = currentPermissions.filter((p) => p !== permission)
-      revokePermissions(plugin.id)
-      if (remaining.length > 0) {
-        grantPermissions(plugin.id, remaining)
+      try {
+        // Use granular revocation for single permission
+        revokePermission(plugin.id, permission)
+        setCurrentPermissions((prev) => prev.filter((p) => p !== permission))
+      } catch (error) {
+        console.error('[PluginConfig] Failed to revoke permission:', error)
       }
-      setCurrentPermissions(remaining)
     },
-    [plugin.id, currentPermissions]
+    [plugin.id]
   )
 
   const handleRevokeAll = useCallback(() => {
-    revokePermissions(plugin.id)
-    setCurrentPermissions([])
+    try {
+      revokePermissions(plugin.id)
+      setCurrentPermissions([])
+    } catch (error) {
+      console.error('[PluginConfig] Failed to revoke all permissions:', error)
+    }
   }, [plugin.id])
 
   const handleRestorePermission = useCallback(
     (permission: PluginPermission) => {
-      grantPermissions(plugin.id, [permission])
-      setCurrentPermissions((prev) => [...prev, permission])
+      try {
+        grantPermissions(plugin.id, [permission])
+        setCurrentPermissions((prev) => [...prev, permission])
+      } catch (error) {
+        console.error('[PluginConfig] Failed to restore permission:', error)
+      }
     },
     [plugin.id]
   )
