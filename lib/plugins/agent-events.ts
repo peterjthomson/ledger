@@ -361,6 +361,40 @@ class AgentEventBus {
       this.activityTimers.delete(path + ':stale')
     }
   }
+
+  /**
+   * Cleanup all resources
+   *
+   * Call this when shutting down the app or when the event bus is no longer needed.
+   * Clears all timers, listeners, and state.
+   */
+  cleanup(): void {
+    // Clear all timers
+    for (const timer of this.activityTimers.values()) {
+      clearTimeout(timer)
+    }
+    this.activityTimers.clear()
+
+    // Clear all listeners
+    this.listeners.clear()
+
+    // Clear all state
+    this.agentStates.clear()
+
+    console.info('[AgentEvents] Cleaned up all resources')
+  }
+
+  /**
+   * Clear all activity timers without clearing state or listeners
+   *
+   * Useful when pausing activity monitoring temporarily.
+   */
+  clearAllTimers(): void {
+    for (const timer of this.activityTimers.values()) {
+      clearTimeout(timer)
+    }
+    this.activityTimers.clear()
+  }
 }
 
 // Singleton export

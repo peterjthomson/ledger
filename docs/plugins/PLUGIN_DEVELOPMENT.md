@@ -454,7 +454,7 @@ async activate(context: PluginContext) {
 
 ### 3. Clean Up Resources
 
-Always clean up in `deactivate`:
+Always clean up in `deactivate`. The plugin system provides multiple cleanup mechanisms:
 
 ```typescript
 let intervalId: number | null = null
@@ -462,18 +462,31 @@ let intervalId: number | null = null
 async activate(context: PluginContext) {
   intervalId = setInterval(() => { /* ... */ }, 5000)
 
+  // Register cleanup callback - automatically called when plugin is deactivated
   context.subscriptions.onDispose(() => {
     if (intervalId) clearInterval(intervalId)
+  })
+
+  // Subscribe to events - automatically cleaned up on deactivation
+  context.events.on('repo:switched', (event) => {
+    // Handle repo change
   })
 }
 
 async deactivate() {
+  // Manual cleanup (for resources not registered with onDispose)
   if (intervalId) {
     clearInterval(intervalId)
     intervalId = null
   }
 }
 ```
+
+**Cleanup lifecycle:**
+1. Plugin's `deactivate()` method is called first
+2. All event subscriptions are automatically removed
+3. All `onDispose` callbacks are executed
+4. Plugin context is disposed and removed from cache
 
 ### 4. Respect User Settings
 

@@ -9,7 +9,8 @@
       "Bash(npm run lint:*)",
       "Bash(grep:*)",
       "Bash(tree:*)",
-      "Bash(find:*)"
+      "Bash(find:*)",
+      "Bash(ls:*)"
     ]
   }
 }

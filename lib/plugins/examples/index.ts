@@ -20,6 +20,9 @@ export { aiReviewAppPlugin } from './ai-review-app'
 /** Team Dashboard - Manager oversight and analytics */
 export { teamDashboardPlugin } from './team-dashboard-app'
 
+/** Agent Events Inbox - Real-time agent event monitoring */
+export { agentEventsInboxPlugin } from './agent-events-inbox-app'
+
 // ============================================================================
 // Panel Plugins
 // ============================================================================
@@ -65,6 +68,7 @@ export { commitAnalyzerPlugin } from './commit-analyzer-plugin'
 
 import { aiReviewAppPlugin } from './ai-review-app'
 import { teamDashboardPlugin } from './team-dashboard-app'
+import { agentEventsInboxPlugin } from './agent-events-inbox-app'
 import { aiChatPanelPlugin } from './ai-chat-panel'
 import { prReviewQueuePlugin } from './pr-review-queue-panel'
 import { standupNotesPlugin } from './standup-notes-panel'
@@ -81,6 +85,7 @@ export const examplePlugins = [
   // Apps
   aiReviewAppPlugin,
   teamDashboardPlugin,
+  agentEventsInboxPlugin,
   // Panels
   aiChatPanelPlugin,
   prReviewQueuePlugin,
@@ -98,7 +103,7 @@ export const examplePlugins = [
  * Example plugins by type
  */
 export const examplePluginsByType = {
-  app: [aiReviewAppPlugin, teamDashboardPlugin],
+  app: [aiReviewAppPlugin, teamDashboardPlugin, agentEventsInboxPlugin],
   panel: [aiChatPanelPlugin, prReviewQueuePlugin, standupNotesPlugin, repositoryManagerPlugin],
   widget: [commitSuggesterWidgetPlugin, branchHealthWidgetPlugin],
   service: [autoFetchServicePlugin, slackNotificationsPlugin],

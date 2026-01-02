@@ -267,13 +267,26 @@ function getContextDependencies(): PluginContextDependencies {
     getOpenPanels: () => usePluginStore.getState().openPanels,
     setActiveApp: (appId) => usePluginStore.getState().setActiveApp(appId),
 
-    // IPC functions for refresh
+    // IPC functions for fetching fresh data
+    // These update the store AND return the data for immediate use
+    //
+    // NOTE: Conveyor API response formats vary by endpoint:
+    // - getBranches: Returns { current, branches } wrapper object
+    // - getWorktrees: Returns array directly (or { error } on failure)
+    // - getPullRequests: Returns { prs, error? } wrapper object
+    // - getCommitHistory: Returns array directly
+    // - getStagingStatus: Returns object directly (or null)
+    //
+    // Each handler below normalizes these to return consistent data types.
     ipc: {
       getBranches: async () => {
         const result = await window.conveyor.branch.getBranches()
         // Result is { current, branches } - extract the branches array
         const branches = result.branches || []
         useRepositoryStore.getState().setBranches(branches)
+        if (result.current) {
+          useRepositoryStore.getState().setCurrentBranch(result.current)
+        }
         return branches
       },
       getWorktrees: async () => {
@@ -289,8 +302,8 @@ function getContextDependencies(): PluginContextDependencies {
         }
         return []
       },
-      getCommitHistory: async () => {
-        const commits = await window.conveyor.commit.getCommitHistory()
+      getCommitHistory: async (limit?: number) => {
+        const commits = await window.conveyor.commit.getCommitHistory(limit)
         useRepositoryStore.getState().setCommits(commits)
         return commits
       },
@@ -308,8 +321,32 @@ function getContextDependencies(): PluginContextDependencies {
 /**
  * Cache of plugin contexts by ID.
  * Since deps are cached, we can also cache the resulting contexts.
+ * Cache is cleared when plugins are deactivated to ensure fresh contexts.
  */
 const pluginContextCache = new Map<string, PluginContext>()
+
+/**
+ * Track event subscriptions for cleanup.
+ * Stored at module level to allow cleanup on hot reload or app shutdown.
+ */
+const cacheCleanupUnsubscribers: Array<() => void> = []
+
+// Subscribe to plugin deactivation events to clear cached contexts
+// This ensures plugins get fresh contexts when reactivated
+if (typeof window !== 'undefined') {
+  // Clear any previous subscriptions (handles hot reload)
+  cacheCleanupUnsubscribers.forEach((unsub) => unsub())
+  cacheCleanupUnsubscribers.length = 0
+
+  const unsubDeactivated = pluginManager.on('deactivated', (event) => {
+    pluginContextCache.delete(event.pluginId)
+  })
+  const unsubUnregistered = pluginManager.on('unregistered', (event) => {
+    pluginContextCache.delete(event.pluginId)
+  })
+
+  cacheCleanupUnsubscribers.push(unsubDeactivated, unsubUnregistered)
+}
 
 /**
  * Create a plugin context with full API access.
@@ -324,6 +361,22 @@ function createFullPluginContext(pluginId: string): PluginContext {
   context = createPluginContext(pluginId, deps)
   pluginContextCache.set(pluginId, context)
   return context
+}
+
+/**
+ * Clear a plugin's cached context.
+ * Call this when a plugin is deactivated to ensure it gets a fresh context on reactivation.
+ */
+export function clearPluginContextCache(pluginId: string): void {
+  pluginContextCache.delete(pluginId)
+}
+
+/**
+ * Clear all cached plugin contexts.
+ * Useful when switching repositories or during cleanup.
+ */
+export function clearAllPluginContextCaches(): void {
+  pluginContextCache.clear()
 }
 
 function PluginLoadingState() {

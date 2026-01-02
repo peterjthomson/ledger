@@ -4317,6 +4317,151 @@ body,
   background: var(--bg-secondary);
 }
 
+/* ----------------------------------------
+   Permission Dialog
+   ---------------------------------------- */
+
+.permission-dialog {
+  width: 480px;
+  max-width: 95vw;
+}
+
+.permission-dialog-header-content {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: var(--text-primary);
+}
+
+.permission-dialog-intro {
+  font-size: 14px;
+  color: var(--text-secondary);
+  margin: 0 0 16px 0;
+}
+
+.permission-dialog-intro strong {
+  color: var(--text-primary);
+}
+
+.permission-dialog-warning {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 12px 14px;
+  background: rgba(255, 179, 0, 0.1);
+  border: 1px solid rgba(255, 179, 0, 0.3);
+  border-radius: 8px;
+  margin-bottom: 16px;
+  font-size: 13px;
+  color: var(--color-warning, #ffb300);
+}
+
+.permission-dialog-warning svg {
+  flex-shrink: 0;
+  margin-top: 1px;
+}
+
+.permission-list {
+  list-style: none;
+  padding: 0;
+  margin: 0 0 16px 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.permission-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 12px 14px;
+  border-radius: 8px;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.permission-item:hover {
+  border-color: var(--border-strong);
+}
+
+.permission-item.selected {
+  border-color: var(--accent);
+  background: rgba(0, 122, 255, 0.05);
+}
+
+.permission-checkbox {
+  position: relative;
+  flex-shrink: 0;
+}
+
+.permission-checkbox input {
+  position: absolute;
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+.permission-check-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  border-radius: 4px;
+  border: 2px solid var(--border-strong);
+  background: var(--bg-primary);
+  color: white;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.permission-item.selected .permission-check-icon {
+  background: var(--accent);
+  border-color: var(--accent);
+}
+
+.permission-content {
+  flex: 1;
+  min-width: 0;
+}
+
+.permission-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 4px;
+}
+
+.permission-label {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--text-primary);
+}
+
+.permission-risk {
+  font-size: 11px;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.permission-description {
+  font-size: 12px;
+  color: var(--text-muted);
+  margin: 0;
+  line-height: 1.4;
+}
+
+.permission-dialog-note {
+  font-size: 12px;
+  color: var(--text-muted);
+  margin: 0;
+  text-align: center;
+}
+
 /* ========================================
    Resizable Panels
    ======================================== */

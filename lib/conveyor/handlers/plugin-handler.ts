@@ -28,6 +28,7 @@ import {
   isConnected,
   type PluginStorageOptions,
 } from '@/lib/data'
+import { serializeError, logHandlerError } from '@/lib/utils/error-helpers'
 
 export const registerPluginHandlers = () => {
   // List installed plugins
@@ -35,7 +36,7 @@ export const registerPluginHandlers = () => {
     try {
       return listInstalledPlugins()
     } catch (error) {
-      console.error('Failed to list installed plugins:', error)
+      console.error('[plugin-handler] plugin-list-installed error:', error)
       return []
     }
   })
@@ -45,7 +46,7 @@ export const registerPluginHandlers = () => {
     try {
       return getPluginManifest(pluginPath)
     } catch (error) {
-      console.error('Failed to get plugin manifest:', error)
+      console.error('[plugin-handler] plugin-get-manifest error:', error)
       return null
     }
   })
@@ -55,7 +56,7 @@ export const registerPluginHandlers = () => {
     try {
       return await installPlugin(source)
     } catch (error) {
-      return { success: false, message: (error as Error).message }
+      return { success: false, message: serializeError(error) }
     }
   })
 
@@ -64,7 +65,7 @@ export const registerPluginHandlers = () => {
     try {
       return await uninstallPlugin(pluginId)
     } catch (error) {
-      return { success: false, message: (error as Error).message }
+      return { success: false, message: serializeError(error) }
     }
   })
 
@@ -73,7 +74,7 @@ export const registerPluginHandlers = () => {
     try {
       return setPluginEnabled(pluginId, enabled)
     } catch (error) {
-      return { success: false, message: (error as Error).message }
+      return { success: false, message: serializeError(error) }
     }
   })
 
@@ -92,7 +93,7 @@ export const registerPluginHandlers = () => {
     try {
       return readPluginFile(pluginId, relativePath)
     } catch (error) {
-      console.error('Failed to read plugin file:', error)
+      console.error('[plugin-handler] plugin-read-file error:', error)
       return null
     }
   })
@@ -102,7 +103,7 @@ export const registerPluginHandlers = () => {
     try {
       return await cloneRepository(gitUrl, targetDir)
     } catch (error) {
-      return { success: false, message: (error as Error).message }
+      return { success: false, message: serializeError(error) }
     }
   })
 
@@ -111,7 +112,7 @@ export const registerPluginHandlers = () => {
     try {
       return await downloadFile(url, targetPath)
     } catch (error) {
-      return { success: false, message: (error as Error).message }
+      return { success: false, message: serializeError(error) }
     }
   })
 
@@ -127,7 +128,7 @@ export const registerPluginHandlers = () => {
     try {
       return { success: true, data: getPluginData(pluginId, key) }
     } catch (error) {
-      return { success: false, message: (error as Error).message }
+      return { success: false, message: serializeError(error) }
     }
   })
 
@@ -142,7 +143,7 @@ export const registerPluginHandlers = () => {
         setPluginData(pluginId, key, value, options)
         return { success: true }
       } catch (error) {
-        return { success: false, message: (error as Error).message }
+        return { success: false, message: serializeError(error) }
       }
     }
   )
@@ -156,7 +157,7 @@ export const registerPluginHandlers = () => {
       const deleted = deletePluginData(pluginId, key)
       return { success: true, deleted }
     } catch (error) {
-      return { success: false, message: (error as Error).message }
+      return { success: false, message: serializeError(error) }
     }
   })
 
@@ -168,7 +169,7 @@ export const registerPluginHandlers = () => {
     try {
       return { success: true, keys: getPluginKeys(pluginId) }
     } catch (error) {
-      return { success: false, message: (error as Error).message, keys: [] }
+      return { success: false, message: serializeError(error), keys: [] }
     }
   })
 
@@ -181,7 +182,7 @@ export const registerPluginHandlers = () => {
       const count = clearPluginData(pluginId)
       return { success: true, count }
     } catch (error) {
-      return { success: false, message: (error as Error).message, count: 0 }
+      return { success: false, message: serializeError(error), count: 0 }
     }
   })
 
@@ -190,7 +191,7 @@ export const registerPluginHandlers = () => {
     try {
       return { success: true, info: getPluginDatabaseInfo(pluginId) }
     } catch (error) {
-      return { success: false, message: (error as Error).message }
+      return { success: false, message: serializeError(error) }
     }
   })
 }

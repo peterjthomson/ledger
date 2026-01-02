@@ -10,10 +10,9 @@
  * NOTE: PR operations require GitHub CLI (gh) to be installed and authenticated.
  */
 
-import { exec } from 'child_process'
-import { promisify } from 'util'
 import { RepositoryContext } from '@/lib/repositories'
 import { stashChanges } from '@/lib/services/branch'
+import { safeExec } from '@/lib/utils/safe-exec'
 import {
   PullRequest,
   PRDetail,
@@ -24,8 +23,6 @@ import {
   MergePROptions,
   CheckoutResult,
 } from './pr-types'
-
-const execAsync = promisify(exec)
 
 /**
  * Get the GitHub remote URL for the repository
@@ -54,17 +51,40 @@ export async function getGitHubUrl(ctx: RepositoryContext): Promise<string | nul
 
 /**
  * Fetch open pull requests using GitHub CLI
+ * Uses safeExec to prevent command injection
  */
 export async function getPullRequests(ctx: RepositoryContext): Promise<PRListResult> {
   try {
     // Use gh CLI to list PRs in JSON format
     // Fetch all open PRs (filtering will happen in UI)
-    const { stdout } = await execAsync(
-      `gh pr list --state open --json number,title,author,headRefName,baseRefName,url,createdAt,updatedAt,additions,deletions,reviewDecision,labels,isDraft,comments`,
+    const result = await safeExec(
+      'gh',
+      [
+        'pr', 'list',
+        '--state', 'open',
+        '--json', 'number,title,author,headRefName,baseRefName,url,createdAt,updatedAt,additions,deletions,reviewDecision,labels,isDraft,comments'
+      ],
       { cwd: ctx.path }
     )
 
-    const rawPRs = JSON.parse(stdout)
+    if (!result.success) {
+      const errorMessage = result.stderr || 'Failed to fetch pull requests'
+
+      // Check for common errors
+      if (errorMessage.includes('gh: command not found') || errorMessage.includes('not recognized')) {
+        return { prs: [], error: 'GitHub CLI (gh) not installed. Install from https://cli.github.com' }
+      }
+      if (errorMessage.includes('not logged in') || errorMessage.includes('authentication')) {
+        return { prs: [], error: 'Not logged in to GitHub CLI. Run: gh auth login' }
+      }
+      if (errorMessage.includes('not a git repository') || errorMessage.includes('no git remotes')) {
+        return { prs: [], error: 'Not a GitHub repository' }
+      }
+
+      return { prs: [], error: errorMessage }
+    }
+
+    const rawPRs = JSON.parse(result.stdout)
 
     // Map to our interface (include all, filtering done in UI)
     const prs: PullRequest[] = rawPRs.map((pr: any) => ({
@@ -105,10 +125,14 @@ export async function getPullRequests(ctx: RepositoryContext): Promise<PRListRes
 
 /**
  * Open a PR in the browser
+ * Uses safeExec to prevent command injection
  */
 export async function openPullRequest(url: string): Promise<PROperationResult> {
   try {
-    await execAsync(`open "${url}"`)
+    const result = await safeExec('open', [url])
+    if (!result.success) {
+      return { success: false, message: result.stderr || 'Failed to open browser' }
+    }
     return { success: true, message: 'Opened PR in browser' }
   } catch (error) {
     return { success: false, message: (error as Error).message }
@@ -139,6 +163,7 @@ async function pushBranchForPR(
 
 /**
  * Create a new pull request
+ * Uses safeExec to prevent command injection (title/body passed as separate arguments)
  */
 export async function createPullRequest(
   ctx: RepositoryContext,
@@ -152,16 +177,11 @@ export async function createPullRequest(
       return { success: false, message: `Failed to push branch: ${pushResult.message}` }
     }
 
-    const args = ['pr', 'create']
-
-    // Escape single quotes in title and body for shell
-    const escapeForShell = (str: string) => str.replace(/'/g, "'\\''")
-
-    args.push('--title', `'${escapeForShell(options.title)}'`)
+    // Build args array - no shell escaping needed with safeExec
+    const args = ['pr', 'create', '--title', options.title]
 
     // Always provide body (required for non-interactive mode)
-    const body = options.body || ''
-    args.push('--body', `'${escapeForShell(body)}'`)
+    args.push('--body', options.body || '')
 
     if (options.headBranch) {
       args.push('--head', options.headBranch)
@@ -178,12 +198,27 @@ export async function createPullRequest(
     if (options.web) {
       // Open in browser for full editing
       args.push('--web')
-      await execAsync(`gh ${args.join(' ')}`, { cwd: ctx.path })
+      const result = await safeExec('gh', args, { cwd: ctx.path })
+      if (!result.success) {
+        return { success: false, message: result.stderr || 'Failed to open browser' }
+      }
       return { success: true, message: 'Opened PR creation in browser' }
     }
 
-    const { stdout } = await execAsync(`gh ${args.join(' ')}`, { cwd: ctx.path })
-    const url = stdout.trim()
+    const result = await safeExec('gh', args, { cwd: ctx.path })
+
+    if (!result.success) {
+      const errorMessage = result.stderr || 'Failed to create PR'
+      if (errorMessage.includes('already exists')) {
+        return { success: false, message: 'A pull request already exists for this branch' }
+      }
+      if (errorMessage.includes('not logged')) {
+        return { success: false, message: 'Not logged into GitHub CLI. Run `gh auth login` in terminal.' }
+      }
+      return { success: false, message: errorMessage }
+    }
+
+    const url = result.stdout.trim()
 
     return {
       success: true,
@@ -205,6 +240,7 @@ export async function createPullRequest(
 
 /**
  * Merge a pull request (full options)
+ * Uses safeExec to prevent command injection
  */
 export async function mergePullRequest(
   ctx: RepositoryContext,
@@ -223,7 +259,35 @@ export async function mergePullRequest(
       args.push('--delete-branch')
     }
 
-    await execAsync(`gh ${args.join(' ')}`, { cwd: ctx.path })
+    const result = await safeExec('gh', args, { cwd: ctx.path })
+
+    if (!result.success) {
+      const errorMessage = result.stderr || 'Failed to merge PR'
+
+      // Check if merge succeeded but branch deletion failed (e.g., branch in use by worktree)
+      if (errorMessage.includes('was already merged') && errorMessage.includes('Cannot delete branch')) {
+        return {
+          success: true,
+          message: `PR #${prNumber} merged! Branch not deleted (in use by a worktree).`,
+        }
+      }
+
+      // Check for common errors
+      if (errorMessage.includes('not mergeable')) {
+        return { success: false, message: 'Pull request is not mergeable. Check for conflicts or required checks.' }
+      }
+      if (errorMessage.includes('not logged')) {
+        return { success: false, message: 'Not logged into GitHub CLI. Run `gh auth login` in terminal.' }
+      }
+      if (errorMessage.includes('MERGED')) {
+        return { success: false, message: 'Pull request has already been merged.' }
+      }
+      if (errorMessage.includes('CLOSED')) {
+        return { success: false, message: 'Pull request is closed.' }
+      }
+
+      return { success: false, message: errorMessage }
+    }
 
     return {
       success: true,
@@ -231,44 +295,31 @@ export async function mergePullRequest(
     }
   } catch (error) {
     const errorMessage = (error as Error).message
-
-    // Check if merge succeeded but branch deletion failed (e.g., branch in use by worktree)
-    if (errorMessage.includes('was already merged') && errorMessage.includes('Cannot delete branch')) {
-      return {
-        success: true,
-        message: `PR #${prNumber} merged! Branch not deleted (in use by a worktree).`,
-      }
-    }
-
-    // Check for common errors
-    if (errorMessage.includes('not mergeable')) {
-      return { success: false, message: 'Pull request is not mergeable. Check for conflicts or required checks.' }
-    }
-    if (errorMessage.includes('not logged')) {
-      return { success: false, message: 'Not logged into GitHub CLI. Run `gh auth login` in terminal.' }
-    }
-    if (errorMessage.includes('MERGED')) {
-      return { success: false, message: 'Pull request has already been merged.' }
-    }
-    if (errorMessage.includes('CLOSED')) {
-      return { success: false, message: 'Pull request is closed.' }
-    }
-
     return { success: false, message: errorMessage }
   }
 }
 
 /**
  * Get detailed PR information including comments, reviews, files
+ * Uses safeExec to prevent command injection
  */
 export async function getPRDetail(ctx: RepositoryContext, prNumber: number): Promise<PRDetail | null> {
   try {
-    const { stdout } = await execAsync(
-      `gh pr view ${prNumber} --json number,title,body,author,state,reviewDecision,baseRefName,headRefName,additions,deletions,createdAt,updatedAt,url,comments,reviews,files,commits`,
+    const result = await safeExec(
+      'gh',
+      [
+        'pr', 'view', prNumber.toString(),
+        '--json', 'number,title,body,author,state,reviewDecision,baseRefName,headRefName,additions,deletions,createdAt,updatedAt,url,comments,reviews,files,commits'
+      ],
       { cwd: ctx.path }
     )
 
-    const data = JSON.parse(stdout)
+    if (!result.success) {
+      console.error('Error fetching PR detail:', result.stderr)
+      return null
+    }
+
+    const data = JSON.parse(result.stdout)
 
     return {
       number: data.number,
@@ -337,11 +388,18 @@ export async function getPRReviewComments(
 
     const [, owner, repo] = match
 
-    const { stdout } = await execAsync(`gh api /repos/${owner}/${repo}/pulls/${prNumber}/comments`, {
-      cwd: ctx.path,
-    })
+    // Use safeExec to prevent command injection
+    const result = await safeExec(
+      'gh',
+      ['api', `/repos/${owner}/${repo}/pulls/${prNumber}/comments`],
+      { cwd: ctx.path }
+    )
+    if (!result.success) {
+      console.error('Error fetching PR review comments:', result.stderr)
+      return []
+    }
 
-    const comments = JSON.parse(stdout)
+    const comments = JSON.parse(result.stdout)
 
     return comments.map((c: any) => ({
       id: c.id,
@@ -373,15 +431,21 @@ export async function getPRFileDiff(
 ): Promise<string | null> {
   try {
     // gh pr diff doesn't support file filtering, so get full diff and parse
-    const { stdout: fullDiff } = await execAsync(`gh pr diff ${prNumber}`, {
+    // Use safeExec to prevent command injection
+    const result = await safeExec('gh', ['pr', 'diff', prNumber.toString()], {
       cwd: ctx.path,
-      maxBuffer: 10 * 1024 * 1024, // 10MB buffer for large diffs
+      timeout: 60000, // 60s timeout for large diffs
     })
+    if (!result.success) {
+      console.error('Error fetching PR file diff:', result.stderr)
+      return null
+    }
+    const fullDiff = result.stdout
 
     // Parse the unified diff to extract just the file we want
     const lines = fullDiff.split('\n')
     let inTargetFile = false
-    const result: string[] = []
+    const diffLines: string[] = []
 
     for (let i = 0; i < lines.length; i++) {
       const line = lines[i]
@@ -396,11 +460,11 @@ export async function getPRFileDiff(
       }
 
       if (inTargetFile) {
-        result.push(line)
+        diffLines.push(line)
       }
     }
 
-    return result.length > 0 ? result.join('\n') : null
+    return diffLines.length > 0 ? diffLines.join('\n') : null
   } catch (error) {
     console.error('Error fetching PR file diff:', error)
     return null
@@ -409,6 +473,7 @@ export async function getPRFileDiff(
 
 /**
  * Add a comment to a PR
+ * Uses safeExec to prevent command injection (body passed as separate argument)
  */
 export async function commentOnPR(
   ctx: RepositoryContext,
@@ -416,10 +481,20 @@ export async function commentOnPR(
   body: string
 ): Promise<PROperationResult> {
   try {
-    // Escape the body for shell
-    const escapedBody = body.replace(/"/g, '\\"').replace(/`/g, '\\`').replace(/\$/g, '\\$')
+    // Use safeExec with array args - no shell interpolation, body passed directly
+    const result = await safeExec('gh', ['pr', 'comment', prNumber.toString(), '--body', body], {
+      cwd: ctx.path,
+    })
 
-    await execAsync(`gh pr comment ${prNumber} --body "${escapedBody}"`, { cwd: ctx.path })
+    if (!result.success) {
+      const errorMessage = result.stderr || 'Failed to add comment'
+
+      if (errorMessage.includes('not logged')) {
+        return { success: false, message: 'Not logged into GitHub CLI. Run `gh auth login` in terminal.' }
+      }
+
+      return { success: false, message: errorMessage }
+    }
 
     return { success: true, message: 'Comment added' }
   } catch (error) {
@@ -435,6 +510,7 @@ export async function commentOnPR(
 
 /**
  * Merge a PR (simplified interface)
+ * Uses safeExec to prevent command injection
  */
 export async function mergePR(
   ctx: RepositoryContext,
@@ -442,33 +518,39 @@ export async function mergePR(
   mergeMethod: 'merge' | 'squash' | 'rebase' = 'merge'
 ): Promise<PROperationResult> {
   try {
-    const methodFlag = mergeMethod === 'merge' ? '--merge' : mergeMethod === 'squash' ? '--squash' : '--rebase'
-    const cmd = `gh pr merge ${prNumber} ${methodFlag} --delete-branch`
+    const methodFlag = `--${mergeMethod}`
+    const args = ['pr', 'merge', prNumber.toString(), methodFlag, '--delete-branch']
 
-    await execAsync(cmd, { cwd: ctx.path })
+    const result = await safeExec('gh', args, { cwd: ctx.path })
+
+    if (!result.success) {
+      const errorMessage = result.stderr || 'Failed to merge PR'
+
+      if (errorMessage.includes('not logged')) {
+        return { success: false, message: 'Not logged into GitHub CLI. Run `gh auth login` in terminal.' }
+      }
+
+      if (errorMessage.includes('already been merged')) {
+        return { success: false, message: 'This PR has already been merged' }
+      }
+
+      if (errorMessage.includes('not mergeable')) {
+        return { success: false, message: 'PR is not mergeable. Check for conflicts or required checks.' }
+      }
+
+      return { success: false, message: errorMessage }
+    }
 
     return { success: true, message: 'PR merged successfully' }
   } catch (error) {
     const errorMessage = (error as Error).message
-
-    if (errorMessage.includes('not logged')) {
-      return { success: false, message: 'Not logged into GitHub CLI. Run `gh auth login` in terminal.' }
-    }
-
-    if (errorMessage.includes('already been merged')) {
-      return { success: false, message: 'This PR has already been merged' }
-    }
-
-    if (errorMessage.includes('not mergeable')) {
-      return { success: false, message: 'PR is not mergeable. Check for conflicts or required checks.' }
-    }
-
     return { success: false, message: errorMessage }
   }
 }
 
 /**
  * Open a branch in GitHub
+ * Uses safeExec to prevent command injection
  */
 export async function openBranchInGitHub(
   ctx: RepositoryContext,
@@ -484,7 +566,10 @@ export async function openBranchInGitHub(
     const cleanBranch = branchName.replace(/^remotes\/origin\//, '').replace(/^origin\//, '')
     const url = `${baseUrl}/tree/${cleanBranch}`
 
-    await execAsync(`open "${url}"`)
+    const result = await safeExec('open', [url])
+    if (!result.success) {
+      return { success: false, message: result.stderr || 'Failed to open browser' }
+    }
     return { success: true, message: `Opened ${cleanBranch} in browser` }
   } catch (error) {
     return { success: false, message: (error as Error).message }

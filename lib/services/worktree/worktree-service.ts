@@ -10,10 +10,10 @@
 
 import * as fs from 'fs'
 import * as path from 'path'
-import { exec } from 'child_process'
 import { promisify } from 'util'
 import { RepositoryContext } from '@/lib/repositories'
 import { stashChanges } from '@/lib/services/branch'
+import { safeExec } from '@/lib/utils/safe-exec'
 import {
   WorktreeAgent,
   WorktreeActivityStatus,
@@ -24,7 +24,6 @@ import {
   WorktreeResult,
 } from './worktree-types'
 
-const execAsync = promisify(exec)
 const statAsync = promisify(fs.stat)
 
 /**
@@ -84,18 +83,21 @@ function detectAgent(worktreePath: string): WorktreeAgent {
 
 /**
  * Get diff stats for a worktree
+ * Uses safeExec to prevent command injection
  */
 async function getWorktreeDiffStats(worktreePath: string): Promise<WorktreeDiffStats & { changedFiles: string[] }> {
   try {
     // Get changed files count and names
-    const { stdout: statusOutput } = await execAsync('git status --porcelain', { cwd: worktreePath })
+    const statusResult = await safeExec('git', ['status', '--porcelain'], { cwd: worktreePath })
+    const statusOutput = statusResult.success ? statusResult.stdout : ''
     const changedFiles = statusOutput
       .split('\n')
       .filter(Boolean)
       .map((line) => line.slice(3))
 
     // Get diff stats (additions/deletions)
-    const { stdout: diffOutput } = await execAsync('git diff --shortstat', { cwd: worktreePath })
+    const diffResult = await safeExec('git', ['diff', '--shortstat'], { cwd: worktreePath })
+    const diffOutput = diffResult.success ? diffResult.stdout : ''
 
     let additions = 0
     let deletions = 0
@@ -148,11 +150,12 @@ function getContextHint(branch: string | null, changedFiles: string[], commitMes
 
 /**
  * Get last commit message for a worktree
+ * Uses safeExec to prevent command injection
  */
 async function getWorktreeCommitMessage(worktreePath: string): Promise<string> {
   try {
-    const { stdout } = await execAsync('git log -1 --format=%s', { cwd: worktreePath })
-    return stdout.trim()
+    const result = await safeExec('git', ['log', '-1', '--format=%s'], { cwd: worktreePath })
+    return result.success ? result.stdout.trim() : ''
   } catch {
     return ''
   }
@@ -365,13 +368,15 @@ export async function convertWorktreeToBranch(
       }
     }
 
-    // Get the diff from the worktree as a patch
-    const { stdout: patchOutput } = await execAsync('git diff HEAD', { cwd: worktreePath })
+    // Get the diff from the worktree as a patch (uses safeExec to prevent injection)
+    const patchResult = await safeExec('git', ['diff', 'HEAD'], { cwd: worktreePath })
+    const patchOutput = patchResult.success ? patchResult.stdout : ''
 
-    // Also get untracked files
-    const { stdout: untrackedOutput } = await execAsync('git ls-files --others --exclude-standard', {
+    // Also get untracked files (uses safeExec to prevent injection)
+    const untrackedResult = await safeExec('git', ['ls-files', '--others', '--exclude-standard'], {
       cwd: worktreePath,
     })
+    const untrackedOutput = untrackedResult.success ? untrackedResult.stdout : ''
     const untrackedFiles = untrackedOutput.split('\n').filter(Boolean)
 
     // Check if there are any changes
@@ -392,12 +397,19 @@ export async function convertWorktreeToBranch(
       const tempPatchFile = path.join(ctx.path, '.ledger-temp-patch')
       try {
         await fs.promises.writeFile(tempPatchFile, patchOutput)
-        await execAsync(`git apply --3way "${tempPatchFile}"`, { cwd: ctx.path })
+        // Use safeExec to prevent command injection (file path as separate arg)
+        const applyResult = await safeExec('git', ['apply', '--3way', tempPatchFile], { cwd: ctx.path })
+        if (!applyResult.success) {
+          throw new Error(applyResult.stderr || 'git apply failed')
+        }
       } catch (applyError) {
         // If apply fails, try to apply with less strict options
-        try {
-          await execAsync(`git apply --reject --whitespace=fix "${tempPatchFile}"`, { cwd: ctx.path })
-        } catch {
+        const fallbackResult = await safeExec(
+          'git',
+          ['apply', '--reject', '--whitespace=fix', tempPatchFile],
+          { cwd: ctx.path }
+        )
+        if (!fallbackResult.success) {
           // Clean up and revert to the base branch
           try {
             await fs.promises.unlink(tempPatchFile)
@@ -464,13 +476,15 @@ export async function applyWorktreeChanges(
       return { success: false, message: 'Cannot apply from the main repository to itself' }
     }
 
-    // Get the diff from the worktree as a patch
-    const { stdout: patchOutput } = await execAsync('git diff HEAD', { cwd: worktreePath })
+    // Get the diff from the worktree as a patch (uses safeExec to prevent injection)
+    const patchResult = await safeExec('git', ['diff', 'HEAD'], { cwd: worktreePath })
+    const patchOutput = patchResult.success ? patchResult.stdout : ''
 
-    // Also get list of untracked files
-    const { stdout: untrackedOutput } = await execAsync('git ls-files --others --exclude-standard', {
+    // Also get list of untracked files (uses safeExec to prevent injection)
+    const untrackedResult = await safeExec('git', ['ls-files', '--others', '--exclude-standard'], {
       cwd: worktreePath,
     })
+    const untrackedOutput = untrackedResult.success ? untrackedResult.stdout : ''
     const untrackedFiles = untrackedOutput.split('\n').filter(Boolean)
 
     // Check if there are any changes
@@ -484,14 +498,22 @@ export async function applyWorktreeChanges(
       const tempPatchFile = path.join(ctx.path, '.ledger-temp-patch')
       try {
         await fs.promises.writeFile(tempPatchFile, patchOutput)
-        await execAsync(`git apply --3way "${tempPatchFile}"`, { cwd: ctx.path })
+        // Use safeExec to prevent command injection (file path as separate arg)
+        const applyResult = await safeExec('git', ['apply', '--3way', tempPatchFile], { cwd: ctx.path })
+        if (!applyResult.success) {
+          throw new Error(applyResult.stderr || 'git apply failed')
+        }
         await fs.promises.unlink(tempPatchFile)
       } catch (_applyError) {
         // If apply fails, try with less strict options
-        try {
-          await execAsync(`git apply --reject --whitespace=fix "${tempPatchFile}"`, { cwd: ctx.path })
+        const fallbackResult = await safeExec(
+          'git',
+          ['apply', '--reject', '--whitespace=fix', tempPatchFile],
+          { cwd: ctx.path }
+        )
+        if (fallbackResult.success) {
           await fs.promises.unlink(tempPatchFile)
-        } catch {
+        } else {
           try {
             await fs.promises.unlink(tempPatchFile)
           } catch {
@@ -547,11 +569,11 @@ export async function removeWorktree(
       return { success: false, message: 'Worktree not found' }
     }
 
-    // Check for uncommitted changes if not forcing
+    // Check for uncommitted changes if not forcing (uses safeExec to prevent injection)
     if (!force) {
       try {
-        const { stdout: statusOutput } = await execAsync('git status --porcelain', { cwd: worktreePath })
-        if (statusOutput.trim()) {
+        const statusResult = await safeExec('git', ['status', '--porcelain'], { cwd: worktreePath })
+        if (statusResult.success && statusResult.stdout.trim()) {
           return { success: false, message: 'Worktree has uncommitted changes. Use force to remove anyway.' }
         }
       } catch {
@@ -599,6 +621,17 @@ export async function createWorktree(
     // Validate folder path
     if (!folderPath || !folderPath.trim()) {
       return { success: false, message: 'Folder path is required' }
+    }
+
+    // Security: Validate path doesn't contain traversal attempts
+    const resolvedPath = path.resolve(folderPath)
+    if (folderPath.includes('..') || resolvedPath !== path.normalize(folderPath)) {
+      return { success: false, message: 'Invalid folder path: path traversal not allowed' }
+    }
+
+    // Security: Ensure path is absolute to prevent relative path attacks
+    if (!path.isAbsolute(folderPath)) {
+      return { success: false, message: 'Folder path must be absolute' }
     }
 
     // Check if folder already exists

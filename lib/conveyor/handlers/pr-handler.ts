@@ -12,6 +12,7 @@ import {
   commentOnPR,
   mergePR,
 } from '@/lib/main/git-service'
+import { serializeError, logHandlerError } from '@/lib/utils/error-helpers'
 
 export const registerPRHandlers = () => {
   handle('get-pull-requests', async () => {
@@ -19,13 +20,18 @@ export const registerPRHandlers = () => {
       return await getPullRequests()
     } catch (error) {
       // Return empty result for remote repos or on error
-      console.error('[pr-handler] get-pull-requests error:', error)
-      return { prs: [], error: (error as Error).message }
+      logHandlerError('get-pull-requests', error)
+      return { prs: [], error: serializeError(error) }
     }
   })
 
   handle('open-pull-request', async (url: string) => {
-    return await openPullRequest(url)
+    try {
+      return await openPullRequest(url)
+    } catch (error) {
+      logHandlerError('open-pull-request', error)
+      return { success: false, message: serializeError(error) }
+    }
   })
 
   handle(
@@ -40,44 +46,63 @@ export const registerPRHandlers = () => {
       try {
         return await createPullRequest(options)
       } catch (error) {
-        return { success: false, message: (error as Error).message }
+        logHandlerError('create-pull-request', error)
+        return { success: false, message: serializeError(error) }
       }
     }
   )
 
   handle('checkout-pr-branch', async (branchName: string) => {
-    return await checkoutPRBranch(branchName)
+    try {
+      return await checkoutPRBranch(branchName)
+    } catch (error) {
+      logHandlerError('checkout-pr-branch', error)
+      return { success: false, message: serializeError(error) }
+    }
   })
 
   handle('get-github-url', async () => {
-    return await getGitHubUrl()
+    try {
+      return await getGitHubUrl()
+    } catch (error) {
+      logHandlerError('get-github-url', error)
+      return null // URL not found is valid - keep null
+    }
   })
 
   handle('open-branch-in-github', async (branchName: string) => {
-    return await openBranchInGitHub(branchName)
+    try {
+      return await openBranchInGitHub(branchName)
+    } catch (error) {
+      logHandlerError('open-branch-in-github', error)
+      return { success: false, message: serializeError(error) }
+    }
   })
 
   handle('get-pr-detail', async (prNumber: number) => {
     try {
       return await getPRDetail(prNumber)
-    } catch (_error) {
-      return null
+    } catch (error) {
+      logHandlerError('get-pr-detail', error)
+      return { error: serializeError(error), data: null }
     }
   })
 
   handle('get-pr-review-comments', async (prNumber: number) => {
     try {
       return await getPRReviewComments(prNumber)
-    } catch (_error) {
-      return []
+    } catch (error) {
+      logHandlerError('get-pr-review-comments', error)
+      return { error: serializeError(error), comments: [] }
     }
   })
 
   handle('get-pr-file-diff', async (prNumber: number, filePath: string) => {
     try {
       return await getPRFileDiff(prNumber, filePath)
-    } catch (_error) {
-      return null
+    } catch (error) {
+      logHandlerError('get-pr-file-diff', error)
+      return { error: serializeError(error), diff: null }
     }
   })
 
@@ -85,7 +110,8 @@ export const registerPRHandlers = () => {
     try {
       return await commentOnPR(prNumber, body)
     } catch (error) {
-      return { success: false, message: (error as Error).message }
+      logHandlerError('comment-on-pr', error)
+      return { success: false, message: serializeError(error) }
     }
   })
 
@@ -93,7 +119,8 @@ export const registerPRHandlers = () => {
     try {
       return await mergePR(prNumber, mergeMethod ?? 'merge')
     } catch (error) {
-      return { success: false, message: (error as Error).message }
+      logHandlerError('merge-pr', error)
+      return { success: false, message: serializeError(error) }
     }
   })
 }

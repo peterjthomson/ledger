@@ -79,17 +79,28 @@ const events = {
   },
 }
 
-// Use `contextBridge` APIs to expose APIs to
-// renderer only if context isolation is enabled, otherwise
-// just add to the DOM global.
+// ============================================
+// SECURITY VERIFICATION
+// Context isolation MUST be enabled for security.
+// ============================================
+if (!process.contextIsolated) {
+  console.error(
+    '[SECURITY] Context isolation is DISABLED! This is a critical security risk.\n' +
+    'Ensure webPreferences.contextIsolation is set to true in lib/main/app.ts'
+  )
+}
+
+// Use `contextBridge` APIs to expose APIs to renderer.
+// Only conveyor and ledgerEvents are exposed - no Node.js APIs.
 if (process.contextIsolated) {
   try {
     contextBridge.exposeInMainWorld('conveyor', conveyor)
     contextBridge.exposeInMainWorld('ledgerEvents', events)
   } catch (error) {
-    console.error(error)
+    console.error('[Preload] Failed to expose APIs:', error)
   }
 } else {
+  // Fallback for testing without context isolation (should never happen in production)
   window.conveyor = conveyor
   window.ledgerEvents = events
 }

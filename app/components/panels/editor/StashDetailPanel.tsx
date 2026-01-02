@@ -102,22 +102,34 @@ export function StashDetailPanel({
 
   // Load stash files
   useEffect(() => {
+    let cancelled = false
+
     const loadFiles = async () => {
       setLoading(true)
       try {
         const stashFiles = await window.conveyor.stash.getStashFiles(stash.index)
-        setFiles(stashFiles)
+        if (!cancelled) {
+          setFiles(stashFiles)
+        }
       } catch (error) {
         console.error('Error loading stash files:', error)
-        setFiles([])
+        if (!cancelled) {
+          setFiles([])
+        }
       } finally {
-        setLoading(false)
+        if (!cancelled) {
+          setLoading(false)
+        }
       }
     }
 
     loadFiles()
     setSelectedFile(null)
     setFileDiff(null)
+
+    return () => {
+      cancelled = true
+    }
   }, [stash.index])
 
   // Load file diff when selected
@@ -127,19 +139,31 @@ export function StashDetailPanel({
       return
     }
 
+    let cancelled = false
+
     const loadDiff = async () => {
       setLoadingDiff(true)
       try {
         const diff = await window.conveyor.stash.getStashFileDiff(stash.index, selectedFile)
-        setFileDiff(diff)
+        if (!cancelled) {
+          setFileDiff(diff)
+        }
       } catch (_error) {
-        setFileDiff(null)
+        if (!cancelled) {
+          setFileDiff(null)
+        }
       } finally {
-        setLoadingDiff(false)
+        if (!cancelled) {
+          setLoadingDiff(false)
+        }
       }
     }
 
     loadDiff()
+
+    return () => {
+      cancelled = true
+    }
   }, [stash.index, selectedFile])
 
   const getStatusIcon = (status: StashFile['status']) => {

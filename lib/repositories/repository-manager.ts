@@ -14,13 +14,19 @@ import { RepositoryContext, RepositoryType, createRepositoryContext } from './re
  * 2. Map-based storage for O(1) lookups by ID or path
  * 3. Active repo concept for backward compatibility with existing handlers
  * 4. Event-like callbacks for UI updates (future: proper events)
+ * 5. LRU eviction policy to prevent unbounded memory growth
  *
  * SAFETY GUARANTEES:
  * - Each context has a unique ID that never changes
  * - switchEpoch increments on every repo change for stale detection
  * - onChange callbacks fire AFTER state is consistent
  * - Legacy state is always kept in sync with active context
+ * - Max 12 repositories to prevent memory issues (LRU eviction)
  */
+
+/** Maximum number of repositories to keep open before evicting LRU entries */
+const MAX_REPOSITORIES = 12
+
 export class RepositoryManager {
   private static instance: RepositoryManager | null = null
 
@@ -108,6 +114,54 @@ export class RepositoryManager {
   }
 
   /**
+   * Evict least recently used repositories if at capacity
+   *
+   * Called before adding new repos to ensure we stay within MAX_REPOSITORIES.
+   * Never evicts the currently active repository.
+   *
+   * @returns Array of evicted repository IDs
+   */
+  private evictLRUIfNeeded(): string[] {
+    const evicted: string[] = []
+
+    // Check if we need to evict (at or over capacity)
+    while (this.contexts.size >= MAX_REPOSITORIES) {
+      // Get all repos sorted by lastAccessed (oldest first)
+      const sortedByLRU = Array.from(this.contexts.values())
+        .filter((ctx) => ctx.id !== this.activeId) // Never evict active repo
+        .sort((a, b) => a.lastAccessed.getTime() - b.lastAccessed.getTime())
+
+      if (sortedByLRU.length === 0) {
+        // All repos are the active one (shouldn't happen with MAX > 1)
+        console.warn('[RepositoryManager] Cannot evict: only active repo remains')
+        break
+      }
+
+      // Evict the oldest (LRU) repo
+      const lruContext = sortedByLRU[0]
+      console.info(`[RepositoryManager] Evicting LRU repository: ${lruContext.name} (last accessed: ${lruContext.lastAccessed.toISOString()})`)
+
+      // Clean up SimpleGit instance
+      if (lruContext.git) {
+        ;(lruContext as { git: null }).git = null
+      }
+
+      // Remove from maps
+      this.contexts.delete(lruContext.id)
+      if (lruContext.path) {
+        this.pathIndex.delete(lruContext.path)
+      }
+      if (lruContext.remote?.fullName) {
+        this.remoteIndex.delete(lruContext.remote.fullName)
+      }
+
+      evicted.push(lruContext.id)
+    }
+
+    return evicted
+  }
+
+  /**
    * Open a repository at the given path
    *
    * If the repo is already open, returns the existing context.
@@ -139,6 +193,9 @@ export class RepositoryManager {
 
       return existing
     }
+
+    // Evict LRU repos if at capacity before adding new one
+    this.evictLRUIfNeeded()
 
     // Create new context
     const context = await createRepositoryContext(repoPath)
@@ -243,6 +300,14 @@ export class RepositoryManager {
     }
 
     const wasActive = this.activeId === id
+
+    // Clean up SimpleGit instance to release resources
+    // Note: SimpleGit doesn't have explicit cleanup, but nulling prevents further operations
+    // and allows GC to collect the instance and any associated child processes
+    if (context.git) {
+      // Cast to allow nulling - the context is being removed anyway
+      ;(context as { git: null }).git = null
+    }
 
     this.contexts.delete(id)
     // Remove from appropriate index
@@ -354,6 +419,9 @@ export class RepositoryManager {
         return existing
       }
     }
+
+    // Evict LRU repos if at capacity before adding new one
+    this.evictLRUIfNeeded()
 
     // Store in maps
     this.contexts.set(context.id, context)

@@ -2,15 +2,24 @@
  * Plugin Store
  *
  * Manages plugin UI state: active app, open panels, widget visibility.
+ * Also handles permission request flow for plugin installation.
  */
 
 import { createAppStore } from './create-store'
-import type { AppPlugin, PanelPlugin, PluginRegistration } from '@/lib/plugins/plugin-types'
+import type { AppPlugin, PanelPlugin, PluginRegistration, PluginPermission } from '@/lib/plugins/plugin-types'
 
 export interface OpenPanel {
   pluginId: string
   instanceId: string
   data?: unknown
+}
+
+/** Pending permission request from a plugin */
+export interface PermissionRequest {
+  pluginId: string
+  pluginName: string
+  permissions: PluginPermission[]
+  resolve: (result: { approved: boolean; permissions?: PluginPermission[] }) => void
 }
 
 export interface PluginState {
@@ -26,6 +35,9 @@ export interface PluginState {
   // Settings panel
   settingsOpen: boolean
   settingsPluginId: string | null
+
+  // Permission request (for installation flow)
+  pendingPermissionRequest: PermissionRequest | null
 }
 
 export interface PluginActions {
@@ -44,6 +56,14 @@ export interface PluginActions {
   // Settings
   openSettings: (pluginId?: string) => void
   closeSettings: () => void
+
+  // Permission requests
+  requestPermissions: (
+    pluginId: string,
+    pluginName: string,
+    permissions: PluginPermission[]
+  ) => Promise<{ approved: boolean; permissions?: PluginPermission[] }>
+  respondToPermissionRequest: (approved: boolean, permissions?: PluginPermission[]) => void
 }
 
 const initialState: PluginState = {
@@ -52,6 +72,7 @@ const initialState: PluginState = {
   registrations: [],
   settingsOpen: false,
   settingsPluginId: null,
+  pendingPermissionRequest: null,
 }
 
 let panelInstanceCounter = 0
@@ -105,6 +126,27 @@ export const usePluginStore = createAppStore<PluginState & PluginActions>(
       set({ settingsOpen: true, settingsPluginId: pluginId ?? null }),
     closeSettings: () =>
       set({ settingsOpen: false, settingsPluginId: null }),
+
+    // Permission requests
+    requestPermissions: (pluginId, pluginName, permissions) => {
+      return new Promise((resolve) => {
+        set({
+          pendingPermissionRequest: {
+            pluginId,
+            pluginName,
+            permissions,
+            resolve,
+          },
+        })
+      })
+    },
+    respondToPermissionRequest: (approved, permissions) => {
+      const request = get().pendingPermissionRequest
+      if (request) {
+        request.resolve({ approved, permissions })
+        set({ pendingPermissionRequest: null })
+      }
+    },
   }),
   {
     persist: true,

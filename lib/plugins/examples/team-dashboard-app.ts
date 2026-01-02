@@ -163,9 +163,11 @@ async function initializeDashboard(context: PluginContext): Promise<void> {
     return
   }
 
-  // Cache initial data
-  const branches = context.api.getBranches()
-  const commits = context.api.getCommits(100)
+  // Cache initial data - fetch fresh data from backend
+  const [branches, commits] = await Promise.all([
+    context.api.getBranches(),
+    context.api.getCommits(100),
+  ])
 
   context.logger.info(`Loaded ${branches.length} branches, ${commits.length} commits`)
 

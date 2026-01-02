@@ -5,7 +5,7 @@
  * Shows commits and PRs from the selected time period.
  */
 
-import { useState, useEffect, useMemo, useCallback } from 'react'
+import { useState, useEffect, useMemo, useCallback, useRef } from 'react'
 import {
   Calendar,
   GitCommit,
@@ -26,6 +26,18 @@ export function StandupNotesPanel({ context, repoPath, onClose }: PluginPanelPro
   const [selectedDate, setSelectedDate] = useState<Date>(new Date())
   const [loading, setLoading] = useState(true)
   const [copied, setCopied] = useState(false)
+
+  // Ref for copy timeout cleanup
+  const copyTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      if (copyTimeoutRef.current) {
+        clearTimeout(copyTimeoutRef.current)
+      }
+    }
+  }, [])
 
   // Load data
   useEffect(() => {
@@ -140,7 +152,9 @@ export function StandupNotesPanel({ context, repoPath, onClose }: PluginPanelPro
     try {
       await navigator.clipboard.writeText(standupNotes)
       setCopied(true)
-      setTimeout(() => setCopied(false), 2000)
+      // Clear any pending timeout and set new one (with cleanup tracking)
+      if (copyTimeoutRef.current) clearTimeout(copyTimeoutRef.current)
+      copyTimeoutRef.current = setTimeout(() => setCopied(false), 2000)
     } catch (error) {
       console.error('Failed to copy:', error)
     }

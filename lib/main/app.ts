@@ -21,7 +21,16 @@ export function createAppWindow(): void {
     resizable: true,
     webPreferences: {
       preload: join(__dirname, '../preload/preload.js'),
-      sandbox: false,
+      // ============================================
+      // SECURITY CONFIGURATION
+      // These settings enforce Electron security best practices.
+      // Do NOT modify without security review.
+      // ============================================
+      sandbox: true,                    // Enable V8 sandbox
+      contextIsolation: true,           // Isolate preload from renderer
+      nodeIntegration: false,           // No Node.js in renderer
+      nodeIntegrationInWorker: false,   // No Node.js in workers
+      webSecurity: true,                // Enforce same-origin policy
     },
   })
 

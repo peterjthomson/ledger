@@ -49,6 +49,7 @@ import {
   PluginWidgetSlot,
   pluginComponentRegistry,
 } from './components/plugins'
+import { PermissionDialog } from './components/plugins/PermissionDialog'
 import { RepoSwitcher } from './components/RepoSwitcher'
 import { useRepoSwitched, useGitCheckout, useGitCommit, useGitPush, useGitPull, useGitStash } from './hooks/use-ledger-events'
 import { registerExampleComponents } from './components/plugins/example-components'
@@ -89,6 +90,7 @@ export default function App() {
     commitDiff, setCommitDiff,
     stashes, setStashes,
     loadingDiff, setLoadingDiff,
+    setRepositoryData,
   } = useRepositoryStore()
 
   // UI state from store
@@ -132,6 +134,8 @@ export default function App() {
   const activeAppId = usePluginStore((s) => s.activeAppId)
   const openPanels = usePluginStore((s) => s.openPanels)
   const closePanel = usePluginStore((s) => s.closePanel)
+  const pendingPermissionRequest = usePluginStore((s) => s.pendingPermissionRequest)
+  const respondToPermissionRequest = usePluginStore((s) => s.respondToPermissionRequest)
 
   // Local state (modals, transient UI)
   const [contextMenu, setContextMenu] = useState<ContextMenu | null>(null)
@@ -146,6 +150,7 @@ export default function App() {
 
   const { setTitle, setTitlebarActions } = useWindowContext()
   const menuRef = useRef<HTMLDivElement>(null)
+  const refreshIdRef = useRef(0)
 
   // Close context menu when clicking outside
   useEffect(() => {
@@ -293,6 +298,11 @@ export default function App() {
 
   // Initialize plugin system
   useEffect(() => {
+    // Configure permission request handler for plugin installation
+    pluginLoader.setPermissionRequestHandler((pluginId, pluginName, permissions) => {
+      return usePluginStore.getState().requestPermissions(pluginId, pluginName, permissions)
+    })
+
     // Register example plugin React components
     registerExampleComponents(pluginComponentRegistry)
 
@@ -402,13 +412,25 @@ export default function App() {
           repoClosed(repoPath).catch((err) => console.error('[Plugin Hook] repoClosed error:', err))
         }
 
-        // Clear state before switching to prevent stale data mixing with new repo
-        setWorktrees([])
-        setBranches([])
-        setCommits([])
-        setPullRequests([])
-        setWorkingStatus(null)
-        setRepoPath(path)
+        // Clear state atomically before switching to prevent stale data mixing with new repo
+        // Using bulk update avoids multiple re-renders
+        setRepositoryData({
+          worktrees: [],
+          branches: [],
+          commits: [],
+          pullRequests: [],
+          workingStatus: null,
+          repoPath: path,
+          // Also clear selection state to prevent orphaned references
+          selectedCommit: null,
+          commitDiff: null,
+          graphCommits: [],
+          stashes: [],
+        })
+
+        // Reset refresh tracking to invalidate any in-flight refreshes from old repo
+        refreshIdRef.current = 0
+
         setStatus({ type: 'info', message: 'Loading repository...' })
         await refresh()
 
@@ -428,6 +450,9 @@ export default function App() {
   }
 
   const refresh = useCallback(async () => {
+    // Track this refresh request to detect stale results
+    const currentRefreshId = ++refreshIdRef.current
+
     setLoading(true)
     setError(null)
     setPrError(null)
@@ -447,6 +472,11 @@ export default function App() {
           window.conveyor.commit.getCommitGraphHistory(100, true, showCheckpoints), // skipStats for fast load
           window.conveyor.stash.getStashes(),
         ])
+
+      // Discard stale results if another refresh started
+      if (currentRefreshId !== refreshIdRef.current) {
+        return
+      }
 
       setGithubUrl(ghUrl)
 
@@ -486,9 +516,15 @@ export default function App() {
 
       // Phase 2: Deferred metadata loading in background
       // This loads detailed branch metadata (commit counts, dates) after initial render
+      // Capture current refresh ID to detect if data is stale when it returns
+      const deferredRefreshId = currentRefreshId
       window.conveyor.branch
         .getBranchesWithMetadata()
         .then((metaResult) => {
+          // Only update if this is still the current refresh
+          if (deferredRefreshId !== refreshIdRef.current) {
+            return
+          }
           if (!('error' in metaResult) && Array.isArray(metaResult.branches)) {
             setBranches(metaResult.branches)
           }
@@ -497,9 +533,15 @@ export default function App() {
           // Silently ignore - we already have basic branch data
         })
     } catch (err) {
-      setError((err as Error).message)
+      // Only set error if this refresh is still current
+      if (currentRefreshId === refreshIdRef.current) {
+        setError((err as Error).message)
+      }
     } finally {
-      setLoading(false)
+      // Only clear loading if this refresh is still current
+      if (currentRefreshId === refreshIdRef.current) {
+        setLoading(false)
+      }
     }
     // Note: State setters from useState/stores are stable and don't need to be in deps
     // Only showCheckpoints affects the actual API call behavior
@@ -1049,7 +1091,8 @@ export default function App() {
       if (branch.current || switching) return
       handleLocalBranchSwitch(branch)
     },
-    [switching]
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- handleLocalBranchSwitch is stable in behavior
+    [switching, handleLocalBranchSwitch]
   )
 
   // Create a new branch
@@ -1143,7 +1186,8 @@ export default function App() {
 
   const handlePRDoubleClick = useCallback(async (pr: PullRequest) => {
     handlePRViewRemote(pr)
-  }, [])
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- handlePRViewRemote is stable in behavior
+  }, [handlePRViewRemote])
 
   const handleCommitDoubleClick = useCallback(
     async (commit: Commit) => {
@@ -2845,6 +2889,17 @@ export default function App() {
 
           {/* Plugin Settings Panel - manages its own visibility via store */}
           <PluginSettingsPanel />
+
+          {/* Plugin Permission Dialog */}
+          {pendingPermissionRequest && (
+            <PermissionDialog
+              pluginId={pendingPermissionRequest.pluginId}
+              pluginName={pendingPermissionRequest.pluginName}
+              permissions={pendingPermissionRequest.permissions}
+              onApprove={(approved) => respondToPermissionRequest(true, approved)}
+              onDeny={() => respondToPermissionRequest(false)}
+            />
+          )}
 
           {/* Open Plugin Panels */}
           {openPanels.map((panel) => (

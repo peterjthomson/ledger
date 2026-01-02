@@ -11,6 +11,7 @@ import {
   getRepoPath,
 } from '@/lib/main/git-service'
 import { emitGitCommit, emitGitPull } from '@/lib/events'
+import { serializeError, logHandlerError } from '@/lib/utils/error-helpers'
 
 export const registerCommitHandlers = () => {
   handle('get-commit-history', async (limit?: number) => {
@@ -33,7 +34,7 @@ export const registerCommitHandlers = () => {
     try {
       return await resetToCommit(commitHash, mode)
     } catch (error) {
-      return { success: false, message: (error as Error).message }
+      return { success: false, message: serializeError(error) }
     }
   })
 
@@ -70,7 +71,7 @@ export const registerCommitHandlers = () => {
       }
       return result
     } catch (error) {
-      return { success: false, message: (error as Error).message }
+      return { success: false, message: serializeError(error) }
     }
   })
 
@@ -85,7 +86,7 @@ export const registerCommitHandlers = () => {
       }
       return result
     } catch (error) {
-      return { success: false, message: (error as Error).message }
+      return { success: false, message: serializeError(error) }
     }
   })
 }

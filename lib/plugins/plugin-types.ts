@@ -452,16 +452,18 @@ export interface PluginAPI {
   getPullRequests(): Promise<PullRequest[]>
   /** Get commits */
   getCommits(limit?: number): Promise<Commit[]>
-  /** Get working status */
+  /** Get working status (alias for getStagingStatus for backwards compatibility) */
   getWorkingStatus(): Promise<unknown>
+  /** Get staging status (fetches fresh data via IPC when available) */
+  getStagingStatus(): Promise<unknown>
   /** Execute a git command */
   git(args: string[]): Promise<string>
   /** Show a notification */
   showNotification(message: string, type?: 'info' | 'success' | 'warning' | 'error'): void
   /** Open a panel plugin */
   openPanel(pluginId: string, data?: unknown): void
-  /** Close a panel plugin */
-  closePanel(pluginId: string): void
+  /** Close all panels opened by this plugin */
+  closePanel(): void
   /** Navigate to an app plugin */
   navigateToApp(pluginId: string): void
   /** Refresh repository data */

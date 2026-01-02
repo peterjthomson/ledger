@@ -5,7 +5,7 @@
  * Uses real staging status data from the context API.
  */
 
-import { useState, useEffect, useMemo, useCallback } from 'react'
+import { useState, useEffect, useMemo, useCallback, useRef } from 'react'
 import {
   Sparkles,
   Copy,
@@ -41,6 +41,18 @@ export function CommitSuggesterWidget({ context, repoPath, slot }: PluginWidgetP
   const [stagingStatus, setStagingStatus] = useState<StagingStatus | null>(null)
   const [loading, setLoading] = useState(true)
   const [copiedIndex, setCopiedIndex] = useState<number | null>(null)
+
+  // Ref for copy timeout cleanup
+  const copyTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      if (copyTimeoutRef.current) {
+        clearTimeout(copyTimeoutRef.current)
+      }
+    }
+  }, [])
 
   // Load staging status
   useEffect(() => {
@@ -178,7 +190,9 @@ export function CommitSuggesterWidget({ context, repoPath, slot }: PluginWidgetP
     try {
       await navigator.clipboard.writeText(message)
       setCopiedIndex(index)
-      setTimeout(() => setCopiedIndex(null), 2000)
+      // Clear any pending timeout and set new one (with cleanup tracking)
+      if (copyTimeoutRef.current) clearTimeout(copyTimeoutRef.current)
+      copyTimeoutRef.current = setTimeout(() => setCopiedIndex(null), 2000)
     } catch (error) {
       console.error('Failed to copy:', error)
     }

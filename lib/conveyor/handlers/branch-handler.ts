@@ -11,6 +11,7 @@ import {
   getRepoPath,
 } from '@/lib/main/git-service'
 import { emitGitCheckout, emitGitPush, emitGitPull } from '@/lib/events'
+import { serializeError, logHandlerError } from '@/lib/utils/error-helpers'
 
 export const registerBranchHandlers = () => {
   handle('get-branches', async () => {
@@ -53,7 +54,7 @@ export const registerBranchHandlers = () => {
       }
       return result
     } catch (error) {
-      return { success: false, message: (error as Error).message }
+      return { success: false, message: serializeError(error) }
     }
   })
 
@@ -61,7 +62,7 @@ export const registerBranchHandlers = () => {
     try {
       return await createBranch(branchName, checkout ?? true)
     } catch (error) {
-      return { success: false, message: (error as Error).message }
+      return { success: false, message: serializeError(error) }
     }
   })
 
@@ -74,7 +75,7 @@ export const registerBranchHandlers = () => {
       }
       return result
     } catch (error) {
-      return { success: false, message: (error as Error).message }
+      return { success: false, message: serializeError(error) }
     }
   })
 
@@ -89,7 +90,7 @@ export const registerBranchHandlers = () => {
       }
       return result
     } catch (error) {
-      return { success: false, message: (error as Error).message }
+      return { success: false, message: serializeError(error) }
     }
   })
 
@@ -103,7 +104,7 @@ export const registerBranchHandlers = () => {
       }
       return result
     } catch (error) {
-      return { success: false, message: (error as Error).message }
+      return { success: false, message: serializeError(error) }
     }
   })
 }

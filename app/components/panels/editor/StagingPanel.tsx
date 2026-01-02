@@ -76,19 +76,31 @@ export function StagingPanel({ workingStatus, currentBranch, onRefresh, onStatus
       return
     }
 
+    let cancelled = false
+
     const loadDiff = async () => {
       setLoadingDiff(true)
       try {
         const diff = await window.conveyor.staging.getFileDiff(selectedFile.path, selectedFile.staged)
-        setFileDiff(diff)
+        if (!cancelled) {
+          setFileDiff(diff)
+        }
       } catch (_error) {
-        setFileDiff(null)
+        if (!cancelled) {
+          setFileDiff(null)
+        }
       } finally {
-        setLoadingDiff(false)
+        if (!cancelled) {
+          setLoadingDiff(false)
+        }
       }
     }
 
     loadDiff()
+
+    return () => {
+      cancelled = true
+    }
   }, [selectedFile])
 
   // Stage a file

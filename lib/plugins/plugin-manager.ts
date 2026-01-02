@@ -20,7 +20,7 @@ import type {
   BackgroundTask,
   WidgetSlot,
 } from './plugin-types'
-import { createPluginContext } from './plugin-context'
+import { createPluginContext, PluginContextWithDispose } from './plugin-context'
 import { grantPermissions, revokePermissions } from './plugin-permissions'
 
 type HookCallback = PluginHooks[keyof PluginHooks]
@@ -38,6 +38,7 @@ class PluginManager {
   private plugins: Map<string, PluginRegistration> = new Map()
   private eventListeners: Map<PluginEventType, Set<EventCallback>> = new Map()
   private runningTasks: Map<string, TaskHandle[]> = new Map()
+  private pluginContexts: Map<string, PluginContextWithDispose> = new Map()
 
   // Cache for getAllRegistrations to prevent returning new array references
   private registrationsCache: PluginRegistration[] | null = null
@@ -152,6 +153,9 @@ class PluginManager {
     // Full API is provided by UI layer when rendering components
     const context = createPluginContext(id)
 
+    // Store context for later cleanup
+    this.pluginContexts.set(id, context)
+
     try {
       // Call activate hook
       if (registration.plugin.activate) {
@@ -170,6 +174,8 @@ class PluginManager {
       this.emit('activated', id)
       console.log(`[PluginManager] Activated plugin: ${id}`)
     } catch (error) {
+      // Clean up context on failure
+      this.pluginContexts.delete(id)
       const message = error instanceof Error ? error.message : String(error)
       registration.error = message
       this.emit('error', id, { error: message })
@@ -199,6 +205,13 @@ class PluginManager {
       // Call deactivate hook
       if (registration.plugin.deactivate) {
         await registration.plugin.deactivate()
+      }
+
+      // Dispose plugin context (clears event subscriptions and calls onDispose callbacks)
+      const context = this.pluginContexts.get(id)
+      if (context) {
+        context.dispose()
+        this.pluginContexts.delete(id)
       }
 
       // Revoke permissions

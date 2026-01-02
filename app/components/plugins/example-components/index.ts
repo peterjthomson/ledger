@@ -24,6 +24,7 @@ import './example-plugin-styles.css'
 // App Components
 export { TeamDashboardApp } from './TeamDashboardApp'
 export { AIReviewApp } from './AIReviewApp'
+export { AgentEventsInboxApp } from './AgentEventsInboxApp'
 
 // Panel Components
 export { PRReviewQueuePanel } from './PRReviewQueuePanel'
@@ -51,6 +52,10 @@ export function registerExampleComponents(
 
   import('./AIReviewApp').then(({ AIReviewApp }) => {
     registry.register('AIReviewApp', 'app', AIReviewApp)
+  })
+
+  import('./AgentEventsInboxApp').then(({ AgentEventsInboxApp }) => {
+    registry.register('AgentEventsInboxApp', 'app', AgentEventsInboxApp)
   })
 
   import('./PRReviewQueuePanel').then(({ PRReviewQueuePanel }) => {

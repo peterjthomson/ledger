@@ -4,7 +4,7 @@
  * Shows PR details, allows commenting, merging, and viewing file diffs.
  */
 
-import { useState, useEffect, useMemo, useCallback } from 'react'
+import { useState, useEffect, useMemo, useCallback, useRef } from 'react'
 import type { PullRequest, PRDetail, PRReviewComment } from '../../../types/electron'
 
 export interface PRReviewPanelProps {
@@ -38,6 +38,18 @@ export function PRReviewPanel({ pr, formatRelativeTime, onCheckout, onPRMerged, 
   const [submittingComment, setSubmittingComment] = useState(false)
   const [commentStatus, setCommentStatus] = useState<{ type: 'success' | 'error'; message: string } | null>(null)
   const [mergingPR, setMergingPR] = useState(false)
+
+  // Ref to track status timeout for cleanup
+  const statusTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  // Cleanup timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (statusTimeoutRef.current) {
+        clearTimeout(statusTimeoutRef.current)
+      }
+    }
+  }, [])
 
   // Load full PR details
   const loadPRDetail = useCallback(async () => {
@@ -75,8 +87,9 @@ export function PRReviewPanel({ pr, formatRelativeTime, onCheckout, onPRMerged, 
         setCommentStatus({ type: 'success', message: 'Comment added!' })
         // Reload PR details to show the new comment
         await loadPRDetail()
-        // Clear success message after a delay
-        setTimeout(() => setCommentStatus(null), 3000)
+        // Clear success message after a delay (with cleanup tracking)
+        if (statusTimeoutRef.current) clearTimeout(statusTimeoutRef.current)
+        statusTimeoutRef.current = setTimeout(() => setCommentStatus(null), 3000)
       } else {
         setCommentStatus({ type: 'error', message: result.message })
       }
@@ -103,7 +116,9 @@ export function PRReviewPanel({ pr, formatRelativeTime, onCheckout, onPRMerged, 
         await loadPRDetail()
         // Notify parent to refresh PR list
         if (onPRMerged) onPRMerged()
-        setTimeout(() => setCommentStatus(null), 3000)
+        // Clear success message after a delay (with cleanup tracking)
+        if (statusTimeoutRef.current) clearTimeout(statusTimeoutRef.current)
+        statusTimeoutRef.current = setTimeout(() => setCommentStatus(null), 3000)
       } else {
         setCommentStatus({ type: 'error', message: result.message })
       }
@@ -121,19 +136,31 @@ export function PRReviewPanel({ pr, formatRelativeTime, onCheckout, onPRMerged, 
       return
     }
 
+    let cancelled = false
+
     const loadDiff = async () => {
       setLoadingDiff(true)
       try {
         const diff = await window.conveyor.pr.getPRFileDiff(pr.number, selectedFile)
-        setFileDiff(diff)
+        if (!cancelled) {
+          setFileDiff(diff)
+        }
       } catch (_error) {
-        setFileDiff(null)
+        if (!cancelled) {
+          setFileDiff(null)
+        }
       } finally {
-        setLoadingDiff(false)
+        if (!cancelled) {
+          setLoadingDiff(false)
+        }
       }
     }
 
     loadDiff()
+
+    return () => {
+      cancelled = true
+    }
   }, [pr.number, selectedFile])
 
   // Filter comments by AI/human

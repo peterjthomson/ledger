@@ -8,6 +8,7 @@ import {
   getFileDiff,
   getWorkingStatus,
 } from '@/lib/main/git-service'
+import { serializeError, logHandlerError } from '@/lib/utils/error-helpers'
 
 export const registerStagingHandlers = () => {
   handle('get-staging-status', async () => {
@@ -30,7 +31,7 @@ export const registerStagingHandlers = () => {
     try {
       return await stageFile(filePath)
     } catch (error) {
-      return { success: false, message: (error as Error).message }
+      return { success: false, message: serializeError(error) }
     }
   })
 
@@ -38,7 +39,7 @@ export const registerStagingHandlers = () => {
     try {
       return await unstageFile(filePath)
     } catch (error) {
-      return { success: false, message: (error as Error).message }
+      return { success: false, message: serializeError(error) }
     }
   })
 
@@ -46,7 +47,7 @@ export const registerStagingHandlers = () => {
     try {
       return await stageAll()
     } catch (error) {
-      return { success: false, message: (error as Error).message }
+      return { success: false, message: serializeError(error) }
     }
   })
 
@@ -54,7 +55,7 @@ export const registerStagingHandlers = () => {
     try {
       return await unstageAll()
     } catch (error) {
-      return { success: false, message: (error as Error).message }
+      return { success: false, message: serializeError(error) }
     }
   })
 
@@ -62,7 +63,7 @@ export const registerStagingHandlers = () => {
     try {
       return await discardFileChanges(filePath)
     } catch (error) {
-      return { success: false, message: (error as Error).message }
+      return { success: false, message: serializeError(error) }
     }
   })
 

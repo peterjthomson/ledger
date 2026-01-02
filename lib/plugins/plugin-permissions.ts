@@ -73,6 +73,24 @@ export function revokePermissions(pluginId: string): void {
 }
 
 /**
+ * Revoke a single permission from a plugin.
+ * Called from the plugin settings UI for granular permission management.
+ * Returns true if the permission was revoked, false if it wasn't granted.
+ */
+export function revokePermission(pluginId: string, permission: PluginPermission): boolean {
+  const perms = grantedPermissions.get(pluginId)
+  if (!perms) {
+    return false
+  }
+
+  const revoked = perms.delete(permission)
+  if (revoked) {
+    console.info(`[Permissions] Revoked ${permission} from ${pluginId}`)
+  }
+  return revoked
+}
+
+/**
  * Get all permissions granted to a plugin
  */
 export function getPermissions(pluginId: string): PluginPermission[] {

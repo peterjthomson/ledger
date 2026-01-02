@@ -38,9 +38,18 @@ export interface PluginInstallOptions {
   autoEnable?: boolean
   /** Permissions to grant */
   permissions?: PluginPermission[]
-  /** Skip confirmation prompt */
+  /** Skip confirmation prompt (only for trusted/builtin plugins) */
   skipConfirmation?: boolean
+  /** Whether this is from a trusted source (internal use only) */
+  trustedSource?: boolean
 }
+
+/** Permission request callback type */
+export type PermissionRequestFn = (
+  pluginId: string,
+  pluginName: string,
+  permissions: PluginPermission[]
+) => Promise<{ approved: boolean; permissions?: PluginPermission[] }>
 
 export interface PluginInstallResult {
   success: boolean
@@ -131,6 +140,16 @@ export const pluginRegistry = new PluginRegistry()
 
 class PluginLoader {
   private loadedPlugins: Map<string, Plugin> = new Map()
+  private permissionRequestFn: PermissionRequestFn | null = null
+
+  /**
+   * Configure the permission request handler.
+   * This should be called by the app during initialization.
+   * If not set, permissions will be auto-approved (development mode).
+   */
+  setPermissionRequestHandler(handler: PermissionRequestFn): void {
+    this.permissionRequestFn = handler
+  }
 
   /**
    * Install a plugin from a source
@@ -151,9 +170,9 @@ class PluginLoader {
         return { success: false, error: 'Plugin already installed' }
       }
 
-      // Validate required permissions
-      if (manifest.permissions?.length && !options.skipConfirmation) {
-        const approved = await this.requestPermissions(manifest)
+      // Request user approval for permissions
+      if (manifest.permissions?.length) {
+        const approved = await this.requestPermissions(manifest, options)
         if (!approved) {
           return { success: false, error: 'Permission denied by user' }
         }
@@ -443,16 +462,49 @@ class PluginLoader {
     return null
   }
 
-  private async requestPermissions(manifest: PluginManifest): Promise<boolean> {
-    // Show permission dialog to user
-    // For now, auto-approve (in production would show UI)
-    console.log(`[PluginLoader] Requesting permissions for ${manifest.id}:`, manifest.permissions)
-
-    // Grant the permissions (stored in memory for runtime checks)
-    if (manifest.permissions?.length) {
-      grantPermissions(manifest.id, manifest.permissions)
+  private async requestPermissions(
+    manifest: PluginManifest,
+    options: PluginInstallOptions = {}
+  ): Promise<boolean> {
+    // No permissions needed
+    if (!manifest.permissions?.length) {
+      return true
     }
 
+    // Skip dialog for trusted sources (built-in plugins)
+    if (options.skipConfirmation && options.trustedSource) {
+      console.log(`[PluginLoader] Auto-approving trusted plugin ${manifest.id}:`, manifest.permissions)
+      grantPermissions(manifest.id, manifest.permissions)
+      return true
+    }
+
+    // Use permission request handler if available
+    if (this.permissionRequestFn) {
+      console.log(`[PluginLoader] Requesting user approval for ${manifest.id}:`, manifest.permissions)
+
+      const result = await this.permissionRequestFn(
+        manifest.id,
+        manifest.name,
+        manifest.permissions
+      )
+
+      if (!result.approved) {
+        console.log(`[PluginLoader] User denied permissions for ${manifest.id}`)
+        return false
+      }
+
+      // Grant only the permissions user approved
+      const approvedPermissions = result.permissions ?? manifest.permissions
+      grantPermissions(manifest.id, approvedPermissions)
+      return true
+    }
+
+    // Fallback: auto-approve with warning (development mode)
+    console.warn(
+      `[PluginLoader] No permission handler configured. Auto-approving ${manifest.id}:`,
+      manifest.permissions
+    )
+    grantPermissions(manifest.id, manifest.permissions)
     return true
   }
 }

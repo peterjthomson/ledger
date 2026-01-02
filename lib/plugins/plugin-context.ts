@@ -43,11 +43,12 @@ export interface PluginContextDependencies {
   setActiveApp: (appId: string | null) => void
 
   // IPC functions (optional - for renderer process only)
+  // These fetch fresh data from the backend and update the store
   ipc?: {
     getBranches: () => Promise<unknown[]>
     getWorktrees: () => Promise<unknown[]>
     getPullRequests: () => Promise<unknown[]>
-    getCommitHistory: () => Promise<unknown[]>
+    getCommitHistory: (limit?: number) => Promise<unknown[]>
     getStagingStatus: () => Promise<unknown>
   }
 }
@@ -267,6 +268,9 @@ export function createPluginAPI(
 
   return {
     // Repository data access (requires git:read)
+    // Note: These methods read from the local store cache by default.
+    // After a repo change, call the refresh methods or use refresh: true option
+    // to fetch fresh data from the backend.
     getRepoPath: () => {
       if (!checkPermission('git:read')) return null
       return deps.getRepoPath()
@@ -277,19 +281,64 @@ export function createPluginAPI(
     },
     getBranches: async () => {
       if (!checkPermission('git:read')) return []
+      // Use IPC to fetch fresh data if available
+      if (deps.ipc?.getBranches) {
+        try {
+          return await deps.ipc.getBranches()
+        } catch (error) {
+          logger.error('Failed to fetch branches:', error)
+        }
+      }
       return deps.getBranches()
     },
     getWorktrees: async () => {
       if (!checkPermission('git:read')) return []
+      // Use IPC to fetch fresh data if available
+      if (deps.ipc?.getWorktrees) {
+        try {
+          return await deps.ipc.getWorktrees()
+        } catch (error) {
+          logger.error('Failed to fetch worktrees:', error)
+        }
+      }
       return deps.getWorktrees()
     },
     getPullRequests: async () => {
       if (!checkPermission('git:read')) return []
+      // Use IPC to fetch fresh data if available
+      if (deps.ipc?.getPullRequests) {
+        try {
+          return await deps.ipc.getPullRequests()
+        } catch (error) {
+          logger.error('Failed to fetch pull requests:', error)
+        }
+      }
       return deps.getPullRequests()
     },
-    getCommits: async () => {
+    getCommits: async (limit?: number) => {
       if (!checkPermission('git:read')) return []
-      return deps.getCommits()
+      // Use IPC to fetch fresh data if available
+      if (deps.ipc?.getCommitHistory) {
+        try {
+          return await deps.ipc.getCommitHistory(limit)
+        } catch (error) {
+          logger.error('Failed to fetch commits:', error)
+        }
+      }
+      const commits = deps.getCommits()
+      return limit ? commits.slice(0, limit) : commits
+    },
+    getStagingStatus: async () => {
+      if (!checkPermission('git:read')) return null
+      // Use IPC to fetch fresh data if available
+      if (deps.ipc?.getStagingStatus) {
+        try {
+          return await deps.ipc.getStagingStatus()
+        } catch (error) {
+          logger.error('Failed to fetch staging status:', error)
+        }
+      }
+      return deps.getWorkingStatus()
     },
     getWorkingStatus: async () => {
       if (!checkPermission('git:read')) return null
@@ -444,20 +493,54 @@ export function createPluginEvents(pluginId: string): PluginEvents {
 // ============================================================================
 
 /**
+ * Extended plugin context with dispose method for cleanup
+ */
+export interface PluginContextWithDispose extends PluginContext {
+  /**
+   * Dispose the context and call all registered cleanup callbacks.
+   * Called by PluginManager when plugin is deactivated.
+   */
+  dispose: () => void
+}
+
+/**
  * Create a complete plugin context.
  *
  * @param pluginId - Unique plugin identifier
  * @param deps - Dependencies for API creation (optional for stub context)
- * @returns Complete plugin context
+ * @returns Complete plugin context with dispose method
  */
 export function createPluginContext(
   pluginId: string,
   deps?: PluginContextDependencies
-): PluginContext {
+): PluginContextWithDispose {
   const storage = createPluginStorage(pluginId)
   const logger = createPluginLogger(pluginId)
   const events = createPluginEvents(pluginId)
   const disposeCallbacks: Array<() => void> = []
+  const eventUnsubscribers: Array<() => void> = []
+
+  // Track event subscriptions for cleanup
+  const trackedEvents: PluginEvents = {
+    on(type: string, callback: (event: unknown) => void): () => void {
+      const unsubscribe = events.on(type, callback)
+      eventUnsubscribers.push(unsubscribe)
+      return () => {
+        const idx = eventUnsubscribers.indexOf(unsubscribe)
+        if (idx >= 0) eventUnsubscribers.splice(idx, 1)
+        unsubscribe()
+      }
+    },
+    once(type: string, callback: (event: unknown) => void): () => void {
+      const unsubscribe = events.once(type, callback)
+      eventUnsubscribers.push(unsubscribe)
+      return () => {
+        const idx = eventUnsubscribers.indexOf(unsubscribe)
+        if (idx >= 0) eventUnsubscribers.splice(idx, 1)
+        unsubscribe()
+      }
+    },
+  }
 
   // Create API - use stubs if no dependencies provided
   const api = deps
@@ -473,7 +556,30 @@ export function createPluginContext(
       },
     },
     api,
-    events,
+    events: trackedEvents,
+    dispose: () => {
+      // Unsubscribe from all events
+      for (const unsub of eventUnsubscribers) {
+        try {
+          unsub()
+        } catch (error) {
+          logger.error('Event unsubscribe error:', error)
+        }
+      }
+      eventUnsubscribers.length = 0
+
+      // Call all dispose callbacks
+      for (const callback of disposeCallbacks) {
+        try {
+          callback()
+        } catch (error) {
+          logger.error('Dispose callback error:', error)
+        }
+      }
+      disposeCallbacks.length = 0
+
+      logger.debug('Context disposed')
+    },
   }
 }
 
@@ -490,6 +596,7 @@ function createStubAPI(): PluginAPI {
     getPullRequests: async () => [],
     getCommits: async () => [],
     getWorkingStatus: async () => null,
+    getStagingStatus: async () => null,
     git: async () => '',
     showNotification: () => {},
     openPanel: () => {},

@@ -11,6 +11,7 @@ import {
   getRepoPath,
 } from '@/lib/main/git-service'
 import { emitGitStash } from '@/lib/events'
+import { serializeError, logHandlerError } from '@/lib/utils/error-helpers'
 
 export const registerStashHandlers = () => {
   handle('get-stashes', async () => {
@@ -54,7 +55,7 @@ export const registerStashHandlers = () => {
       }
       return result
     } catch (error) {
-      return { success: false, message: (error as Error).message }
+      return { success: false, message: serializeError(error) }
     }
   })
 
@@ -67,7 +68,7 @@ export const registerStashHandlers = () => {
       }
       return result
     } catch (error) {
-      return { success: false, message: (error as Error).message }
+      return { success: false, message: serializeError(error) }
     }
   })
 
@@ -80,7 +81,7 @@ export const registerStashHandlers = () => {
       }
       return result
     } catch (error) {
-      return { success: false, message: (error as Error).message }
+      return { success: false, message: serializeError(error) }
     }
   })
 
@@ -88,7 +89,7 @@ export const registerStashHandlers = () => {
     try {
       return await stashToBranch(stashIndex, branchName)
     } catch (error) {
-      return { success: false, message: (error as Error).message }
+      return { success: false, message: serializeError(error) }
     }
   })
 }

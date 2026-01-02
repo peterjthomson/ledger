@@ -12,6 +12,8 @@ import { exec } from 'child_process'
 import { promisify } from 'util'
 import * as https from 'https'
 import * as http from 'http'
+import simpleGit from 'simple-git'
+import { safeExec, isValidNpmPackageName } from '@/lib/utils/safe-exec'
 
 const execAsync = promisify(exec)
 
@@ -197,7 +199,9 @@ export async function cloneRepository(
       return { success: false, message: 'Invalid target directory' }
     }
 
-    await execAsync(`git clone --depth 1 "${gitUrl}" "${fullPath}"`)
+    // Use simple-git for safe cloning (no shell interpolation)
+    const git = simpleGit()
+    await git.clone(gitUrl, fullPath, ['--depth', '1'])
     return { success: true, message: 'Repository cloned successfully' }
   } catch (error) {
     return { success: false, message: (error as Error).message }
@@ -334,8 +338,23 @@ export async function installPlugin(
       }
 
       case 'npm': {
-        // Install from npm
-        const result = await execAsync(`npm pack ${source.location} --pack-destination "${getPluginsDirectory()}"`)
+        // Validate npm package name to prevent injection
+        if (!isValidNpmPackageName(source.location)) {
+          return { success: false, message: 'Invalid npm package name' }
+        }
+
+        // Use safeExec for secure execution (no shell interpolation)
+        const result = await safeExec('npm', [
+          'pack',
+          source.location,
+          '--pack-destination',
+          getPluginsDirectory()
+        ])
+
+        if (!result.success) {
+          return { success: false, message: result.stderr || 'Failed to download npm package' }
+        }
+
         // Would need to unpack - simplified
         return { success: false, message: 'NPM installation not fully implemented' }
       }

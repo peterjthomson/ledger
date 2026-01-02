@@ -37,6 +37,11 @@ export const WindowContextProvider = ({
     // Add class to parent element
     const parent = document.querySelector('.window-content')?.parentElement
     parent?.classList.add('window-frame')
+
+    // Cleanup: remove class on unmount
+    return () => {
+      parent?.classList.remove('window-frame')
+    }
   }, [])
 
   const windowProps = useMemo(
