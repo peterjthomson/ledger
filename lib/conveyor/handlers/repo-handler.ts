@@ -40,13 +40,14 @@ export const registerRepoHandlers = () => {
     const selectedPath = result.filePaths[0]
     const previousPath = getRepoPath()
 
-    // Use RepositoryManager for the new architecture
+    // Open in RepositoryManager and sync module state
     const manager = getRepositoryManager()
     try {
       const ctx = await manager.open(selectedPath)
       // Update module state
       setRepoPath(ctx.path)
       saveLastRepoPath(ctx.path)
+      addRecentRepo(ctx.path)
 
       // Emit events
       emitRepoOpened(ctx.path)
@@ -59,6 +60,7 @@ export const registerRepoHandlers = () => {
       // Direct path handling if RepositoryManager fails
       setRepoPath(selectedPath)
       saveLastRepoPath(selectedPath)
+      addRecentRepo(selectedPath)
 
       // Emit events
       emitRepoOpened(selectedPath)

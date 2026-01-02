@@ -386,7 +386,7 @@ export default function App() {
       setGithubUrl(ghUrl)
 
       // Update window title with repo name
-      if (repoPathForTitle) {
+      if (repoPathForTitle && typeof repoPathForTitle === 'string') {
         const repoName = repoPathForTitle.split('/').pop() || 'Ledger'
         setTitle(repoName)
       } else {
@@ -1190,7 +1190,7 @@ export default function App() {
         const path = await window.electronAPI.loadSavedRepo()
         if (path) {
           setRepoPath(path)
-          await refresh()
+          await refresh(path)
         }
       } catch (err) {
         console.error('Failed to load saved repository:', err)
@@ -1377,7 +1377,7 @@ export default function App() {
             setStatus({ type: 'info', message: `Opening ${repo.name}...` })
             try {
               setRepoPath(repo.path)
-              await refresh()
+              await refresh(repo.path)
               setStatus({ type: 'success', message: `Opened ${repo.name}` })
             } catch (err) {
               setStatus({ type: 'error', message: (err as Error).message })
@@ -1456,7 +1456,7 @@ export default function App() {
       setStatus({ type: 'info', message: `Opening ${repo.name}...` })
       try {
         setRepoPath(repo.path)
-        await refresh()
+        await refresh(repo.path)
         setStatus({ type: 'success', message: `Opened ${repo.name}` })
       } catch (err) {
         setStatus({ type: 'error', message: (err as Error).message })
@@ -1705,7 +1705,7 @@ export default function App() {
                 <span className="view-label">Change</span>
               </button>
               <button
-                onClick={refresh}
+                onClick={() => refresh()}
                 disabled={loading || switching}
                 className="view-toggle-btn active"
                 title="Refresh"

@@ -235,8 +235,7 @@ export class RepositoryManager {
   /**
    * Get the currently active repository context
    *
-   * This is the primary method handlers will use - it replaces
-   * the old `if (!git) return null` guard pattern.
+   * Returns null if no repository is currently active.
    */
   getActive(): RepositoryContext | null {
     if (!this.activeId) return null

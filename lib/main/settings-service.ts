@@ -266,7 +266,7 @@ export function updateCanvas(canvasId: string, updates: Partial<CanvasConfig>): 
   saveSettings(settings);
 }
 
-// Recent repos management (from architecture refactor)
+// Recent repos management
 const MAX_RECENT_REPOS = 10;
 
 export function getRecentRepos(): string[] {

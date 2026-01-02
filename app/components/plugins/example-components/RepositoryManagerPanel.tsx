@@ -22,8 +22,10 @@ import {
   Download,
   Cloud,
   Link,
+  MapPin,
 } from 'lucide-react'
 import type { PluginPanelProps } from '@/lib/plugins/plugin-types'
+import type { RepoInfo } from '@/app/types/electron'
 import './example-plugin-styles.css'
 
 interface RemoteInfo {
@@ -45,6 +47,7 @@ interface RepositorySummary {
 export function RepositoryManagerPanel({ context, onClose }: PluginPanelProps) {
   const [openRepos, setOpenRepos] = useState<RepositorySummary[]>([])
   const [recentRepos, setRecentRepos] = useState<string[]>([])
+  const [siblingRepos, setSiblingRepos] = useState<RepoInfo[]>([])
   const [loading, setLoading] = useState(true)
   const [switching, setSwitching] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -60,14 +63,17 @@ export function RepositoryManagerPanel({ context, onClose }: PluginPanelProps) {
     setLoading(true)
     setError(null)
     try {
-      const [open, recent] = await Promise.all([
+      const [open, recent, siblings] = await Promise.all([
         window.conveyor.repo.listRepositories(),
         window.conveyor.repo.getRecentRepositories(),
+        window.electronAPI.getSiblingRepos(),
       ])
       setOpenRepos(open)
       // Filter recent to exclude already-open repos
       const openPaths = new Set(open.map((r) => r.path))
       setRecentRepos(recent.filter((p) => !openPaths.has(p)))
+      // Filter siblings to exclude already-open repos and current repo
+      setSiblingRepos(siblings.filter((s) => !openPaths.has(s.path) && !s.isCurrent))
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load repositories')
     } finally {
@@ -171,6 +177,29 @@ export function RepositoryManagerPanel({ context, onClose }: PluginPanelProps) {
       }
     },
     []
+  )
+
+  // Open a sibling repository
+  const handleOpenSibling = useCallback(
+    async (repoPath: string) => {
+      setSwitching(repoPath)
+      setError(null)
+      try {
+        const result = await window.conveyor.repo.openRepository(repoPath)
+        if (result.success) {
+          context.api.refresh()
+          await loadRepos()
+          onClose() // Close panel after opening
+        } else {
+          setError(result.error || 'Failed to open repository')
+        }
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'Failed to open repository')
+      } finally {
+        setSwitching(null)
+      }
+    },
+    [context, loadRepos, onClose]
   )
 
   // Clone a remote repository
@@ -418,6 +447,47 @@ export function RepositoryManagerPanel({ context, onClose }: PluginPanelProps) {
           </div>
           <div className="repo-manager-clone-hint">
             Enter a Git URL (HTTPS or SSH) and select where to clone
+          </div>
+        </div>
+      )}
+
+      {/* Sibling Repositories */}
+      {siblingRepos.length > 0 && (
+        <div className="repo-manager-section">
+          <div className="repo-manager-section-header">
+            <MapPin size={14} />
+            <span>Nearby Repositories</span>
+          </div>
+
+          <div className="repo-manager-list">
+            {siblingRepos.map((repo) => (
+              <div
+                key={repo.path}
+                className="repo-manager-item sibling"
+                onClick={() => handleOpenSibling(repo.path)}
+              >
+                <div className="repo-manager-item-icon">
+                  <FolderGit2 size={14} />
+                </div>
+                <div className="repo-manager-item-content">
+                  <div className="repo-manager-item-name">{repo.name}</div>
+                  <div className="repo-manager-item-path">{repo.path}</div>
+                </div>
+                <div className="repo-manager-item-actions">
+                  {switching === repo.path ? (
+                    <RefreshCw size={14} className="spinning" />
+                  ) : (
+                    <button
+                      className="repo-manager-item-open"
+                      onClick={() => handleOpenSibling(repo.path)}
+                      title="Open repository"
+                    >
+                      <ExternalLink size={14} />
+                    </button>
+                  )}
+                </div>
+              </div>
+            ))}
           </div>
         </div>
       )}

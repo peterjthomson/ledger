@@ -4,7 +4,7 @@ import fixPath from 'fix-path'
 import { createAppWindow } from './app'
 import { registerResourcesProtocol } from './protocols'
 
-// Database (from architecture refactor)
+// Database
 import {
   connect as connectDatabase,
   close as closeDatabase,
@@ -12,6 +12,9 @@ import {
   cleanupExpiredPluginData,
   closeAllCustomDatabases,
 } from '@/lib/data'
+
+// Repository manager
+import { getRepositoryManager } from '@/lib/repositories'
 
 // Conveyor handlers (typed IPC with schema validation)
 import { registerAppHandlers } from '@/lib/conveyor/handlers/app-handler'
@@ -165,7 +168,7 @@ const testRepoPath = repoArgIndex !== -1 ? process.argv[repoArgIndex].split('=')
 // initialization and is ready to create browser windows.
 // Some APIs can only be used after this event occurs.
 app.whenReady().then(() => {
-  // Initialize database (from architecture refactor)
+  // Initialize database
   try {
     connectDatabase()
     // Clean up expired entries on startup
@@ -207,10 +210,21 @@ app.whenReady().then(() => {
       return null
     }
 
-    const path = result.filePaths[0]
-    setRepoPath(path)
-    saveLastRepoPath(path) // Save for next launch
-    return path
+    const selectedPath = result.filePaths[0]
+    
+    // Open in RepositoryManager and sync module state
+    const manager = getRepositoryManager()
+    try {
+      const ctx = await manager.open(selectedPath)
+      setRepoPath(ctx.path)
+      saveLastRepoPath(ctx.path)
+      return ctx.path
+    } catch (_error) {
+      // Fallback if path isn't a valid git repo
+      setRepoPath(selectedPath)
+      saveLastRepoPath(selectedPath)
+      return selectedPath
+    }
   })
 
   ipcMain.handle('get-repo-path', () => {
@@ -221,17 +235,33 @@ app.whenReady().then(() => {
     return getLastRepoPath()
   })
 
-  ipcMain.handle('load-saved-repo', () => {
+  ipcMain.handle('load-saved-repo', async () => {
     // Check for test repo path first (command line argument)
     if (testRepoPath) {
-      setRepoPath(testRepoPath)
-      return testRepoPath
+      // Add to RepositoryManager
+      const manager = getRepositoryManager()
+      try {
+        const ctx = await manager.open(testRepoPath)
+        setRepoPath(ctx.path)
+        return ctx.path
+      } catch {
+        setRepoPath(testRepoPath)
+        return testRepoPath
+      }
     }
     // Otherwise use saved settings
     const savedPath = getLastRepoPath()
     if (savedPath) {
-      setRepoPath(savedPath)
-      return savedPath
+      // Add to RepositoryManager
+      const manager = getRepositoryManager()
+      try {
+        const ctx = await manager.open(savedPath)
+        setRepoPath(ctx.path)
+        return ctx.path
+      } catch {
+        setRepoPath(savedPath)
+        return savedPath
+      }
     }
     return null
   })
@@ -931,7 +961,7 @@ app.on('window-all-closed', () => {
   }
 })
 
-// Clean up database on quit (from architecture refactor)
+// Clean up database on quit
 app.on('will-quit', () => {
   closeAllCustomDatabases()
   closeDatabase()
