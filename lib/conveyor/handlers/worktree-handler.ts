@@ -8,7 +8,7 @@ import {
   createWorktree,
 } from '@/lib/main/git-service'
 import { agentEvents } from '@/lib/plugins/agent-events'
-import { serializeError, logHandlerError } from '@/lib/utils/error-helpers'
+import { serializeError } from '@/lib/utils/error-helpers'
 
 export const registerWorktreeHandlers = () => {
   handle('get-worktrees', async () => {

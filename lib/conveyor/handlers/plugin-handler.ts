@@ -28,7 +28,7 @@ import {
   isConnected,
   type PluginStorageOptions,
 } from '@/lib/data'
-import { serializeError, logHandlerError } from '@/lib/utils/error-helpers'
+import { serializeError } from '@/lib/utils/error-helpers'
 
 export const registerPluginHandlers = () => {
   // List installed plugins

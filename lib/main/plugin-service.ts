@@ -8,14 +8,10 @@
 import { app } from 'electron'
 import * as fs from 'fs'
 import * as path from 'path'
-import { exec } from 'child_process'
-import { promisify } from 'util'
 import * as https from 'https'
 import * as http from 'http'
 import simpleGit from 'simple-git'
 import { safeExec, isValidNpmPackageName } from '@/lib/utils/safe-exec'
-
-const execAsync = promisify(exec)
 
 // Plugin storage directory
 const PLUGINS_DIR = 'plugins'

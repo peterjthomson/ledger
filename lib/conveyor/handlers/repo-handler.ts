@@ -55,8 +55,8 @@ export const registerRepoHandlers = () => {
       }
 
       return ctx.path
-    } catch (error) {
-      // Fall back to legacy behavior if RepositoryManager fails
+    } catch (_error) {
+      // Direct path handling if RepositoryManager fails
       setRepoPath(selectedPath)
       saveLastRepoPath(selectedPath)
 

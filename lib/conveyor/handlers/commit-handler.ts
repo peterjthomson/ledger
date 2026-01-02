@@ -11,7 +11,7 @@ import {
   getRepoPath,
 } from '@/lib/main/git-service'
 import { emitGitCommit, emitGitPull } from '@/lib/events'
-import { serializeError, logHandlerError } from '@/lib/utils/error-helpers'
+import { serializeError } from '@/lib/utils/error-helpers'
 
 export const registerCommitHandlers = () => {
   handle('get-commit-history', async (limit?: number) => {

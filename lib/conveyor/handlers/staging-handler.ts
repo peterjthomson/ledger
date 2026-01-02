@@ -8,7 +8,7 @@ import {
   getFileDiff,
   getWorkingStatus,
 } from '@/lib/main/git-service'
-import { serializeError, logHandlerError } from '@/lib/utils/error-helpers'
+import { serializeError } from '@/lib/utils/error-helpers'
 
 export const registerStagingHandlers = () => {
   handle('get-staging-status', async () => {
