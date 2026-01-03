@@ -1,25 +1,30 @@
 import { ipcMain } from 'electron'
 import { ipcSchemas, validateArgs, validateReturn, type ChannelArgs, type ChannelReturn } from '@/lib/conveyor/schemas'
 
+// Track which IPC channels have handlers registered
+const registeredChannels = new Set<string>()
+
 /**
- * Helper to register IPC handlers
- * @param channel - The IPC channel to register the handler for
- * @param handler - The handler function to register
- * @returns void
+ * Mark a channel as registered (call before ipcMain.handle)
+ */
+export const markChannelRegistered = (channel: string): void => {
+  registeredChannels.add(channel)
+}
+
+/**
+ * Register a typed IPC handler with schema validation.
+ * Skips registration if the channel already has a handler.
  */
 export const handle = <T extends keyof typeof ipcSchemas>(
   channel: T,
   handler: (...args: ChannelArgs<T>) => ChannelReturn<T>
-) => {
+): void => {
+  if (registeredChannels.has(channel)) return
+  
   ipcMain.handle(channel, async (_, ...args) => {
-    try {
-      const validatedArgs = validateArgs(channel, args)
-      const result = await handler(...validatedArgs)
-
-      return validateReturn(channel, result)
-    } catch (error) {
-      console.error(`IPC Error in ${channel}:`, error)
-      throw error
-    }
+    const validatedArgs = validateArgs(channel, args)
+    const result = await handler(...validatedArgs)
+    return validateReturn(channel, result)
   })
+  registeredChannels.add(channel)
 }

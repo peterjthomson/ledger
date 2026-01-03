@@ -4,6 +4,67 @@ import fixPath from 'fix-path'
 import { createAppWindow } from './app'
 import { registerResourcesProtocol } from './protocols'
 
+// Database
+import {
+  connect as connectDatabase,
+  close as closeDatabase,
+  runCacheCleanup,
+  cleanupExpiredPluginData,
+  closeAllCustomDatabases,
+} from '@/lib/data'
+
+// Repository manager
+import { getRepositoryManager } from '@/lib/repositories'
+
+// Conveyor handlers (typed IPC with schema validation)
+import { registerAppHandlers } from '@/lib/conveyor/handlers/app-handler'
+import { registerRepoHandlers } from '@/lib/conveyor/handlers/repo-handler'
+import { registerBranchHandlers } from '@/lib/conveyor/handlers/branch-handler'
+import { registerWorktreeHandlers } from '@/lib/conveyor/handlers/worktree-handler'
+import { registerPRHandlers } from '@/lib/conveyor/handlers/pr-handler'
+import { registerCommitHandlers } from '@/lib/conveyor/handlers/commit-handler'
+import { registerStashHandlers } from '@/lib/conveyor/handlers/stash-handler'
+import { registerStagingHandlers } from '@/lib/conveyor/handlers/staging-handler'
+import { registerThemeHandlers } from '@/lib/conveyor/handlers/theme-handler'
+import { registerPluginHandlers } from '@/lib/conveyor/handlers/plugin-handler'
+import { markChannelRegistered } from '@/lib/main/shared'
+
+// IPC channels registered below via ipcMain.handle
+const IPC_CHANNELS = [
+  // Repo
+  'select-repo', 'get-repo-path', 'get-saved-repo-path', 'load-saved-repo', 'get-sibling-repos',
+  // Branches
+  'get-branches', 'get-branches-basic', 'get-branches-with-metadata',
+  'checkout-branch', 'create-branch', 'delete-branch', 'delete-remote-branch',
+  'push-branch', 'checkout-remote-branch', 'open-branch-in-github', 'pull-branch', 'pull-current-branch',
+  // Worktrees
+  'get-worktrees', 'open-worktree', 'convert-worktree-to-branch', 'apply-worktree-changes',
+  'remove-worktree', 'create-worktree', 'select-worktree-folder', 'push-worktree-branch',
+  // Pull requests
+  'get-pull-requests', 'open-pull-request', 'create-pull-request', 'checkout-pr-branch',
+  'get-pr-detail', 'get-pr-review-comments', 'get-pr-file-diff', 'comment-on-pr', 'merge-pr', 'get-github-url',
+  // Commits
+  'get-commit-history', 'get-commit-diff', 'get-branch-diff', 'get-commit-graph-history', 'get-contributor-stats',
+  'get-merged-branch-tree', 'reset-to-commit',
+  // Stashes
+  'get-stashes', 'get-stash-files', 'get-stash-file-diff', 'get-stash-file-diff-parsed',
+  'get-stash-diff', 'apply-stash', 'pop-stash', 'drop-stash', 'stash-to-branch', 'apply-stash-to-branch',
+  // Staging
+  'get-working-status', 'stage-file', 'unstage-file', 'stage-all', 'unstage-all',
+  'discard-file-changes', 'discard-all-changes', 'get-file-diff', 'commit-changes',
+  // Worktree staging
+  'get-worktree-working-status', 'stage-file-in-worktree', 'unstage-file-in-worktree',
+  'stage-all-in-worktree', 'unstage-all-in-worktree', 'get-file-diff-in-worktree', 'commit-in-worktree',
+  // Theme
+  'get-theme-mode', 'set-theme-mode', 'get-system-theme', 'get-selected-theme-id',
+  'get-custom-theme', 'load-vscode-theme', 'load-built-in-theme', 'clear-custom-theme',
+  // Canvas
+  'get-canvases', 'save-canvases', 'get-active-canvas-id', 'save-active-canvas-id',
+  'add-canvas', 'remove-canvas', 'update-canvas',
+  // Mailmap
+  'get-mailmap', 'add-mailmap-entries', 'remove-mailmap-entry', 'suggest-mailmap-entries', 'get-author-identities',
+]
+
 // Fix PATH for macOS when launched from Finder/Dock (not terminal)
 // Without this, git/gh commands may not be found if installed via Homebrew
 fixPath()
@@ -114,6 +175,37 @@ const testRepoPath = repoArgIndex !== -1 ? process.argv[repoArgIndex].split('=')
 // initialization and is ready to create browser windows.
 // Some APIs can only be used after this event occurs.
 app.whenReady().then(() => {
+  // Initialize database
+  try {
+    connectDatabase()
+    // Clean up expired entries on startup
+    const cacheCleanup = runCacheCleanup()
+    const pluginCleanup = cleanupExpiredPluginData()
+    if (cacheCleanup > 0 || pluginCleanup > 0) {
+      console.log(
+        `[Database] Cleaned ${cacheCleanup} cache entries, ${pluginCleanup} plugin data entries`
+      )
+    }
+  } catch (error) {
+    console.error('[Database] Failed to initialize:', error)
+    // Continue without database - app can still function with reduced features
+  }
+
+  // Mark channels that are registered below
+  IPC_CHANNELS.forEach(channel => markChannelRegistered(channel))
+
+  // Register conveyor handlers (typed IPC with schema validation)
+  registerAppHandlers(app)
+  registerRepoHandlers()
+  registerBranchHandlers()
+  registerWorktreeHandlers()
+  registerPRHandlers()
+  registerCommitHandlers()
+  registerStashHandlers()
+  registerStagingHandlers()
+  registerThemeHandlers()
+  registerPluginHandlers()
+
   // Register git IPC handlers
   ipcMain.handle('select-repo', async () => {
     const result = await dialog.showOpenDialog({
@@ -125,10 +217,21 @@ app.whenReady().then(() => {
       return null
     }
 
-    const path = result.filePaths[0]
-    setRepoPath(path)
-    saveLastRepoPath(path) // Save for next launch
-    return path
+    const selectedPath = result.filePaths[0]
+    
+    // Open in RepositoryManager and sync module state
+    const manager = getRepositoryManager()
+    try {
+      const ctx = await manager.open(selectedPath)
+      setRepoPath(ctx.path)
+      saveLastRepoPath(ctx.path)
+      return ctx.path
+    } catch (_error) {
+      // Fallback if path isn't a valid git repo
+      setRepoPath(selectedPath)
+      saveLastRepoPath(selectedPath)
+      return selectedPath
+    }
   })
 
   ipcMain.handle('get-repo-path', () => {
@@ -139,17 +242,33 @@ app.whenReady().then(() => {
     return getLastRepoPath()
   })
 
-  ipcMain.handle('load-saved-repo', () => {
+  ipcMain.handle('load-saved-repo', async () => {
     // Check for test repo path first (command line argument)
     if (testRepoPath) {
-      setRepoPath(testRepoPath)
-      return testRepoPath
+      // Add to RepositoryManager
+      const manager = getRepositoryManager()
+      try {
+        const ctx = await manager.open(testRepoPath)
+        setRepoPath(ctx.path)
+        return ctx.path
+      } catch {
+        setRepoPath(testRepoPath)
+        return testRepoPath
+      }
     }
     // Otherwise use saved settings
     const savedPath = getLastRepoPath()
     if (savedPath) {
-      setRepoPath(savedPath)
-      return savedPath
+      // Add to RepositoryManager
+      const manager = getRepositoryManager()
+      try {
+        const ctx = await manager.open(savedPath)
+        setRepoPath(ctx.path)
+        return ctx.path
+      } catch {
+        setRepoPath(savedPath)
+        return savedPath
+      }
     }
     return null
   })
@@ -978,6 +1097,12 @@ app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') {
     app.quit()
   }
+})
+
+// Clean up database on quit
+app.on('will-quit', () => {
+  closeAllCustomDatabases()
+  closeDatabase()
 })
 
 // In this file, you can include the rest of your app's specific main process

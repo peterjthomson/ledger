@@ -1,4 +1,4 @@
-import { createContext, useContext, useState } from 'react'
+import { createContext, useContext, useState, useMemo, useCallback } from 'react'
 
 interface TitlebarContextProps {
   activeMenuIndex: number | null
@@ -13,12 +13,16 @@ const TitlebarContext = createContext<TitlebarContextProps | undefined>(undefine
 export const TitlebarContextProvider = ({ children }: { children: React.ReactNode }) => {
   const [activeMenuIndex, setActiveMenuIndex] = useState<number | null>(null)
   const [menusVisible, setMenusVisible] = useState(false)
-  const closeActiveMenu = () => setActiveMenuIndex(null)
+  const closeActiveMenu = useCallback(() => setActiveMenuIndex(null), [])
+
+  // Memoize context value to prevent unnecessary re-renders of consumers
+  const contextValue = useMemo(
+    () => ({ activeMenuIndex, menusVisible, setActiveMenuIndex, setMenusVisible, closeActiveMenu }),
+    [activeMenuIndex, menusVisible, closeActiveMenu]
+  )
 
   return (
-    <TitlebarContext.Provider
-      value={{ activeMenuIndex, menusVisible, setActiveMenuIndex, setMenusVisible, closeActiveMenu }}
-    >
+    <TitlebarContext.Provider value={contextValue}>
       {children}
     </TitlebarContext.Provider>
   )

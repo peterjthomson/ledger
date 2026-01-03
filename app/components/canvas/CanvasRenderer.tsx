@@ -276,11 +276,13 @@ export function CanvasRenderer({
               worktrees={data.worktrees}
               stashes={data.stashes}
               repoPath={data.repoPath}
+              workingStatus={data.workingStatus}
               selectedPR={selection.selectedPR}
               selectedBranch={selection.selectedBranch}
               selectedWorktree={selection.selectedWorktree}
               selectedStash={selection.selectedStash}
               selectedRepo={selection.selectedRepo}
+              uncommittedSelected={selection.uncommittedSelected}
               onSelectPR={handlers.onSelectPR}
               onDoubleClickPR={handlers.onDoubleClickPR}
               onContextMenuPR={handlers.onContextMenuPR}
@@ -294,6 +296,8 @@ export function CanvasRenderer({
               onDoubleClickStash={handlers.onDoubleClickStash}
               onSelectRepo={handlers.onSelectRepo}
               onDoubleClickRepo={handlers.onDoubleClickRepo}
+              onSelectUncommitted={handlers.onSelectUncommitted}
+              onDoubleClickUncommitted={handlers.onDoubleClickUncommitted}
               onCreateBranch={handlers.onCreateBranch}
               onCreateWorktree={handlers.onCreateWorktree}
               formatRelativeTime={handlers.formatRelativeTime}

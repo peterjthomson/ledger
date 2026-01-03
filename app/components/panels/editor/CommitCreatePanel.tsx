@@ -1,39 +1,23 @@
 /**
- * CommitCreatePanel - Git staging area with commit functionality
+ * StagingPanel - Git staging area with commit functionality
  *
  * Shows staged/unstaged files, diff preview, and commit form with options
  * for creating new branches and PRs.
  */
 
-import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import type { WorkingStatus, UncommittedFile, StagingFileDiff } from '../../../types/electron'
 import type { StatusMessage } from '../../../types/app-types'
+import { beforeCommit, afterCommit } from '@/lib/plugins'
 
-export interface CommitCreatePanelProps {
+export interface StagingPanelProps {
   workingStatus: WorkingStatus
   currentBranch: string
   onRefresh: () => Promise<void>
   onStatusChange: (status: StatusMessage | null) => void
 }
 
-// Helper to generate branch name from commit message
-function generateBranchNameFromMessage(message: string): string {
-  if (!message.trim()) return ''
-  
-  return message
-    .toLowerCase()
-    .trim()
-    // Remove common prefixes
-    .replace(/^(fix|feat|feature|bugfix|hotfix|chore|docs|style|refactor|test|perf):\s*/i, '')
-    // Replace non-alphanumeric characters with hyphens
-    .replace(/[^a-z0-9]+/g, '-')
-    // Remove leading/trailing hyphens
-    .replace(/^-+|-+$/g, '')
-    // Limit length
-    .slice(0, 50)
-}
-
-export function CommitCreatePanel({ workingStatus, currentBranch, onRefresh, onStatusChange }: CommitCreatePanelProps) {
+export function StagingPanel({ workingStatus, currentBranch, onRefresh, onStatusChange }: StagingPanelProps) {
   const [selectedFile, setSelectedFile] = useState<UncommittedFile | null>(null)
   const [fileDiff, setFileDiff] = useState<StagingFileDiff | null>(null)
   const [loadingDiff, setLoadingDiff] = useState(false)
@@ -45,13 +29,11 @@ export function CommitCreatePanel({ workingStatus, currentBranch, onRefresh, onS
   const [pushAfterCommit, setPushAfterCommit] = useState(true)
   const [fileContextMenu, setFileContextMenu] = useState<{ x: number; y: number; file: UncommittedFile } | null>(null)
   const fileMenuRef = useRef<HTMLDivElement>(null)
-  const fileListRef = useRef<HTMLDivElement>(null)
   // New branch creation
   const [createNewBranch, setCreateNewBranch] = useState(false)
   const [branchFolder, setBranchFolder] = useState<string>('feature')
   const [customFolder, setCustomFolder] = useState('')
   const [branchName, setBranchName] = useState('')
-  const [suggestedBranchName, setSuggestedBranchName] = useState('')
   // PR creation option (inline with commit flow)
   const [createPR, setCreatePR] = useState(false)
   const [prTitle, setPrTitle] = useState('')
@@ -60,75 +42,6 @@ export function CommitCreatePanel({ workingStatus, currentBranch, onRefresh, onS
 
   const stagedFiles = workingStatus.files.filter((f) => f.staged)
   const unstagedFiles = workingStatus.files.filter((f) => !f.staged)
-  const allFiles = [...stagedFiles, ...unstagedFiles]
-
-  // Generate suggested commit message from files (staged preferred, unstaged as preview)
-  const suggestedCommitMessage = useMemo(() => {
-    // Use staged files if any, otherwise preview from unstaged
-    const filesToUse = stagedFiles.length > 0 ? stagedFiles : unstagedFiles
-    if (filesToUse.length === 0) return ''
-    
-    // Get the primary file (first one, or could pick by other heuristics)
-    const primaryFile = filesToUse[0]
-    const fileName = primaryFile.path.split('/').pop() || primaryFile.path
-    
-    // Generate action verb based on status
-    let action = 'Update'
-    if (primaryFile.status === 'added' || primaryFile.status === 'untracked') {
-      action = 'Add'
-    } else if (primaryFile.status === 'deleted') {
-      action = 'Remove'
-    } else if (primaryFile.status === 'renamed') {
-      action = 'Rename'
-    }
-    
-    return `${action} ${fileName}`
-  }, [stagedFiles, unstagedFiles])
-
-  // Effective commit message: user input OR auto-suggested from files
-  const effectiveCommitMessage = commitMessage.trim() || suggestedCommitMessage
-
-  // Update suggested branch name when effective commit message changes
-  useEffect(() => {
-    const suggested = generateBranchNameFromMessage(effectiveCommitMessage)
-    setSuggestedBranchName(suggested)
-  }, [effectiveCommitMessage])
-
-  // Keyboard navigation for file list
-  const handleFileListKeyDown = useCallback((e: React.KeyboardEvent) => {
-    if (allFiles.length === 0) return
-
-    const currentIndex = selectedFile ? allFiles.findIndex(f => f.path === selectedFile.path && f.staged === selectedFile.staged) : -1
-    
-    switch (e.key) {
-      case 'ArrowDown':
-        e.preventDefault()
-        if (currentIndex < allFiles.length - 1) {
-          setSelectedFile(allFiles[currentIndex + 1])
-        } else if (currentIndex === -1 && allFiles.length > 0) {
-          setSelectedFile(allFiles[0])
-        }
-        break
-      case 'ArrowUp':
-        e.preventDefault()
-        if (currentIndex > 0) {
-          setSelectedFile(allFiles[currentIndex - 1])
-        } else if (currentIndex === -1 && allFiles.length > 0) {
-          setSelectedFile(allFiles[allFiles.length - 1])
-        }
-        break
-      case ' ':
-        e.preventDefault()
-        if (selectedFile) {
-          if (selectedFile.staged) {
-            handleUnstageFile(selectedFile)
-          } else {
-            handleStageFile(selectedFile)
-          }
-        }
-        break
-    }
-  }, [allFiles, selectedFile])
 
 
   // Close file context menu when clicking outside
@@ -163,25 +76,38 @@ export function CommitCreatePanel({ workingStatus, currentBranch, onRefresh, onS
       return
     }
 
+    let cancelled = false
+
     const loadDiff = async () => {
       setLoadingDiff(true)
       try {
-        const diff = await window.electronAPI.getFileDiff(selectedFile.path, selectedFile.staged)
-        setFileDiff(diff)
+        const diff = await window.conveyor.staging.getFileDiff(selectedFile.path, selectedFile.staged)
+        if (!cancelled) {
+          setFileDiff(diff)
+        }
       } catch (_error) {
-        setFileDiff(null)
+        if (!cancelled) {
+          setFileDiff(null)
+        }
       } finally {
-        setLoadingDiff(false)
+        if (!cancelled) {
+          setLoadingDiff(false)
+        }
       }
     }
 
     loadDiff()
+
+    return () => {
+      cancelled = true
+    }
   }, [selectedFile])
 
   // Stage a file
   const handleStageFile = async (file: UncommittedFile) => {
-    const result = await window.electronAPI.stageFile(file.path)
+    const result = await window.conveyor.staging.stageFile(file.path)
     if (result.success) {
+      onStatusChange({ type: 'success', message: result.message })
       await onRefresh()
     } else {
       onStatusChange({ type: 'error', message: result.message })
@@ -190,8 +116,9 @@ export function CommitCreatePanel({ workingStatus, currentBranch, onRefresh, onS
 
   // Unstage a file
   const handleUnstageFile = async (file: UncommittedFile) => {
-    const result = await window.electronAPI.unstageFile(file.path)
+    const result = await window.conveyor.staging.unstageFile(file.path)
     if (result.success) {
+      onStatusChange({ type: 'success', message: result.message })
       await onRefresh()
     } else {
       onStatusChange({ type: 'error', message: result.message })
@@ -200,7 +127,7 @@ export function CommitCreatePanel({ workingStatus, currentBranch, onRefresh, onS
 
   // Stage all files
   const handleStageAll = async () => {
-    const result = await window.electronAPI.stageAll()
+    const result = await window.conveyor.staging.stageAll()
     if (result.success) {
       onStatusChange({ type: 'success', message: result.message })
       await onRefresh()
@@ -211,7 +138,7 @@ export function CommitCreatePanel({ workingStatus, currentBranch, onRefresh, onS
 
   // Unstage all files
   const handleUnstageAll = async () => {
-    const result = await window.electronAPI.unstageAll()
+    const result = await window.conveyor.staging.unstageAll()
     if (result.success) {
       onStatusChange({ type: 'success', message: result.message })
       await onRefresh()
@@ -223,27 +150,12 @@ export function CommitCreatePanel({ workingStatus, currentBranch, onRefresh, onS
   // Discard changes in a file
   const handleDiscardFile = async (file: UncommittedFile) => {
     setFileContextMenu(null)
-    const result = await window.electronAPI.discardFileChanges(file.path)
+    const result = await window.conveyor.staging.discardFileChanges(file.path)
     if (result.success) {
       onStatusChange({ type: 'success', message: result.message })
       if (selectedFile?.path === file.path) {
         setSelectedFile(null)
       }
-      await onRefresh()
-    } else {
-      onStatusChange({ type: 'error', message: result.message })
-    }
-  }
-
-  // Discard all changes
-  const handleDiscardAll = async () => {
-    const totalChanges = workingStatus.files.length
-    if (!confirm(`Discard all ${totalChanges} changes? This cannot be undone.`)) return
-
-    const result = await window.electronAPI.discardAllChanges()
-    if (result.success) {
-      onStatusChange({ type: 'success', message: result.message })
-      setSelectedFile(null)
       await onRefresh()
     } else {
       onStatusChange({ type: 'error', message: result.message })
@@ -258,20 +170,21 @@ export function CommitCreatePanel({ workingStatus, currentBranch, onRefresh, onS
 
   // Get the effective folder name (custom or preset)
   const effectiveFolder = branchFolder === 'custom' ? customFolder.trim() : branchFolder
-  // Use explicit branch name, or fall back to suggested name from commit message
-  const effectiveBranchName = branchName.trim() || suggestedBranchName
-  const fullBranchName = createNewBranch && effectiveBranchName ? `${effectiveFolder}/${effectiveBranchName}` : null
+  const fullBranchName = createNewBranch && branchName.trim() ? `${effectiveFolder}/${branchName.trim()}` : null
 
   // Commit with optional force to skip behind-check
   const handleCommit = async (force: boolean = false) => {
-    if (!effectiveCommitMessage || stagedFiles.length === 0) return
+    if (!commitMessage.trim() || stagedFiles.length === 0) return
 
     setIsCommitting(true)
     try {
+      // Plugin hook: allow plugins to transform commit message
+      const finalCommitMessage = await beforeCommit(commitMessage.trim())
+
       // If creating a new branch, do that first
       if (fullBranchName) {
         onStatusChange({ type: 'info', message: `Creating branch ${fullBranchName}...` })
-        const branchResult = await window.electronAPI.createBranch(fullBranchName, true)
+        const branchResult = await window.conveyor.branch.createBranch(fullBranchName, true)
         if (!branchResult.success) {
           onStatusChange({ type: 'error', message: `Failed to create branch: ${branchResult.message}` })
           setIsCommitting(false)
@@ -279,27 +192,30 @@ export function CommitCreatePanel({ workingStatus, currentBranch, onRefresh, onS
         }
       }
 
-      const result = await window.electronAPI.commitChanges(
-        effectiveCommitMessage,
+      const result = await window.conveyor.commit.commitChanges(
+        finalCommitMessage,
         commitDescription.trim() || undefined,
         force
       )
       if (result.success) {
+        // Plugin hook: notify plugins of successful commit
+        await afterCommit(result.hash || 'HEAD')
+
         const targetBranch = fullBranchName || currentBranch
         let finalMessage = fullBranchName ? `Created ${fullBranchName} and committed` : result.message
 
         // If push after commit is enabled, push the branch
         if (pushAfterCommit && targetBranch) {
           onStatusChange({ type: 'info', message: 'Pushing to remote...' })
-          const pushResult = await window.electronAPI.pushBranch(targetBranch, true)
+          const pushResult = await window.conveyor.branch.pushBranch(targetBranch, true)
           if (pushResult.success) {
             finalMessage = `Committed and pushed to ${targetBranch}`
 
             // If create PR is enabled, create the PR
             if (createPR) {
               onStatusChange({ type: 'info', message: 'Creating pull request...' })
-              const prTitleToUse = prTitle.trim() || suggestedPRTitle
-              const prResult = await window.electronAPI.createPullRequest({
+              const prTitleToUse = prTitle.trim() || generatePRTitle(targetBranch)
+              const prResult = await window.conveyor.pr.createPullRequest({
                 title: prTitleToUse,
                 body: prBody.trim() || undefined,
                 headBranch: targetBranch,
@@ -381,7 +297,7 @@ export function CommitCreatePanel({ workingStatus, currentBranch, onRefresh, onS
     onStatusChange({ type: 'info', message: 'Pulling latest changes...' })
 
     try {
-      const pullResult = await window.electronAPI.pullCurrentBranch()
+      const pullResult = await window.conveyor.commit.pullCurrentBranch()
       if (pullResult.success && !pullResult.hadConflicts) {
         onStatusChange({ type: 'success', message: pullResult.message })
         setBehindPrompt(null)
@@ -414,19 +330,13 @@ export function CommitCreatePanel({ workingStatus, currentBranch, onRefresh, onS
     await handleCommit(true)
   }
 
-  // Auto-generate PR title - cascade: commit message → branch name
-  const suggestedPRTitle = useMemo(() => {
-    // Prefer commit message (preserves original casing and wording)
-    if (effectiveCommitMessage) {
-      return effectiveCommitMessage
-    }
-    // Fallback: format branch name into title
-    const branch = fullBranchName || currentBranch
+  // Auto-generate PR title from branch name
+  const generatePRTitle = (branch: string) => {
     return branch
       .replace(/^(feature|bugfix|hotfix)\//, '')
       .replace(/[-_]/g, ' ')
       .replace(/\b\w/g, (c) => c.toUpperCase())
-  }, [effectiveCommitMessage, fullBranchName, currentBranch])
+  }
 
   // File status helpers
   const getFileStatusIcon = (status: UncommittedFile['status']) => {
@@ -468,30 +378,16 @@ export function CommitCreatePanel({ workingStatus, currentBranch, onRefresh, onS
       {/* Header */}
       <div className="staging-header">
         <div className="staging-title">
-          <div className="detail-type-badge uncommitted">Changes</div>
-          <div className="staging-stats">
+          <span className="detail-type-badge uncommitted">Changes</span>
+          <span className="staging-stats">
             <span className="diff-additions">+{workingStatus.additions}</span>
             <span className="diff-deletions">-{workingStatus.deletions}</span>
-          </div>
+          </span>
         </div>
-        {workingStatus.files.length > 0 && (
-          <button
-            className="btn btn-secondary btn-danger btn-small"
-            onClick={handleDiscardAll}
-            title="Discard all changes"
-          >
-            Discard All
-          </button>
-        )}
       </div>
 
       {/* File Lists */}
-      <div 
-        className="staging-files" 
-        ref={fileListRef}
-        tabIndex={0}
-        onKeyDown={handleFileListKeyDown}
-      >
+      <div className="staging-files">
         {/* Staged Section */}
         <div className="staging-section">
           <div className="staging-section-header">
@@ -643,7 +539,7 @@ export function CommitCreatePanel({ workingStatus, currentBranch, onRefresh, onS
         <input
           type="text"
           className="commit-summary-input"
-          placeholder={suggestedCommitMessage || 'Commit message (required)'}
+          placeholder="Commit message (required)"
           value={commitMessage}
           onChange={(e) => setCommitMessage(e.target.value)}
           maxLength={72}
@@ -692,11 +588,16 @@ export function CommitCreatePanel({ workingStatus, currentBranch, onRefresh, onS
               <input
                 type="text"
                 className="branch-name-input"
-                placeholder={suggestedBranchName || 'branch-name'}
+                placeholder="branch-name"
                 value={branchName}
                 onChange={(e) => setBranchName(e.target.value.replace(/[^a-zA-Z0-9-_]/g, ''))}
               />
             </div>
+            {fullBranchName && (
+              <div className="branch-preview">
+                → <code>{fullBranchName}</code>
+              </div>
+            )}
           </div>
         )}
         <div className="commit-options">
@@ -724,7 +625,7 @@ export function CommitCreatePanel({ workingStatus, currentBranch, onRefresh, onS
                   className="pr-inline-title"
                   value={prTitle}
                   onChange={(e) => setPrTitle(e.target.value)}
-                  placeholder={suggestedPRTitle || 'PR title'}
+                  placeholder={`PR title (default: ${generatePRTitle(fullBranchName || currentBranch)})`}
                 />
                 <textarea
                   className="pr-inline-body"
@@ -772,10 +673,10 @@ export function CommitCreatePanel({ workingStatus, currentBranch, onRefresh, onS
             className="btn btn-primary commit-btn"
             onClick={() => handleCommit()}
             disabled={
-              !effectiveCommitMessage ||
+              !commitMessage.trim() ||
               stagedFiles.length === 0 ||
               isCommitting ||
-              (createNewBranch && !effectiveBranchName) ||
+              (createNewBranch && !branchName.trim()) ||
               (createNewBranch && branchFolder === 'custom' && !customFolder.trim())
             }
           >
@@ -804,4 +705,3 @@ export function CommitCreatePanel({ workingStatus, currentBranch, onRefresh, onS
     </div>
   )
 }
-

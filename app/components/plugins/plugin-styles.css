@@ -1,0 +1,1276 @@
+/**
+ * Plugin System Styles
+ */
+
+/* ============================================================================
+   App Layout Wrapper (Ledger + optional plugin sidebar)
+   ============================================================================ */
+
+.ledger-app-wrapper {
+  display: flex;
+  height: 100%;
+  width: 100%;
+}
+
+.ledger-app-wrapper .ledger-app {
+  flex: 1;
+  min-width: 0;
+}
+
+/* ============================================================================
+   Plugin Sidebar
+   ============================================================================ */
+
+.plugin-sidebar {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 48px;
+  min-width: 48px;
+  background: var(--bg-primary);
+  border-right: 1px solid var(--border-color);
+  padding: 8px 0;
+  gap: 4px;
+}
+
+.plugin-sidebar-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 8px;
+  border: none;
+  background: transparent;
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: all 0.15s ease;
+  position: relative;
+}
+
+.plugin-sidebar-icon:hover {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+}
+
+.plugin-sidebar-icon.active {
+  background: var(--accent-bg);
+  color: var(--accent-color);
+}
+
+.plugin-sidebar-icon.active::before {
+  content: '';
+  position: absolute;
+  left: -8px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 3px;
+  height: 20px;
+  background: var(--accent-color);
+  border-radius: 0 2px 2px 0;
+}
+
+.plugin-sidebar-divider {
+  width: 24px;
+  height: 1px;
+  background: var(--border-color);
+  margin: 4px 0;
+}
+
+.plugin-sidebar-spacer {
+  flex: 1;
+}
+
+.plugin-sidebar-icon-settings {
+  margin-bottom: 4px;
+}
+
+/* ============================================================================
+   Plugin Settings Panel
+   ============================================================================ */
+
+.plugin-settings-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+
+.plugin-settings-panel {
+  background: var(--bg-primary);
+  border-radius: 12px;
+  width: 90%;
+  max-width: 800px;
+  max-height: 80vh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+}
+
+.plugin-settings-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.plugin-settings-header h2 {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.plugin-settings-close {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 6px;
+  border: none;
+  background: transparent;
+  color: var(--text-secondary);
+  cursor: pointer;
+}
+
+.plugin-settings-close:hover {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+}
+
+.plugin-settings-back {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 6px;
+  border: none;
+  background: transparent;
+  color: var(--text-secondary);
+  cursor: pointer;
+  margin-right: 8px;
+}
+
+.plugin-settings-back:hover {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+}
+
+.plugin-card-config-button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+  background: var(--bg-primary);
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.plugin-card-config-button:hover {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+  border-color: var(--accent);
+}
+
+.plugin-settings-content {
+  flex: 1;
+  overflow-y: auto;
+  padding: 20px;
+}
+
+.plugin-settings-tabs {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 20px;
+  border-bottom: 1px solid var(--border-color);
+  padding-bottom: 12px;
+}
+
+.plugin-settings-tab {
+  padding: 8px 16px;
+  border-radius: 6px;
+  border: none;
+  background: transparent;
+  color: var(--text-secondary);
+  cursor: pointer;
+  font-size: 13px;
+}
+
+.plugin-settings-tab:hover {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+}
+
+.plugin-settings-tab.active {
+  background: var(--accent-bg);
+  color: var(--accent-color);
+}
+
+/* ============================================================================
+   Plugin List
+   ============================================================================ */
+
+.plugin-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.plugin-card {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 16px;
+  background: var(--bg-secondary);
+  border-radius: 8px;
+  border: 1px solid var(--border-color);
+}
+
+.plugin-card-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 8px;
+  background: var(--bg-primary);
+  color: var(--text-secondary);
+  flex-shrink: 0;
+}
+
+.plugin-card-content {
+  flex: 1;
+  min-width: 0;
+}
+
+.plugin-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 4px;
+}
+
+.plugin-card-name {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin: 0;
+}
+
+.plugin-card-version {
+  font-size: 11px;
+  color: var(--text-tertiary);
+  background: var(--bg-primary);
+  padding: 2px 6px;
+  border-radius: 4px;
+}
+
+.plugin-card-description {
+  font-size: 12px;
+  color: var(--text-secondary);
+  margin: 0 0 8px 0;
+  line-height: 1.4;
+}
+
+.plugin-card-meta {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 11px;
+  color: var(--text-tertiary);
+}
+
+.plugin-card-type {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  border-radius: 4px;
+  background: var(--bg-primary);
+  text-transform: capitalize;
+}
+
+.plugin-card-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.plugin-toggle {
+  position: relative;
+  width: 44px;
+  height: 24px;
+  border-radius: 12px;
+  border: none;
+  background: var(--bg-tertiary);
+  cursor: pointer;
+  transition: background 0.2s ease;
+}
+
+.plugin-toggle.active {
+  background: var(--accent-color);
+}
+
+.plugin-toggle::after {
+  content: '';
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: white;
+  transition: transform 0.2s ease;
+}
+
+.plugin-toggle.active::after {
+  transform: translateX(20px);
+}
+
+/* ============================================================================
+   Plugin Panel (Floating)
+   ============================================================================ */
+
+.plugin-panel-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.3);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 900;
+}
+
+.plugin-panel {
+  background: var(--bg-primary);
+  border-radius: 12px;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.2);
+}
+
+.plugin-panel.size-small {
+  width: 400px;
+  max-height: 60vh;
+}
+
+.plugin-panel.size-medium {
+  width: 600px;
+  max-height: 70vh;
+}
+
+.plugin-panel.size-large {
+  width: 800px;
+  max-height: 80vh;
+}
+
+.plugin-panel.size-fullscreen {
+  width: 95%;
+  height: 90%;
+  max-width: 1400px;
+}
+
+.plugin-panel.position-right {
+  position: fixed;
+  right: 0;
+  top: 0;
+  bottom: 0;
+  border-radius: 0;
+  max-height: 100vh;
+}
+
+.plugin-panel.position-bottom {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  border-radius: 12px 12px 0 0;
+  max-width: 100%;
+}
+
+.plugin-panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--border-color);
+  background: var(--bg-secondary);
+}
+
+.plugin-panel-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin: 0;
+}
+
+.plugin-panel-close {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 4px;
+  border: none;
+  background: transparent;
+  color: var(--text-secondary);
+  cursor: pointer;
+}
+
+.plugin-panel-close:hover {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+}
+
+.plugin-panel-content {
+  flex: 1;
+  overflow-y: auto;
+  padding: 16px;
+}
+
+/* ============================================================================
+   Plugin App Container
+   ============================================================================ */
+
+.plugin-app-container {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  overflow: hidden;
+  background: var(--bg-primary);
+}
+
+.plugin-app-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--border-color);
+  background: var(--bg-secondary);
+}
+
+.plugin-app-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin: 0;
+}
+
+.plugin-app-nav {
+  display: flex;
+  gap: 4px;
+  margin-left: auto;
+}
+
+.plugin-app-nav-item {
+  padding: 6px 12px;
+  border-radius: 6px;
+  border: none;
+  background: transparent;
+  color: var(--text-secondary);
+  cursor: pointer;
+  font-size: 12px;
+}
+
+.plugin-app-nav-item:hover {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+}
+
+.plugin-app-nav-item.active {
+  background: var(--accent-bg);
+  color: var(--accent-color);
+}
+
+.plugin-app-content {
+  flex: 1;
+  overflow: auto;
+}
+
+/* ============================================================================
+   Empty States
+   ============================================================================ */
+
+.plugin-empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 60px 20px;
+  text-align: center;
+}
+
+.plugin-empty-state-icon {
+  width: 64px;
+  height: 64px;
+  border-radius: 16px;
+  background: var(--bg-secondary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-tertiary);
+  margin-bottom: 16px;
+}
+
+.plugin-empty-state-title {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin: 0 0 8px 0;
+}
+
+.plugin-empty-state-description {
+  font-size: 13px;
+  color: var(--text-secondary);
+  margin: 0;
+  max-width: 300px;
+}
+
+/* ============================================================================
+   Widget Slots
+   ============================================================================ */
+
+.plugin-widget-slot {
+  display: contents;
+}
+
+.plugin-widget {
+  display: inline-flex;
+  align-items: center;
+}
+
+/* ============================================================================
+   Loading States
+   ============================================================================ */
+
+.plugin-loading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 40px 20px;
+  gap: 16px;
+  color: var(--text-secondary);
+  font-size: 13px;
+}
+
+.plugin-loading-spinner {
+  width: 24px;
+  height: 24px;
+  border: 2px solid var(--border-color);
+  border-top-color: var(--accent-color);
+  border-radius: 50%;
+  animation: plugin-spin 0.8s linear infinite;
+}
+
+@keyframes plugin-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* ============================================================================
+   Error States
+   ============================================================================ */
+
+.plugin-error {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 40px 20px;
+  text-align: center;
+  color: var(--error-text);
+  background: var(--error-bg);
+  border-radius: 8px;
+  margin: 16px;
+}
+
+.plugin-error-icon {
+  width: 48px;
+  height: 48px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background: var(--error);
+  color: white;
+  margin-bottom: 12px;
+}
+
+.plugin-error-title {
+  font-size: 14px;
+  font-weight: 600;
+  margin: 0 0 8px 0;
+}
+
+.plugin-error-message {
+  font-size: 12px;
+  margin: 0 0 16px 0;
+  max-width: 400px;
+  opacity: 0.9;
+}
+
+.plugin-error-retry {
+  padding: 8px 16px;
+  border-radius: 6px;
+  border: 1px solid var(--error-border);
+  background: transparent;
+  color: var(--error-text);
+  cursor: pointer;
+  font-size: 12px;
+  transition: background 0.15s ease;
+}
+
+.plugin-error-retry:hover {
+  background: var(--error-border);
+}
+
+.plugin-error-inline {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 16px;
+  background: var(--error-bg);
+  border: 1px solid var(--error-border);
+  border-radius: 6px;
+  color: var(--error-text);
+  font-size: 12px;
+  margin: 8px;
+}
+
+.plugin-error-inline svg {
+  flex-shrink: 0;
+}
+
+/* ============================================================================
+   Plugin Card Error State
+   ============================================================================ */
+
+.plugin-card.has-error {
+  border-color: var(--error-border);
+  background: color-mix(in srgb, var(--error-bg) 30%, var(--bg-secondary));
+}
+
+.plugin-card.has-error .plugin-card-icon {
+  color: var(--error);
+}
+
+/* ============================================================================
+   Plugin Config Editor
+   ============================================================================ */
+
+.plugin-config-editor {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.plugin-config-form {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.plugin-config-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.plugin-config-field.has-error .plugin-config-input,
+.plugin-config-field.has-error .plugin-config-select {
+  border-color: var(--error);
+}
+
+.plugin-config-field-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.plugin-config-label {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-primary);
+}
+
+.plugin-config-label .required {
+  color: var(--error);
+  margin-left: 2px;
+}
+
+.plugin-config-description {
+  font-size: 11px;
+  color: var(--text-tertiary);
+  margin: 0;
+  line-height: 1.4;
+}
+
+.plugin-config-error {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+  color: var(--error);
+}
+
+.plugin-config-input-wrapper {
+  display: flex;
+}
+
+.plugin-config-input,
+.plugin-config-select {
+  flex: 1;
+  padding: 8px 12px;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  font-size: 13px;
+  font-family: inherit;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.plugin-config-input:focus,
+.plugin-config-select:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px var(--accent-glow);
+}
+
+.plugin-config-input::placeholder {
+  color: var(--text-muted);
+}
+
+.plugin-config-input[type="number"] {
+  font-family: 'JetBrains Mono', monospace;
+}
+
+/* Toggle Switch */
+.plugin-config-toggle {
+  display: flex;
+  align-items: center;
+  cursor: pointer;
+}
+
+.plugin-config-toggle input {
+  position: absolute;
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+.plugin-config-toggle-track {
+  position: relative;
+  width: 44px;
+  height: 24px;
+  border-radius: 12px;
+  background: var(--bg-tertiary);
+  transition: background 0.2s ease;
+}
+
+.plugin-config-toggle input:checked + .plugin-config-toggle-track {
+  background: var(--accent);
+}
+
+.plugin-config-toggle-thumb {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: white;
+  transition: transform 0.2s ease;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.15);
+}
+
+.plugin-config-toggle input:checked + .plugin-config-toggle-track .plugin-config-toggle-thumb {
+  transform: translateX(20px);
+}
+
+/* Multi-select Checkboxes */
+.plugin-config-multiselect {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.plugin-config-checkbox {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--text-primary);
+  cursor: pointer;
+}
+
+.plugin-config-checkbox input[type="checkbox"] {
+  width: 16px;
+  height: 16px;
+  border-radius: 4px;
+  accent-color: var(--accent);
+}
+
+/* Color Picker */
+.plugin-config-color {
+  display: flex;
+  gap: 8px;
+}
+
+.plugin-config-color input[type="color"] {
+  width: 40px;
+  height: 36px;
+  padding: 2px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--bg-primary);
+  cursor: pointer;
+}
+
+.plugin-config-color input[type="color"]::-webkit-color-swatch-wrapper {
+  padding: 2px;
+}
+
+.plugin-config-color input[type="color"]::-webkit-color-swatch {
+  border-radius: 4px;
+  border: none;
+}
+
+/* Actions */
+.plugin-config-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  padding-top: 16px;
+  border-top: 1px solid var(--border);
+}
+
+.plugin-config-button {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 16px;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+  background: var(--bg-secondary);
+  color: var(--text-primary);
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.plugin-config-button:hover {
+  background: var(--bg-hover);
+}
+
+.plugin-config-button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.plugin-config-button.primary {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: white;
+}
+
+.plugin-config-button.primary:hover:not(:disabled) {
+  background: var(--accent-dim);
+}
+
+.plugin-config-button.secondary {
+  background: transparent;
+}
+
+/* Empty State */
+.plugin-config-empty {
+  padding: 24px;
+  text-align: center;
+  color: var(--text-secondary);
+  font-size: 13px;
+}
+
+/* ============================================================================
+   Plugin Install Button (Header)
+   ============================================================================ */
+
+.plugin-install-button {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  margin-left: auto;
+  margin-right: 8px;
+  border-radius: 6px;
+  border: 1px solid var(--accent);
+  background: var(--accent);
+  color: white;
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.plugin-install-button:hover {
+  background: var(--accent-dim);
+}
+
+/* ============================================================================
+   Plugin Install Dialog
+   ============================================================================ */
+
+.plugin-install-overlay {
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 10;
+  border-radius: 12px;
+}
+
+.plugin-install-dialog {
+  background: var(--bg-primary);
+  border-radius: 10px;
+  width: 90%;
+  max-width: 480px;
+  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.3);
+  overflow: hidden;
+}
+
+.plugin-install-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.plugin-install-header h3 {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.plugin-install-content {
+  padding: 16px;
+}
+
+.plugin-install-source-tabs {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 16px;
+}
+
+.plugin-install-source-tab {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex: 1;
+  padding: 10px 12px;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+  background: var(--bg-secondary);
+  color: var(--text-secondary);
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  justify-content: center;
+}
+
+.plugin-install-source-tab:hover:not(:disabled) {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+}
+
+.plugin-install-source-tab.active {
+  background: var(--accent-bg);
+  border-color: var(--accent);
+  color: var(--accent-color);
+}
+
+.plugin-install-source-tab:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.plugin-install-input-wrapper {
+  margin-bottom: 12px;
+}
+
+.plugin-install-input {
+  width: 100%;
+  padding: 10px 12px;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  font-size: 13px;
+  font-family: 'JetBrains Mono', monospace;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.plugin-install-input:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px var(--accent-glow);
+}
+
+.plugin-install-input::placeholder {
+  color: var(--text-muted);
+  font-family: inherit;
+}
+
+.plugin-install-input:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.plugin-install-error {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px;
+  margin-bottom: 12px;
+  border-radius: 6px;
+  background: var(--error-bg);
+  border: 1px solid var(--error-border);
+  color: var(--error-text);
+  font-size: 12px;
+}
+
+.plugin-install-hint {
+  font-size: 11px;
+  color: var(--text-tertiary);
+  margin: 0;
+  line-height: 1.5;
+}
+
+.plugin-install-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  padding: 12px 16px;
+  border-top: 1px solid var(--border-color);
+  background: var(--bg-secondary);
+}
+
+/* ============================================================================
+   Plugin Card Uninstall Button
+   ============================================================================ */
+
+.plugin-card-uninstall-button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+  background: var(--bg-primary);
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.plugin-card-uninstall-button:hover:not(:disabled) {
+  background: var(--error-bg);
+  border-color: var(--error-border);
+  color: var(--error);
+}
+
+.plugin-card-uninstall-button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+/* ============================================================================
+   Plugin Spinner Animation
+   ============================================================================ */
+
+.plugin-spinner {
+  animation: plugin-spin 0.8s linear infinite;
+}
+
+@keyframes plugin-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* ============================================================================
+   Plugin Permissions Section
+   ============================================================================ */
+
+.plugin-permissions-section {
+  padding: 16px 0;
+}
+
+.plugin-permissions-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+
+.plugin-permissions-header h3 {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.plugin-revoke-all-button {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 10px;
+  border-radius: 4px;
+  border: 1px solid var(--error-border);
+  background: var(--error-bg);
+  color: var(--error);
+  font-size: 11px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.plugin-revoke-all-button:hover {
+  background: var(--error);
+  border-color: var(--error);
+  color: white;
+}
+
+.plugin-permissions-description {
+  font-size: 12px;
+  color: var(--text-secondary);
+  margin: 0 0 16px 0;
+  line-height: 1.4;
+}
+
+.plugin-permissions-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.plugin-permission-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 12px;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+  background: var(--bg-secondary);
+}
+
+.plugin-permission-item.active {
+  border-color: var(--success-border, var(--border));
+  background: color-mix(in srgb, var(--success-bg, var(--bg-secondary)) 50%, transparent);
+}
+
+.plugin-permission-item.revoked {
+  border-color: var(--warning-border, var(--border));
+  background: color-mix(in srgb, var(--warning-bg, var(--bg-secondary)) 30%, transparent);
+  opacity: 0.7;
+}
+
+.plugin-permission-info {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+}
+
+.plugin-permission-icon {
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+
+.plugin-permission-icon.granted {
+  color: var(--success, var(--color-green));
+}
+
+.plugin-permission-icon.revoked {
+  color: var(--warning, var(--color-orange));
+}
+
+.plugin-permission-name {
+  display: block;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-primary);
+  font-family: 'JetBrains Mono', monospace;
+}
+
+.plugin-permission-desc {
+  display: block;
+  font-size: 11px;
+  color: var(--text-tertiary);
+  margin-top: 2px;
+  line-height: 1.3;
+}
+
+.plugin-permission-action {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 10px;
+  border-radius: 4px;
+  border: 1px solid var(--border);
+  background: var(--bg-primary);
+  color: var(--text-secondary);
+  font-size: 11px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.plugin-permission-action:hover {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+}
+
+.plugin-permission-action.revoke:hover {
+  background: var(--error-bg);
+  border-color: var(--error-border);
+  color: var(--error);
+}
+
+.plugin-permission-action.restore:hover {
+  background: var(--success-bg, var(--bg-hover));
+  border-color: var(--success-border, var(--accent));
+  color: var(--success, var(--accent));
+}
+
+.plugin-permissions-empty {
+  padding: 20px;
+  text-align: center;
+  color: var(--text-tertiary);
+  font-size: 12px;
+}
+
+.plugin-config-divider {
+  height: 1px;
+  background: var(--border);
+  margin: 16px 0;
+}

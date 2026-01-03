@@ -8,14 +8,20 @@
 export { DiffPanel } from './DiffPanel'
 export type { DiffPanelProps } from './DiffPanel'
 
-export { CommitCreatePanel } from './CommitCreatePanel'
-export type { CommitCreatePanelProps } from './CommitCreatePanel'
+export { StagingPanel } from './CommitCreatePanel'
+export type { StagingPanelProps } from './CommitCreatePanel'
+// Alias
+export { StagingPanel as CommitCreatePanel } from './CommitCreatePanel'
+export type { StagingPanelProps as CommitCreatePanelProps } from './CommitCreatePanel'
 
 export { BranchDetailPanel } from './BranchDetailPanel'
 export type { BranchDetailPanelProps } from './BranchDetailPanel'
 
-export { PRDetailPanel } from './PRDetailPanel'
-export type { PRDetailPanelProps } from './PRDetailPanel'
+export { PRReviewPanel } from './PRDetailPanel'
+export type { PRReviewPanelProps } from './PRDetailPanel'
+// Alias
+export { PRReviewPanel as PRDetailPanel } from './PRDetailPanel'
+export type { PRReviewPanelProps as PRDetailPanelProps } from './PRDetailPanel'
 
 export { WorktreeDetailPanel } from './WorktreeDetailPanel'
 export type { WorktreeDetailPanelProps } from './WorktreeDetailPanel'
