@@ -38,6 +38,7 @@ export { previewRegistry, type ProviderWithAvailability } from './preview-regist
 
 // Built-in Providers
 import * as npmDevProvider from './providers/npm-dev-provider'
+import { railsProvider } from './providers/rails-provider'
 
 // Provider wrapper for npm-dev (conforms to PreviewProvider interface)
 import type { PreviewProvider, CreateWorktreeFn } from './preview-types'
@@ -83,7 +84,13 @@ export function initializePreviewProviders(): void {
   // Import here to avoid circular dependencies
   const { previewRegistry } = require('./preview-registry')
 
-  // Register npm-dev provider (universal JS/TS)
+  // Register built-in providers
+  // Order matters - first compatible provider is used for "auto" preview
+  
+  // 1. Rails provider (uses puma-dev for .test domains when available)
+  previewRegistry.register(railsProvider)
+
+  // 2. npm-dev provider (universal JS/TS, fallback for most projects)
   previewRegistry.register(npmDevPreviewProvider)
 
   // Note: Herd provider would be registered here too once refactored
@@ -91,3 +98,6 @@ export function initializePreviewProviders(): void {
 
   console.info('[Preview] Initialized with built-in providers:', previewRegistry.getIds())
 }
+
+// Re-export Rails provider for direct use
+export { railsProvider }

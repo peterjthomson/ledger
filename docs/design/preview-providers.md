@@ -1,5 +1,102 @@
 # Preview Providers - Extensible Architecture
 
+## URL Strategy for Parallel Worktrees
+
+The key question: **What URL does each worktree get?**
+
+### Option 1: `.test` Domains (Preferred)
+
+Tools like **puma-dev** (Rails) and **Laravel Herd/Valet** provide automatic `.test` domains:
+
+```
+Main repo:        myapp.test
+feature-login:    feature-login.test
+feature-checkout: feature-checkout.test
+pr-42:            pr-42.test
+```
+
+**Pros:**
+- Human-readable URLs
+- No port conflicts
+- Easy to remember which is which
+- HTTPS support built-in
+- No server management needed
+
+**Setup (one-time):**
+```bash
+# Rails: puma-dev
+brew install puma/puma/puma-dev
+sudo puma-dev -setup
+puma-dev -install
+
+# Laravel: Herd
+# Just install Herd.app
+```
+
+### Option 2: Dynamic Ports (Fallback)
+
+When `.test` domain tools aren't installed:
+
+```
+Main repo:        localhost:3000
+feature-login:    localhost:3001
+feature-checkout: localhost:3002
+pr-42:            localhost:3003
+```
+
+**Pros:**
+- Works without additional setup
+- Universal (any framework)
+
+**Cons:**
+- Hard to remember which port is which
+- Need to track port assignments
+
+---
+
+## DHH's Rails Philosophy
+
+Per DHH (David Heinemeier Hansson):
+
+| Principle | Implementation |
+|-----------|----------------|
+| **No Docker for dev** | Native Ruby on Mac |
+| **Simple tooling** | Homebrew for deps |
+| **Foreman/Overmind** | Manage multiple processes |
+| **bin/dev** | Rails 7+ standard startup |
+| **puma-dev** | Zero-config `.test` domains |
+
+### Rails Parallel Worktree Setup
+
+```
+~/.ledger/previews/
+├── feature-login/           → feature-login.test (via puma-dev)
+│   ├── vendor/bundle → ../../main/vendor/bundle (symlink)
+│   ├── node_modules → ../../main/node_modules (symlink)
+│   ├── config/
+│   │   ├── database.yml (copied, with different DB name)
+│   │   ├── master.key → ../../main/config/master.key (symlink)
+│   │   └── credentials.yml.enc → (symlink)
+│   └── ...
+└── pr-42/                   → pr-42.test
+    └── ...
+```
+
+### Database Strategy
+
+Each worktree needs its own database to avoid conflicts:
+
+```yaml
+# config/database.yml (auto-modified)
+development:
+  database: myapp_feature_login_development  # Added worktree suffix
+
+test:
+  database: myapp_feature_login_test
+```
+
+---
+
 ## Overview
 
 Make "Preview in Browser" extensible to support multiple preview environments:
