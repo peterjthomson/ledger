@@ -2,7 +2,6 @@ import { BrowserWindow, shell, app, nativeImage } from 'electron'
 import { join } from 'path'
 import appIcon from '@/resources/build/icon.png?asset'
 import { registerWindowHandlers } from '@/lib/conveyor/handlers/window-handler'
-import { registerAppHandlers } from '@/lib/conveyor/handlers/app-handler'
 
 export function createAppWindow(): void {
   // Set dock icon for macOS (works in dev mode)
@@ -26,13 +25,21 @@ export function createAppWindow(): void {
     resizable: true,
     webPreferences: {
       preload: join(__dirname, '../preload/preload.js'),
-      sandbox: false,
+      // ============================================
+      // SECURITY CONFIGURATION
+      // These settings enforce Electron security best practices.
+      // Do NOT modify without security review.
+      // ============================================
+      sandbox: true,                    // Enable V8 sandbox
+      contextIsolation: true,           // Isolate preload from renderer
+      nodeIntegration: false,           // No Node.js in renderer
+      nodeIntegrationInWorker: false,   // No Node.js in workers
+      webSecurity: true,                // Enforce same-origin policy
     },
   })
 
-  // Register IPC events for the main window.
+  // Register window-specific IPC handlers (needs mainWindow reference)
   registerWindowHandlers(mainWindow)
-  registerAppHandlers(app)
 
   mainWindow.on('ready-to-show', () => {
     mainWindow.show()

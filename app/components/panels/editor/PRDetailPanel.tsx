@@ -1,13 +1,13 @@
 /**
- * PRDetailPanel - Full PR review interface with conversation, files, and commits tabs
+ * PRReviewPanel - Full PR review interface with conversation, files, and commits tabs
  *
  * Shows PR details, allows commenting, merging, and viewing file diffs.
  */
 
-import React, { useState, useEffect, useMemo, useCallback } from 'react'
+import { useState, useEffect, useMemo, useCallback, useRef } from 'react'
 import type { PullRequest, PRDetail, PRReviewComment } from '../../../types/electron'
 
-export interface PRDetailPanelProps {
+export interface PRReviewPanelProps {
   pr: PullRequest
   repoPath: string | null
   formatRelativeTime: (date: string) => string
@@ -27,36 +27,7 @@ function isAIAuthor(login: string): boolean {
   return AI_AUTHORS.some((ai) => lower.includes(ai)) || lower.endsWith('[bot]') || lower.endsWith('-bot')
 }
 
-// Helper to render text with clickable links
-function renderTextWithLinks(text: string): React.ReactNode {
-  // URL regex pattern
-  const urlPattern = /(https?:\/\/[^\s<>[\](){}'"]+)/g
-  const parts = text.split(urlPattern)
-  
-  return parts.map((part, index) => {
-    if (urlPattern.test(part)) {
-      // Reset the regex lastIndex after test
-      urlPattern.lastIndex = 0
-      return (
-        <a
-          key={index}
-          href={part}
-          className="pr-comment-link"
-          onClick={(e) => {
-            e.preventDefault()
-            window.electronAPI.openPullRequest(part)
-          }}
-          title={part}
-        >
-          {part}
-        </a>
-      )
-    }
-    return part
-  })
-}
-
-export function PRDetailPanel({ pr, repoPath, formatRelativeTime, onCheckout, onPRMerged, onStatusChange, switching }: PRDetailPanelProps) {
+export function PRReviewPanel({ pr, repoPath, formatRelativeTime, onCheckout, onPRMerged, onStatusChange, switching }: PRReviewPanelProps) {
   const [activeTab, setActiveTab] = useState<PRTab>('conversation')
   const [prDetail, setPrDetail] = useState<PRDetail | null>(null)
   const [reviewComments, setReviewComments] = useState<PRReviewComment[]>([])
@@ -74,13 +45,25 @@ export function PRDetailPanel({ pr, repoPath, formatRelativeTime, onCheckout, on
   const [isLaravel, setIsLaravel] = useState(false)
   const [previewLoading, setPreviewLoading] = useState(false)
 
+  // Ref to track status timeout for cleanup
+  const statusTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  // Cleanup timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (statusTimeoutRef.current) {
+        clearTimeout(statusTimeoutRef.current)
+      }
+    }
+  }, [])
+
   // Load full PR details
   const loadPRDetail = useCallback(async () => {
     setLoading(true)
     try {
       const [detail, comments] = await Promise.all([
-        window.electronAPI.getPRDetail(pr.number),
-        window.electronAPI.getPRReviewComments(pr.number),
+        window.conveyor.pr.getPRDetail(pr.number),
+        window.conveyor.pr.getPRReviewComments(pr.number),
       ])
       setPrDetail(detail)
       setReviewComments(comments)
@@ -123,15 +106,16 @@ export function PRDetailPanel({ pr, repoPath, formatRelativeTime, onCheckout, on
     setCommentStatus(null)
 
     try {
-      const result = await window.electronAPI.commentOnPR(pr.number, commentText.trim())
+      const result = await window.conveyor.pr.commentOnPR(pr.number, commentText.trim())
 
       if (result.success) {
         setCommentText('')
         setCommentStatus({ type: 'success', message: 'Comment added!' })
         // Reload PR details to show the new comment
         await loadPRDetail()
-        // Clear success message after a delay
-        setTimeout(() => setCommentStatus(null), 3000)
+        // Clear success message after a delay (with cleanup tracking)
+        if (statusTimeoutRef.current) clearTimeout(statusTimeoutRef.current)
+        statusTimeoutRef.current = setTimeout(() => setCommentStatus(null), 3000)
       } else {
         setCommentStatus({ type: 'error', message: result.message })
       }
@@ -150,7 +134,7 @@ export function PRDetailPanel({ pr, repoPath, formatRelativeTime, onCheckout, on
     setCommentStatus(null)
 
     try {
-      const result = await window.electronAPI.mergePR(pr.number, 'merge')
+      const result = await window.conveyor.pr.mergePR(pr.number, 'squash')
 
       if (result.success) {
         setCommentStatus({ type: 'success', message: 'PR merged!' })
@@ -158,7 +142,9 @@ export function PRDetailPanel({ pr, repoPath, formatRelativeTime, onCheckout, on
         await loadPRDetail()
         // Notify parent to refresh PR list
         if (onPRMerged) onPRMerged()
-        setTimeout(() => setCommentStatus(null), 3000)
+        // Clear success message after a delay (with cleanup tracking)
+        if (statusTimeoutRef.current) clearTimeout(statusTimeoutRef.current)
+        statusTimeoutRef.current = setTimeout(() => setCommentStatus(null), 3000)
       } else {
         setCommentStatus({ type: 'error', message: result.message })
       }
@@ -201,19 +187,31 @@ export function PRDetailPanel({ pr, repoPath, formatRelativeTime, onCheckout, on
       return
     }
 
+    let cancelled = false
+
     const loadDiff = async () => {
       setLoadingDiff(true)
       try {
-        const diff = await window.electronAPI.getPRFileDiff(pr.number, selectedFile)
-        setFileDiff(diff)
+        const diff = await window.conveyor.pr.getPRFileDiff(pr.number, selectedFile)
+        if (!cancelled) {
+          setFileDiff(diff)
+        }
       } catch (_error) {
-        setFileDiff(null)
+        if (!cancelled) {
+          setFileDiff(null)
+        }
       } finally {
-        setLoadingDiff(false)
+        if (!cancelled) {
+          setLoadingDiff(false)
+        }
       }
     }
 
     loadDiff()
+
+    return () => {
+      cancelled = true
+    }
   }, [pr.number, selectedFile])
 
   // Filter comments by AI/human
@@ -320,7 +318,7 @@ export function PRDetailPanel({ pr, repoPath, formatRelativeTime, onCheckout, on
         )}
         <button
           className="btn btn-secondary"
-          onClick={() => window.electronAPI.openPullRequest(pr.url)}
+          onClick={() => window.conveyor.pr.openPullRequest(pr.url)}
         >
           View on GitHub
         </button>
@@ -386,7 +384,7 @@ export function PRDetailPanel({ pr, repoPath, formatRelativeTime, onCheckout, on
                   <span className="pr-comment-author">@{prDetail.author.login}</span>
                   <span className="pr-comment-time">{formatRelativeTime(prDetail.createdAt)}</span>
                 </div>
-                <div className="pr-comment-body">{renderTextWithLinks(prDetail.body)}</div>
+                <div className="pr-comment-body">{prDetail.body}</div>
               </div>
             )}
 
@@ -412,7 +410,7 @@ export function PRDetailPanel({ pr, repoPath, formatRelativeTime, onCheckout, on
                       {isReview && getReviewStateBadge((item as any).state)}
                       <span className="pr-comment-time">{formatRelativeTime(date)}</span>
                     </div>
-                    {item.body && <div className="pr-comment-body">{renderTextWithLinks(item.body)}</div>}
+                    {item.body && <div className="pr-comment-body">{item.body}</div>}
                   </div>
                 )
               })}
@@ -484,7 +482,7 @@ export function PRDetailPanel({ pr, repoPath, formatRelativeTime, onCheckout, on
                     href={`${pr.url}/files#diff-${selectedFile.replace(/[^a-zA-Z0-9]/g, '')}`}
                     onClick={(e) => {
                       e.preventDefault()
-                      window.electronAPI.openPullRequest(`${pr.url}/files`)
+                      window.conveyor.pr.openPullRequest(`${pr.url}/files`)
                     }}
                     className="pr-view-on-github"
                   >
@@ -520,7 +518,7 @@ export function PRDetailPanel({ pr, repoPath, formatRelativeTime, onCheckout, on
                           {comment.line && <span className="pr-comment-line">Line {comment.line}</span>}
                           <span className="pr-comment-time">{formatRelativeTime(comment.createdAt)}</span>
                         </div>
-                        <div className="pr-inline-comment-body">{renderTextWithLinks(comment.body)}</div>
+                        <div className="pr-inline-comment-body">{comment.body}</div>
                       </div>
                     ))}
                   </div>
@@ -548,5 +546,3 @@ export function PRDetailPanel({ pr, repoPath, formatRelativeTime, onCheckout, on
     </div>
   )
 }
-
-

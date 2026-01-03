@@ -58,7 +58,7 @@ ledger/
 ├── lib/                              # Main Process
 │   ├── main/
 │   │   ├── main.ts                   # IPC handlers (70+ channels)
-│   │   ├── git-service.ts            # Git operations via simpe-git
+│   │   ├── git-service.ts            # Git operations via simple-git
 │   │   ├── settings-service.ts       # Read/write ~/Library/App Support/ledger/
 │   │   ├── app.ts                    # BrowserWindow config
 │   │   └── protocols.ts              # Custom URL protocols

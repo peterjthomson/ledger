@@ -33,6 +33,28 @@ import {
 } from './components/panels/editor'
 import { SettingsPanel } from './components/SettingsPanel'
 import { initializeTheme, setThemeMode as applyThemeMode, getCurrentThemeMode, type ThemeMode } from './theme'
+import { RepoSwitcher } from './components/RepoSwitcher'
+import { usePluginStore } from './stores/plugin-store'
+import { useRepositoryStore } from './stores/repository-store'
+import {
+  PluginSidebar,
+  PluginSettingsPanel,
+  PluginAppContainer,
+  PluginPanelContainer,
+  PluginComponentProvider,
+  pluginComponentRegistry,
+} from './components/plugins'
+import { PermissionDialog } from './components/plugins/PermissionDialog'
+import { registerExampleComponents } from './components/plugins/example-components'
+import {
+  useRepoSwitched,
+  useGitCheckout,
+  useGitCommit,
+  useGitPush,
+  useGitPull,
+  useGitStash,
+} from './hooks/use-ledger-events'
+import { pluginManager, pluginLoader, examplePlugins, type AppPlugin } from '@/lib/plugins'
 
 export default function App() {
   const [repoPath, setRepoPath] = useState<string | null>(null)
@@ -54,7 +76,15 @@ export default function App() {
   const [creatingBranch, setCreatingBranch] = useState(false)
   const [githubUrl, setGithubUrl] = useState<string | null>(null)
   const [themeMode, setThemeMode] = useState<ThemeMode>('light')
+  const [activePluginNavItem, setActivePluginNavItem] = useState<string | undefined>(undefined)
   const { setTitle, setTitlebarActions } = useWindowContext()
+
+  // Plugin state
+  const activeAppId = usePluginStore((s) => s.activeAppId)
+  const openPanels = usePluginStore((s) => s.openPanels)
+  const closePanel = usePluginStore((s) => s.closePanel)
+  const pendingPermissionRequest = usePluginStore((s) => s.pendingPermissionRequest)
+  const respondToPermissionRequest = usePluginStore((s) => s.respondToPermissionRequest)
 
   // Canvas navigation for global editor state
   const { 
@@ -246,6 +276,62 @@ export default function App() {
     setTitlebarActions(actions.length > 0 ? <>{actions}</> : null)
   }, [repoPath, viewMode, mainPanelView, canvasState, radarEditorVisible, toggleRadarEditor, setTitlebarActions, setActiveCanvas, isColumnVisible, toggleColumnVisibility])
 
+  // Initialize plugin system (restores the merged POC wiring that was later removed)
+  useEffect(() => {
+    // Configure permission request handler for plugin installation
+    pluginLoader.setPermissionRequestHandler((pluginId, pluginName, permissions) => {
+      return usePluginStore.getState().requestPermissions(pluginId, pluginName, permissions)
+    })
+
+    // Register example plugin React components
+    registerExampleComponents(pluginComponentRegistry)
+
+    // Register and activate example plugins
+    const initPlugins = async () => {
+      for (const plugin of examplePlugins) {
+        if (!pluginManager.get(plugin.id)) {
+          pluginManager.register(plugin)
+        }
+      }
+
+      for (const plugin of examplePlugins) {
+        try {
+          await pluginManager.activate(plugin.id)
+        } catch (err) {
+          console.error(`[Plugin] Failed to activate ${plugin.id}:`, err)
+        }
+      }
+    }
+
+    initPlugins()
+
+    // Load installed plugins from registry
+    pluginLoader.loadInstalled().catch((err) => {
+      console.error('Failed to load installed plugins:', err)
+    })
+  }, [])
+
+  // Get the active app plugin if one is selected
+  const activeAppPlugin = useMemo(() => {
+    if (!activeAppId) return null
+    const plugin = pluginManager.get(activeAppId)
+    return plugin?.type === 'app' ? (plugin as AppPlugin) : null
+  }, [activeAppId])
+
+  // Reset plugin nav item when switching apps, set to first nav item
+  useEffect(() => {
+    if (activeAppPlugin?.navigation?.length) {
+      setActivePluginNavItem(activeAppPlugin.navigation[0].id)
+    } else {
+      setActivePluginNavItem(undefined)
+    }
+  }, [activeAppPlugin])
+
+  // Handler for plugin navigation
+  const handlePluginNavigate = useCallback((itemId: string) => {
+    setActivePluginNavItem(itemId)
+  }, [])
+
   const selectRepo = async () => {
     if (switching) return
 
@@ -263,7 +349,7 @@ export default function App() {
         setWorkingStatus(null)
         setRepoPath(path)
         setStatus({ type: 'info', message: 'Loading repository...' })
-        await refresh()
+        await refresh(path)
         setStatus({ type: 'success', message: 'Repository loaded' })
       } else {
         // User cancelled dialog - clear status
@@ -276,7 +362,7 @@ export default function App() {
     }
   }
 
-  const refresh = async () => {
+  const refresh = useCallback(async (repoPathForTitle: string | null = repoPath) => {
     setLoading(true)
     setError(null)
     setPrError(null)
@@ -300,8 +386,8 @@ export default function App() {
       setGithubUrl(ghUrl)
 
       // Update window title with repo name
-      if (repoPath) {
-        const repoName = repoPath.split('/').pop() || 'Ledger'
+      if (repoPathForTitle && typeof repoPathForTitle === 'string') {
+        const repoName = repoPathForTitle.split('/').pop() || 'Ledger'
         setTitle(repoName)
       } else {
         setTitle('Ledger')
@@ -349,7 +435,116 @@ export default function App() {
     } finally {
       setLoading(false)
     }
-  }
+  }, [repoPath, setTitle, showCheckpoints])
+
+  // Keep the repository store in sync so plugin apps/panels can rely on it.
+  // (This avoids a full migration of App state back to Zustand while restoring the plugin UI.)
+  useEffect(() => {
+    useRepositoryStore.getState().setRepositoryData({
+      repoPath,
+      githubUrl,
+      currentBranch,
+      branches,
+      worktrees,
+      pullRequests,
+      commits: _commits,
+      graphCommits,
+      stashes,
+      workingStatus,
+      selectedCommit,
+      commitDiff,
+      loading,
+      switching,
+      loadingDiff,
+      error,
+      prError,
+      status,
+    })
+  }, [
+    repoPath,
+    githubUrl,
+    currentBranch,
+    branches,
+    worktrees,
+    pullRequests,
+    _commits,
+    graphCommits,
+    stashes,
+    workingStatus,
+    selectedCommit,
+    commitDiff,
+    loading,
+    switching,
+    loadingDiff,
+    error,
+    prError,
+    status,
+  ])
+
+  // ============================================================================
+  // Event Subscriptions (auto-refresh)
+  // ============================================================================
+
+  // Auto-refresh when repo is switched (from another window or component)
+  useRepoSwitched(
+    (_fromPath, toPath, _name) => {
+      if (toPath !== repoPath) {
+        setRepoPath(toPath)
+        refresh(toPath)
+      }
+    },
+    [repoPath, refresh]
+  )
+
+  // Auto-refresh when git checkout happens
+  useGitCheckout(
+    (path, _branch) => {
+      if (path === repoPath) {
+        refresh(repoPath)
+      }
+    },
+    [repoPath, refresh]
+  )
+
+  // Auto-refresh when git commit happens
+  useGitCommit(
+    (path, _hash, _message) => {
+      if (path === repoPath) {
+        refresh(repoPath)
+      }
+    },
+    [repoPath, refresh]
+  )
+
+  // Auto-refresh when git push happens
+  useGitPush(
+    (path, _branch) => {
+      if (path === repoPath) {
+        refresh(repoPath)
+      }
+    },
+    [repoPath, refresh]
+  )
+
+  // Auto-refresh when git pull happens
+  useGitPull(
+    (path, _branch) => {
+      if (path === repoPath) {
+        refresh(repoPath)
+      }
+    },
+    [repoPath, refresh]
+  )
+
+  // Auto-refresh when stash operations happen
+  useGitStash(
+    (path, _action) => {
+      if (path === repoPath) {
+        refresh(repoPath)
+      }
+    },
+    [repoPath, refresh]
+  )
 
   // Fetch diff when a commit is selected
   const handleSelectCommit = useCallback(async (commit: GraphCommit) => {
@@ -995,7 +1190,7 @@ export default function App() {
         const path = await window.electronAPI.loadSavedRepo()
         if (path) {
           setRepoPath(path)
-          await refresh()
+          await refresh(path)
         }
       } catch (err) {
         console.error('Failed to load saved repository:', err)
@@ -1060,7 +1255,7 @@ export default function App() {
       setCommitDiff(null)
       setSidebarFocus(newFocus)
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+     
   }, [canvasState.editorState.historyIndex])
 
   // Filter graph commits based on history panel filters
@@ -1184,7 +1379,7 @@ export default function App() {
             setStatus({ type: 'info', message: `Opening ${repo.name}...` })
             try {
               setRepoPath(repo.path)
-              await refresh()
+              await refresh(repo.path)
               setStatus({ type: 'success', message: `Opened ${repo.name}` })
             } catch (err) {
               setStatus({ type: 'error', message: (err as Error).message })
@@ -1263,7 +1458,7 @@ export default function App() {
       setStatus({ type: 'info', message: `Opening ${repo.name}...` })
       try {
         setRepoPath(repo.path)
-        await refresh()
+        await refresh(repo.path)
         setStatus({ type: 'success', message: `Opened ${repo.name}` })
       } catch (err) {
         setStatus({ type: 'error', message: (err as Error).message })
@@ -1319,7 +1514,12 @@ export default function App() {
   }), [switching, deleting])
 
   return (
-    <div className="ledger-app">
+    <PluginComponentProvider>
+      <div className="ledger-app-wrapper">
+        {/* Plugin Sidebar - only show when repo is loaded */}
+        {repoPath && <PluginSidebar />}
+
+        <div className="ledger-app">
       {/* Context Menu */}
       {contextMenu && (
         <div ref={menuRef} className="context-menu" style={{ left: contextMenu.x, top: contextMenu.y }}>
@@ -1405,6 +1605,30 @@ export default function App() {
       <header className="ledger-header" data-testid="app-header">
         <div className="header-left">
           {repoPath && (
+            <RepoSwitcher
+              currentPath={repoPath}
+              onRepoChange={(path) => {
+                if (path === repoPath) return
+                // Clear state before switching to prevent stale data mixing with new repo
+                setWorktrees([])
+                setBranches([])
+                setCommits([])
+                setPullRequests([])
+                setGraphCommits([])
+                setStashes([])
+                setWorkingStatus(null)
+                setSelectedCommit(null)
+                setCommitDiff(null)
+                setSidebarFocus(null)
+                setError(null)
+                setPrError(null)
+                setRepoPath(path)
+                setStatus({ type: 'info', message: 'Switching repository...' })
+                refresh(path)
+              }}
+            />
+          )}
+          {repoPath && (
             <span
               className="repo-path clickable"
               data-testid="repo-path"
@@ -1483,7 +1707,7 @@ export default function App() {
                 <span className="view-label">Change</span>
               </button>
               <button
-                onClick={refresh}
+                onClick={() => refresh()}
                 disabled={loading || switching}
                 className="view-toggle-btn active"
                 title="Refresh"
@@ -1531,15 +1755,49 @@ export default function App() {
       {/* Main Content - Canvas Renderer for ALL canvases */}
       {repoPath && !error && (
         <main className="ledger-content canvas-mode" data-testid="main-content">
-          <CanvasRenderer
-            data={canvasData}
-            selection={canvasSelection}
-            handlers={canvasHandlers}
-            uiState={canvasUIState}
-          />
+          {activeAppPlugin ? (
+            <PluginAppContainer
+              plugin={activeAppPlugin}
+              activeNavItem={activePluginNavItem}
+              onNavigate={handlePluginNavigate}
+            />
+          ) : (
+            <CanvasRenderer
+              data={canvasData}
+              selection={canvasSelection}
+              handlers={canvasHandlers}
+              uiState={canvasUIState}
+            />
+          )}
         </main>
       )}
 
-    </div>
+          {/* Plugin Settings Panel - manages its own visibility via store */}
+          <PluginSettingsPanel />
+
+          {/* Plugin Permission Dialog */}
+          {pendingPermissionRequest && (
+            <PermissionDialog
+              pluginId={pendingPermissionRequest.pluginId}
+              pluginName={pendingPermissionRequest.pluginName}
+              permissions={pendingPermissionRequest.permissions}
+              onApprove={(approved) => respondToPermissionRequest(true, approved)}
+              onDeny={() => respondToPermissionRequest(false)}
+            />
+          )}
+
+          {/* Open Plugin Panels */}
+          {openPanels.map((panel) => (
+            <PluginPanelContainer
+              key={panel.instanceId}
+              pluginId={panel.pluginId}
+              instanceId={panel.instanceId}
+              data={panel.data}
+              onClose={() => closePanel(panel.instanceId)}
+            />
+          ))}
+        </div>
+      </div>
+    </PluginComponentProvider>
   )
 }

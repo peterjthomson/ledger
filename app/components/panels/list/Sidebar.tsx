@@ -6,7 +6,7 @@
  */
 
 import { useState, useMemo, useCallback, useEffect } from 'react'
-import type { PullRequest, Branch, Worktree, StashEntry, RepoInfo } from '../../../types/electron'
+import type { PullRequest, Branch, Worktree, StashEntry, RepoInfo, WorkingStatus } from '../../../types/electron'
 import type { Column } from '../../../types/app-types'
 
 export interface SidebarProps {
@@ -17,12 +17,14 @@ export interface SidebarProps {
   worktrees: Worktree[]
   stashes: StashEntry[]
   repoPath?: string | null
+  workingStatus?: WorkingStatus | null
   // Selection
   selectedPR?: PullRequest | null
   selectedBranch?: Branch | null
   selectedWorktree?: Worktree | null
   selectedStash?: StashEntry | null
   selectedRepo?: RepoInfo | null
+  uncommittedSelected?: boolean
   // Handlers
   onSelectPR?: (pr: PullRequest) => void
   onDoubleClickPR?: (pr: PullRequest) => void
@@ -38,6 +40,8 @@ export interface SidebarProps {
   onContextMenuStash?: (e: React.MouseEvent, stash: StashEntry) => void
   onSelectRepo?: (repo: RepoInfo) => void
   onDoubleClickRepo?: (repo: RepoInfo) => void
+  onSelectUncommitted?: () => void
+  onDoubleClickUncommitted?: () => void
   // Action handlers
   onCreateBranch?: () => void
   onCreateWorktree?: () => void
@@ -70,11 +74,13 @@ export function Sidebar({
   worktrees,
   stashes,
   repoPath,
+  workingStatus,
   selectedPR,
   selectedBranch,
   selectedWorktree,
   selectedStash,
   selectedRepo,
+  uncommittedSelected,
   onSelectPR,
   onDoubleClickPR,
   onContextMenuPR,
@@ -89,6 +95,8 @@ export function Sidebar({
   onContextMenuStash,
   onSelectRepo,
   onDoubleClickRepo,
+  onSelectUncommitted,
+  onDoubleClickUncommitted,
   onCreateBranch,
   onCreateWorktree,
   formatRelativeTime,
@@ -353,13 +361,26 @@ export function Sidebar({
             sectionKey="branches"
             sectionIcon="⎇"
             sectionLabel="Branches"
-            count={filteredLocalBranches.length}
+            count={filteredLocalBranches.length + (workingStatus?.hasChanges ? 1 : 0)}
             hasActiveFilter={!!sectionSearch.branches.trim()}
             onAdd={onCreateBranch}
           />
           <SectionFilter sectionKey="branches" placeholder="Filter branches..." />
           {sections.branches && (
             <ul className="sidebar-items">
+              {/* Uncommitted changes as virtual branch */}
+              {workingStatus?.hasChanges && (
+                <li
+                  className={`sidebar-item uncommitted-item ${uncommittedSelected ? 'selected' : ''}`}
+                  onClick={() => onSelectUncommitted?.()}
+                  onDoubleClick={() => onDoubleClickUncommitted?.()}
+                >
+                  <span className="item-title">Uncommitted changes</span>
+                  <span className="badge badge-uncommitted">
+                    {workingStatus.stagedCount + workingStatus.unstagedCount}
+                  </span>
+                </li>
+              )}
               {filteredLocalBranches.map((branch) => (
                 <li
                   key={branch.name}
@@ -372,7 +393,7 @@ export function Sidebar({
                   {branch.current && <span className="badge badge-current">•</span>}
                 </li>
               ))}
-              {filteredLocalBranches.length === 0 && (
+              {filteredLocalBranches.length === 0 && !workingStatus?.hasChanges && (
                 <li className="sidebar-empty">No branches</li>
               )}
             </ul>

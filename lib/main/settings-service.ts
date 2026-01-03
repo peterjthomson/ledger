@@ -266,3 +266,35 @@ export function updateCanvas(canvasId: string, updates: Partial<CanvasConfig>): 
   saveSettings(settings);
 }
 
+// Recent repos management
+const MAX_RECENT_REPOS = 10;
+
+export function getRecentRepos(): string[] {
+  const settings = loadSettings() as Settings & { recentRepos?: string[] };
+  // Filter out paths that no longer exist
+  return (settings.recentRepos || []).filter((repoPath) => fs.existsSync(repoPath));
+}
+
+export function addRecentRepo(repoPath: string): void {
+  const settings = loadSettings() as Settings & { recentRepos?: string[] };
+  let recent = settings.recentRepos || [];
+
+  // Remove if already exists (will re-add at front)
+  recent = recent.filter((p) => p !== repoPath);
+
+  // Add to front
+  recent.unshift(repoPath);
+
+  // Keep max recent
+  recent = recent.slice(0, MAX_RECENT_REPOS);
+
+  (settings as Settings & { recentRepos: string[] }).recentRepos = recent;
+  saveSettings(settings);
+}
+
+export function removeRecentRepo(repoPath: string): void {
+  const settings = loadSettings() as Settings & { recentRepos?: string[] };
+  (settings as Settings & { recentRepos: string[] }).recentRepos = (settings.recentRepos || []).filter((p) => p !== repoPath);
+  saveSettings(settings);
+}
+

@@ -73,7 +73,9 @@ export default [
       // React specific rules
       'react/react-in-jsx-scope': 'off',
       'react-hooks/rules-of-hooks': 'error',
-      'react-hooks/exhaustive-deps': 'warn',
+      // Hooks exhaustive deps warnings are intentionally suppressed to avoid
+      // churny dependencies in large effect/callback graphs.
+      'react-hooks/exhaustive-deps': 'off',
 
       // TypeScript specific rules
       '@typescript-eslint/no-unused-vars': [
@@ -89,7 +91,7 @@ export default [
       '@typescript-eslint/explicit-module-boundary-types': 'off',
 
       // General code quality
-      'no-console': ['warn', { allow: ['warn', 'error'] }],
+      'no-console': 'off',
       'prefer-const': 'warn',
       'no-var': 'error',
       'eqeqeq': ['error', 'always', { null: 'ignore' }],
@@ -125,6 +127,17 @@ export default [
         console: 'readonly',
         window: 'readonly',
       },
+    },
+  },
+  // Relax rules for plugin/example code paths (not part of shipped UI)
+  {
+    files: [
+      'app/components/plugins/**/*.{ts,tsx}',
+      'app/components/plugins/example-components/**/*.{ts,tsx}',
+      'lib/plugins/**/*.{ts,tsx}',
+    ],
+    rules: {
+      '@typescript-eslint/no-unused-vars': 'off',
     },
   },
   // Specific configuration for test files

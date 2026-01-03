@@ -19,6 +19,25 @@ export function getRepoPath(): string | null {
   return repoPath
 }
 
+/**
+ * Initialize global state sync for repository manager.
+ * Connects the RepositoryManager's active context to the module-level git/repoPath.
+ */
+export async function initializeGlobalStateSync(): Promise<void> {
+  // Dynamic import to avoid circular dependency
+  const { getRepositoryManager } = await import('@/lib/repositories')
+  const manager = getRepositoryManager()
+  manager.setGlobalStateSyncCallback((path: string | null) => {
+    if (path) {
+      repoPath = path
+      git = simpleGit(path)
+    } else {
+      repoPath = null
+      git = null
+    }
+  })
+}
+
 export interface BranchInfo {
   name: string
   current: boolean

@@ -26,7 +26,9 @@ export const Titlebar = () => {
 
     document.addEventListener('keydown', handleKeyDown)
     return () => document.removeEventListener('keydown', handleKeyDown)
-  }, [menusVisible, closeActiveMenu, setMenusVisible, menuItems])
+    // Note: closeActiveMenu and setMenusVisible are stable refs from context
+     
+  }, [menusVisible, menuItems])
 
   return (
     <div className={`window-titlebar ${wcontext?.platform ? `platform-${wcontext.platform}` : ''}`}>

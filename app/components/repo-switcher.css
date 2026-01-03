@@ -1,0 +1,80 @@
+/**
+ * Repo Switcher Styles
+ *
+ * Lightweight styling for the multi-repo chip switcher.
+ * Kept local to the component to avoid bloating app/styles/app.css.
+ */
+
+.repo-switcher {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 6px;
+  background: var(--bg-primary);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  -webkit-app-region: no-drag;
+}
+
+.repo-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 8px;
+  border-radius: 6px;
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--text-secondary);
+  cursor: pointer;
+  user-select: none;
+  max-width: 220px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+}
+
+.repo-chip:hover {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+}
+
+.repo-chip.active {
+  background: var(--accent-bg);
+  border-color: var(--border-subtle);
+  color: var(--text-primary);
+}
+
+.repo-chip.switching {
+  opacity: 0.7;
+  cursor: progress;
+}
+
+.repo-chip-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.repo-chip.add {
+  padding: 4px 6px;
+  width: 28px;
+  justify-content: center;
+}
+
+.repo-chip-close {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  background: transparent;
+  color: var(--text-muted);
+  padding: 0;
+  margin-left: 4px;
+  cursor: pointer;
+}
+
+.repo-chip-close:hover {
+  color: var(--text-primary);
+}
+
+

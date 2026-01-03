@@ -1,7 +1,22 @@
-import { type BrowserWindow, shell } from 'electron'
+import { type BrowserWindow, shell, ipcMain } from 'electron'
 import { handle } from '@/lib/main/shared'
 
+// Track if handlers are registered to prevent duplicates on window recreation
+let handlersRegistered = false
+
 export const registerWindowHandlers = (window: BrowserWindow) => {
+  // Remove existing handlers if re-registering (e.g., on macOS window recreation)
+  if (handlersRegistered) {
+    const channels = [
+      'window-init', 'window-is-minimizable', 'window-is-maximizable',
+      'window-minimize', 'window-maximize', 'window-close', 'window-maximize-toggle',
+      'web-undo', 'web-redo', 'web-cut', 'web-copy', 'web-paste', 'web-delete',
+      'web-select-all', 'web-reload', 'web-force-reload', 'web-toggle-devtools',
+      'web-actual-size', 'web-zoom-in', 'web-zoom-out', 'web-toggle-fullscreen', 'web-open-url'
+    ]
+    channels.forEach(channel => ipcMain.removeHandler(channel))
+  }
+  handlersRegistered = true
   // Window operations
   handle('window-init', () => {
     const { width, height } = window.getBounds()
