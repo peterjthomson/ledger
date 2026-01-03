@@ -320,9 +320,9 @@ export function BranchDetailPanel({
               className="btn btn-secondary"
               onClick={handlePreviewInBrowser}
               disabled={!isLaravel || previewLoading || deleting}
-              title={!isLaravel ? 'Not a Laravel project' : 'Preview in browser via Herd'}
+              title={!isLaravel ? 'Preview not available for this project type' : 'Open preview in browser'}
             >
-              {previewLoading ? 'Opening...' : 'Preview in Browser'}
+              {previewLoading ? 'Opening...' : 'Preview'}
             </button>
           )}
           {!isMainOrMaster && !branch.current && onDeleteBranch && (
