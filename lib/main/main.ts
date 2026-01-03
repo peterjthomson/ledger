@@ -159,6 +159,13 @@ import {
   removeCanvas,
   updateCanvas,
 } from './settings-service'
+import {
+  isHerdInstalled,
+  isLaravelProject,
+  setupWorktreeForPreview,
+  getPreviewWorktreePath,
+  ensurePreviewsDirectory,
+} from './herd-service'
 
 // Check for --repo command line argument (for testing)
 const repoArgIndex = process.argv.findIndex((arg) => arg.startsWith('--repo='))
@@ -621,6 +628,137 @@ app.whenReady().then(() => {
     }
 
     return result.filePaths[0]
+  })
+
+  // Herd preview handlers
+  ipcMain.handle('check-herd-available', async (_, worktreePath: string) => {
+    try {
+      const herdInstalled = await isHerdInstalled()
+      const isLaravel = isLaravelProject(worktreePath)
+      return { herdInstalled, isLaravel }
+    } catch (_error) {
+      return { herdInstalled: false, isLaravel: false }
+    }
+  })
+
+  ipcMain.handle('open-worktree-in-browser', async (_, worktreePath: string, mainRepoPath: string) => {
+    try {
+      const result = await setupWorktreeForPreview(worktreePath, mainRepoPath)
+      if (result.success && result.url) {
+        await shell.openExternal(result.url)
+      }
+      return result
+    } catch (error) {
+      return { success: false, message: (error as Error).message }
+    }
+  })
+
+  ipcMain.handle(
+    'preview-branch-in-browser',
+    async (_, branchName: string, mainRepoPath: string) => {
+      try {
+        // Ensure previews directory exists
+        await ensurePreviewsDirectory()
+
+        // Sanitize branch name for folder (replace / with -)
+        const safeBranchName = branchName.replace(/\//g, '-')
+        const worktreePath = getPreviewWorktreePath(safeBranchName)
+
+        // Check if worktree already exists at this path
+        const fs = await import('fs')
+        if (!fs.existsSync(worktreePath)) {
+          // Create worktree for this branch
+          const createResult = await createWorktree({
+            branchName,
+            isNewBranch: false,
+            folderPath: worktreePath,
+          })
+
+          if (!createResult.success) {
+            return createResult
+          }
+        }
+
+        // Setup for preview and open
+        const result = await setupWorktreeForPreview(worktreePath, mainRepoPath)
+        if (result.success && result.url) {
+          await shell.openExternal(result.url)
+        }
+        return { ...result, worktreePath }
+      } catch (error) {
+        return { success: false, message: (error as Error).message }
+      }
+    }
+  )
+
+  ipcMain.handle(
+    'preview-pr-in-browser',
+    async (_, prNumber: number, prBranchName: string, mainRepoPath: string) => {
+      try {
+        // Ensure previews directory exists
+        await ensurePreviewsDirectory()
+
+        const worktreePath = getPreviewWorktreePath(`pr-${prNumber}`)
+
+        // Check if worktree already exists at this path
+        const fs = await import('fs')
+        if (!fs.existsSync(worktreePath)) {
+          // Create worktree for the PR branch
+          const createResult = await createWorktree({
+            branchName: prBranchName,
+            isNewBranch: false,
+            folderPath: worktreePath,
+          })
+
+          if (!createResult.success) {
+            return createResult
+          }
+        }
+
+        // Setup for preview and open
+        const result = await setupWorktreeForPreview(worktreePath, mainRepoPath)
+        if (result.success && result.url) {
+          await shell.openExternal(result.url)
+        }
+        return { ...result, worktreePath }
+      } catch (error) {
+        return { success: false, message: (error as Error).message }
+      }
+    }
+  )
+
+  ipcMain.handle('preview-commit-in-browser', async (_, commitHash: string, mainRepoPath: string) => {
+    try {
+      // Ensure previews directory exists
+      await ensurePreviewsDirectory()
+
+      const shortHash = commitHash.substring(0, 7)
+      const worktreePath = getPreviewWorktreePath(`commit-${shortHash}`)
+
+      // Check if worktree already exists at this path
+      const fs = await import('fs')
+      if (!fs.existsSync(worktreePath)) {
+        // Create detached worktree at this commit
+        const createResult = await createWorktree({
+          commitHash,
+          isNewBranch: false,
+          folderPath: worktreePath,
+        })
+
+        if (!createResult.success) {
+          return createResult
+        }
+      }
+
+      // Setup for preview and open
+      const result = await setupWorktreeForPreview(worktreePath, mainRepoPath)
+      if (result.success && result.url) {
+        await shell.openExternal(result.url)
+      }
+      return { ...result, worktreePath }
+    } catch (error) {
+      return { success: false, message: (error as Error).message }
+    }
   })
 
   ipcMain.handle('get-stashes', async () => {

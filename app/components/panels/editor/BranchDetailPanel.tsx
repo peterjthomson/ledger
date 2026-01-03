@@ -10,6 +10,7 @@ import type { StatusMessage } from '../../../types/app-types'
 
 export interface BranchDetailPanelProps {
   branch: Branch
+  repoPath: string | null
   formatDate: (date?: string) => string
   onStatusChange?: (status: StatusMessage | null) => void
   onCheckoutBranch?: (branch: Branch) => void
@@ -21,6 +22,7 @@ export interface BranchDetailPanelProps {
 
 export function BranchDetailPanel({
   branch,
+  repoPath,
   formatDate,
   onStatusChange,
   onCheckoutBranch,
@@ -31,6 +33,10 @@ export function BranchDetailPanel({
 }: BranchDetailPanelProps) {
   const [creatingPR, setCreatingPR] = useState(false)
   const [pushing, setPushing] = useState(false)
+  // Herd preview state
+  const [herdInstalled, setHerdInstalled] = useState<boolean | null>(null)
+  const [isLaravel, setIsLaravel] = useState(false)
+  const [previewLoading, setPreviewLoading] = useState(false)
   const [branchDiff, setBranchDiff] = useState<BranchDiff | null>(null)
   const [loadingDiff, setLoadingDiff] = useState(false)
   const [expandedFiles, setExpandedFiles] = useState<Set<string>>(new Set())
@@ -69,6 +75,26 @@ export function BranchDetailPanel({
       cancelled = true
     }
   }, [branch.name, isMainOrMaster, diffType])
+
+  // Check Herd availability when repoPath changes
+  useEffect(() => {
+    if (!repoPath) {
+      setHerdInstalled(false)
+      setIsLaravel(false)
+      return
+    }
+    const checkHerd = async () => {
+      try {
+        const result = await window.electronAPI.checkHerdAvailable(repoPath)
+        setHerdInstalled(result.herdInstalled)
+        setIsLaravel(result.isLaravel)
+      } catch {
+        setHerdInstalled(false)
+        setIsLaravel(false)
+      }
+    }
+    checkHerd()
+  }, [repoPath])
 
   const handleStartPRCreation = () => {
     // Auto-generate title from branch name
@@ -133,6 +159,30 @@ export function BranchDetailPanel({
       onStatusChange?.({ type: 'error', message: (error as Error).message })
     } finally {
       setPushing(false)
+    }
+  }
+
+  const handlePreviewInBrowser = async () => {
+    if (!repoPath) {
+      onStatusChange?.({ type: 'error', message: 'No repository path available' })
+      return
+    }
+
+    setPreviewLoading(true)
+    onStatusChange?.({ type: 'info', message: `Creating preview for ${branch.name}...` })
+
+    try {
+      const result = await window.electronAPI.previewBranchInBrowser(branch.name, repoPath)
+      if (result.success) {
+        const warningMsg = result.warnings?.length ? ` (${result.warnings.join(', ')})` : ''
+        onStatusChange?.({ type: 'success', message: `Opened ${result.url}${warningMsg}` })
+      } else {
+        onStatusChange?.({ type: 'error', message: result.message })
+      }
+    } catch (error) {
+      onStatusChange?.({ type: 'error', message: (error as Error).message })
+    } finally {
+      setPreviewLoading(false)
     }
   }
 
@@ -265,6 +315,16 @@ export function BranchDetailPanel({
           <button className="btn btn-secondary" onClick={() => window.electronAPI.openBranchInGitHub(branch.name)} disabled={deleting}>
             View on GitHub
           </button>
+          {herdInstalled && (
+            <button
+              className="btn btn-secondary"
+              onClick={handlePreviewInBrowser}
+              disabled={!isLaravel || previewLoading || deleting}
+              title={!isLaravel ? 'Preview not available for this project type' : 'Open preview in browser'}
+            >
+              {previewLoading ? 'Opening...' : 'Preview'}
+            </button>
+          )}
           {!isMainOrMaster && !branch.current && onDeleteBranch && (
             <button className="btn btn-secondary btn-danger" onClick={() => onDeleteBranch(branch)} disabled={switching || deleting}>
               {deleting ? 'Deleting...' : 'Delete Branch'}

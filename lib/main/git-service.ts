@@ -2012,7 +2012,8 @@ export async function removeWorktree(
 
 // Create a new worktree
 export interface CreateWorktreeOptions {
-  branchName: string
+  branchName?: string // Optional if using commitHash for detached HEAD
+  commitHash?: string // For creating worktree at specific commit (detached HEAD)
   isNewBranch: boolean
   folderPath: string
 }
@@ -2022,12 +2023,12 @@ export async function createWorktree(
 ): Promise<{ success: boolean; message: string; path?: string }> {
   if (!git) throw new Error('No repository selected')
 
-  const { branchName, isNewBranch, folderPath } = options
+  const { branchName, commitHash, isNewBranch, folderPath } = options
 
   try {
-    // Validate branch name
-    if (!branchName || !branchName.trim()) {
-      return { success: false, message: 'Branch name is required' }
+    // Validate - need either branchName or commitHash
+    if (!branchName && !commitHash) {
+      return { success: false, message: 'Branch name or commit hash is required' }
     }
 
     // Validate folder path
@@ -2040,9 +2041,26 @@ export async function createWorktree(
       return { success: false, message: `Folder already exists: ${folderPath}` }
     }
 
+    // Ensure parent directory exists
+    const parentDir = path.dirname(folderPath)
+    if (!fs.existsSync(parentDir)) {
+      await fs.promises.mkdir(parentDir, { recursive: true })
+    }
+
+    // Handle detached HEAD at specific commit
+    if (commitHash && !branchName) {
+      // Create worktree at specific commit (detached HEAD): git worktree add --detach <path> <commit>
+      await git.raw(['worktree', 'add', '--detach', folderPath, commitHash])
+      return {
+        success: true,
+        message: `Created worktree at ${path.basename(folderPath)} at commit ${commitHash.substring(0, 7)}`,
+        path: folderPath,
+      }
+    }
+
     // Check if branch already exists (for new branches)
     const branches = await git.branchLocal()
-    const branchExists = branches.all.includes(branchName)
+    const branchExists = branches.all.includes(branchName!)
 
     if (isNewBranch && branchExists) {
       return { success: false, message: `Branch '${branchName}' already exists` }
@@ -2057,19 +2075,13 @@ export async function createWorktree(
       }
     }
 
-    // Ensure parent directory exists
-    const parentDir = path.dirname(folderPath)
-    if (!fs.existsSync(parentDir)) {
-      await fs.promises.mkdir(parentDir, { recursive: true })
-    }
-
     // Create the worktree
     if (isNewBranch) {
       // Create worktree with new branch: git worktree add -b <branch> <path>
-      await git.raw(['worktree', 'add', '-b', branchName, folderPath])
+      await git.raw(['worktree', 'add', '-b', branchName!, folderPath])
     } else {
       // Create worktree with existing branch: git worktree add <path> <branch>
-      await git.raw(['worktree', 'add', folderPath, branchName])
+      await git.raw(['worktree', 'add', folderPath, branchName!])
     }
 
     return {

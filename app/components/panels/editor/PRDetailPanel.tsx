@@ -9,9 +9,11 @@ import type { PullRequest, PRDetail, PRReviewComment } from '../../../types/elec
 
 export interface PRReviewPanelProps {
   pr: PullRequest
+  repoPath: string | null
   formatRelativeTime: (date: string) => string
   onCheckout?: (pr: PullRequest) => void
   onPRMerged?: () => void
+  onStatusChange?: (status: { type: 'info' | 'success' | 'error'; message: string } | null) => void
   switching?: boolean
 }
 
@@ -25,7 +27,7 @@ function isAIAuthor(login: string): boolean {
   return AI_AUTHORS.some((ai) => lower.includes(ai)) || lower.endsWith('[bot]') || lower.endsWith('-bot')
 }
 
-export function PRReviewPanel({ pr, formatRelativeTime, onCheckout, onPRMerged, switching }: PRReviewPanelProps) {
+export function PRReviewPanel({ pr, repoPath, formatRelativeTime, onCheckout, onPRMerged, onStatusChange, switching }: PRReviewPanelProps) {
   const [activeTab, setActiveTab] = useState<PRTab>('conversation')
   const [prDetail, setPrDetail] = useState<PRDetail | null>(null)
   const [reviewComments, setReviewComments] = useState<PRReviewComment[]>([])
@@ -38,6 +40,10 @@ export function PRReviewPanel({ pr, formatRelativeTime, onCheckout, onPRMerged, 
   const [submittingComment, setSubmittingComment] = useState(false)
   const [commentStatus, setCommentStatus] = useState<{ type: 'success' | 'error'; message: string } | null>(null)
   const [mergingPR, setMergingPR] = useState(false)
+  // Herd preview state
+  const [herdInstalled, setHerdInstalled] = useState<boolean | null>(null)
+  const [isLaravel, setIsLaravel] = useState(false)
+  const [previewLoading, setPreviewLoading] = useState(false)
 
   // Ref to track status timeout for cleanup
   const statusTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -71,6 +77,26 @@ export function PRReviewPanel({ pr, formatRelativeTime, onCheckout, onPRMerged, 
   useEffect(() => {
     loadPRDetail()
   }, [loadPRDetail])
+
+  // Check Herd availability when repoPath changes
+  useEffect(() => {
+    if (!repoPath) {
+      setHerdInstalled(false)
+      setIsLaravel(false)
+      return
+    }
+    const checkHerd = async () => {
+      try {
+        const result = await window.electronAPI.checkHerdAvailable(repoPath)
+        setHerdInstalled(result.herdInstalled)
+        setIsLaravel(result.isLaravel)
+      } catch {
+        setHerdInstalled(false)
+        setIsLaravel(false)
+      }
+    }
+    checkHerd()
+  }, [repoPath])
 
   // Submit a comment
   const handleSubmitComment = async () => {
@@ -126,6 +152,31 @@ export function PRReviewPanel({ pr, formatRelativeTime, onCheckout, onPRMerged, 
       setCommentStatus({ type: 'error', message: (error as Error).message })
     } finally {
       setMergingPR(false)
+    }
+  }
+
+  // Preview PR in browser via Herd
+  const handlePreviewInBrowser = async () => {
+    if (!repoPath || !prDetail) {
+      onStatusChange?.({ type: 'error', message: 'No repository path available' })
+      return
+    }
+
+    setPreviewLoading(true)
+    onStatusChange?.({ type: 'info', message: `Creating preview for PR #${pr.number}...` })
+
+    try {
+      const result = await window.electronAPI.previewPRInBrowser(pr.number, prDetail.headRefName, repoPath)
+      if (result.success) {
+        const warningMsg = result.warnings?.length ? ` (${result.warnings.join(', ')})` : ''
+        onStatusChange?.({ type: 'success', message: `Opened ${result.url}${warningMsg}` })
+      } else {
+        onStatusChange?.({ type: 'error', message: result.message })
+      }
+    } catch (error) {
+      onStatusChange?.({ type: 'error', message: (error as Error).message })
+    } finally {
+      setPreviewLoading(false)
     }
   }
 
@@ -271,6 +322,16 @@ export function PRReviewPanel({ pr, formatRelativeTime, onCheckout, onPRMerged, 
         >
           View on GitHub
         </button>
+        {herdInstalled && (
+          <button
+            className="btn btn-secondary"
+            onClick={handlePreviewInBrowser}
+            disabled={!isLaravel || previewLoading}
+            title={!isLaravel ? 'Preview not available for this project type' : 'Open preview in browser'}
+          >
+            {previewLoading ? 'Opening...' : 'Preview'}
+          </button>
+        )}
         <button
           className="btn btn-primary"
           onClick={handleMergePR}

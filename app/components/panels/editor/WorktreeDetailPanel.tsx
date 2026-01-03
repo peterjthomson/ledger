@@ -12,6 +12,7 @@ import type { StatusMessage } from '../../../types/app-types'
 export interface WorktreeDetailPanelProps {
   worktree: Worktree
   currentBranch: string
+  repoPath: string | null
   switching?: boolean
   onStatusChange?: (status: StatusMessage | null) => void
   onRefresh?: () => Promise<void>
@@ -23,6 +24,7 @@ export interface WorktreeDetailPanelProps {
 export function WorktreeDetailPanel({
   worktree,
   currentBranch,
+  repoPath,
   switching,
   onStatusChange,
   onRefresh,
@@ -31,6 +33,10 @@ export function WorktreeDetailPanel({
   onOpenStaging,
 }: WorktreeDetailPanelProps) {
   const [actionInProgress, setActionInProgress] = useState(false)
+  // Herd preview state
+  const [herdInstalled, setHerdInstalled] = useState<boolean | null>(null)
+  const [isLaravel, setIsLaravel] = useState(false)
+  const [previewLoading, setPreviewLoading] = useState(false)
   // Staging/commit state
   const [showCommitUI, setShowCommitUI] = useState(false)
   const [workingStatus, setWorkingStatus] = useState<WorkingStatus | null>(null)
@@ -102,6 +108,21 @@ export function WorktreeDetailPanel({
       document.removeEventListener('keydown', handleEscape)
     }
   }, [fileContextMenu])
+
+  // Check Herd availability when worktree changes
+  useEffect(() => {
+    const checkHerd = async () => {
+      try {
+        const result = await window.electronAPI.checkHerdAvailable(worktree.path)
+        setHerdInstalled(result.herdInstalled)
+        setIsLaravel(result.isLaravel)
+      } catch {
+        setHerdInstalled(false)
+        setIsLaravel(false)
+      }
+    }
+    checkHerd()
+  }, [worktree.path])
 
   const loadWorkingStatus = async () => {
     setLoadingStatus(true)
@@ -294,6 +315,30 @@ export function WorktreeDetailPanel({
     await window.electronAPI.openWorktree(worktree.path)
   }
 
+  const handlePreviewInBrowser = async () => {
+    if (!repoPath) {
+      onStatusChange?.({ type: 'error', message: 'No repository path available' })
+      return
+    }
+
+    setPreviewLoading(true)
+    onStatusChange?.({ type: 'info', message: 'Setting up preview...' })
+
+    try {
+      const result = await window.electronAPI.openWorktreeInBrowser(worktree.path, repoPath)
+      if (result.success) {
+        const warningMsg = result.warnings?.length ? ` (${result.warnings.join(', ')})` : ''
+        onStatusChange?.({ type: 'success', message: `Opened ${result.url}${warningMsg}` })
+      } else {
+        onStatusChange?.({ type: 'error', message: result.message })
+      }
+    } catch (error) {
+      onStatusChange?.({ type: 'error', message: (error as Error).message })
+    } finally {
+      setPreviewLoading(false)
+    }
+  }
+
   const handleRemove = async (force: boolean = false) => {
     const confirmMsg = force
       ? `Force remove worktree "${worktree.displayName}"? This will discard any uncommitted changes.`
@@ -383,6 +428,16 @@ export function WorktreeDetailPanel({
           {onOpenStaging && (
             <button className="btn btn-secondary" onClick={onOpenStaging}>
               Open Staging
+            </button>
+          )}
+          {herdInstalled && (
+            <button
+              className="btn btn-secondary"
+              onClick={handlePreviewInBrowser}
+              disabled={!isLaravel || previewLoading}
+              title={!isLaravel ? 'Preview not available for this project type' : 'Open preview in browser'}
+            >
+              {previewLoading ? 'Opening...' : 'Preview'}
             </button>
           )}
         </div>
@@ -748,6 +803,17 @@ export function WorktreeDetailPanel({
         <button className="btn btn-secondary" onClick={handleOpenInFinder} disabled={actionInProgress}>
           Open in Finder
         </button>
+
+        {herdInstalled && (
+          <button
+            className="btn btn-secondary"
+            onClick={handlePreviewInBrowser}
+            disabled={!isLaravel || previewLoading || actionInProgress}
+            title={!isLaravel ? 'Preview not available for this project type' : 'Open preview in browser'}
+          >
+            {previewLoading ? 'Opening...' : 'Preview'}
+          </button>
+        )}
 
         {isCurrent && onOpenStaging && (
           <button className="btn btn-secondary" onClick={onOpenStaging} disabled={actionInProgress}>
