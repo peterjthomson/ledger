@@ -1,8 +1,8 @@
 /**
- * NPM Dev Provider - Universal JavaScript Project Preview
+ * Node Provider - Universal JavaScript/TypeScript Project Preview
  *
- * The simplest, most universal preview provider. Works with any JS project
- * that has a `dev` script in package.json:
+ * The fallback provider for any Node.js project with a `dev` script.
+ * Works with all major JS frameworks:
  *
  * - Vite (React, Vue, Svelte)
  * - Next.js
@@ -13,9 +13,13 @@
  * - Remix
  * - Any project with `npm run dev`
  *
+ * Note: This provider is intentionally LAST in priority.
+ * Laravel/Rails apps also have package.json, but we want their
+ * native servers (PHP/Ruby), not a Node dev server.
+ *
  * How it works:
  * 1. Detects package.json with "dev" script
- * 2. Runs `npm run dev` in the worktree
+ * 2. Runs `npm run dev` (or yarn/pnpm/bun)
  * 3. Parses stdout to find the local URL
  * 4. Opens in browser
  * 5. Tracks running processes for cleanup
@@ -107,7 +111,7 @@ function hasDevScript(dirPath: string): boolean {
 /**
  * Get the dev script command (for display/debugging)
  */
-function getDevScript(dirPath: string): string | null {
+function _getDevScript(dirPath: string): string | null {
   const pkg = readPackageJson(dirPath)
   if (!pkg) return null
   const scripts = pkg.scripts as Record<string, string> | undefined

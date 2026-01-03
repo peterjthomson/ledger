@@ -2,19 +2,24 @@
  * Preview System - Extensible Branch/PR/Worktree Preview
  *
  * Provides a unified interface for previewing code in the browser.
- * Built-in providers:
- *   - npm-dev: Universal JS/TS projects (npm run dev)
- *   - herd: Laravel projects via Laravel Herd
  *
- * Plugins can register additional providers for:
- *   - Vercel (cloud preview deployments)
- *   - Docker Compose
- *   - Rails
- *   - Custom environments
+ * Built-in providers (in priority order):
+ *   1. laravelProvider - Laravel (Herd → artisan serve)
+ *   2. railsProvider   - Rails (puma-dev → bin/dev)
+ *   3. nodeProvider    - Node.js (npm/yarn/pnpm run dev)
+ *
+ * Node is last because Laravel/Rails apps also have package.json,
+ * but we want the proper PHP/Ruby server.
+ *
+ * Future providers:
+ *   - pythonProvider (Django, Flask, FastAPI)
+ *   - goProvider (Go HTTP servers)
+ *   - dockerProvider (docker-compose)
+ *   - vercelProvider (cloud preview deployments)
  *
  * @example
  * ```typescript
- * import { previewRegistry, npmDevProvider } from '@/lib/preview'
+ * import { previewRegistry, nodeProvider } from '@/lib/preview'
  *
  * // Get available providers for a project
  * const providers = await previewRegistry.getAvailableProviders('/path/to/repo')
@@ -34,49 +39,50 @@ export type {
 } from './preview-types'
 
 // Registry
+import { previewRegistry } from './preview-registry'
 export { previewRegistry, type ProviderWithAvailability } from './preview-registry'
 
 // Built-in Providers
-import * as npmDevProvider from './providers/npm-dev-provider'
+import * as nodeProviderModule from './providers/node-provider'
 import { railsProvider } from './providers/rails-provider'
 import { laravelProvider } from './providers/laravel-provider'
 
-// Provider wrapper for npm-dev (conforms to PreviewProvider interface)
-import type { PreviewProvider, CreateWorktreeFn } from './preview-types'
+// Provider wrapper for node (conforms to PreviewProvider interface)
+import type { PreviewProvider } from './preview-types'
 
-export const npmDevPreviewProvider: PreviewProvider = {
-  id: 'npm-dev',
-  name: 'Dev Server',
-  description: 'Run npm run dev (Vite, Next.js, etc.)',
-  icon: 'play',
+export const nodeProvider: PreviewProvider = {
+  id: 'node',
+  name: 'Node.js',
+  description: 'Run dev server (Vite, Next.js, etc.)',
+  icon: 'hexagon', // Node.js hexagon logo
   type: 'local',
 
-  checkAvailability: npmDevProvider.checkAvailability,
+  checkAvailability: nodeProviderModule.checkAvailability,
 
   async previewWorktree(worktreePath, mainRepoPath, _createWorktree) {
-    return npmDevProvider.previewWorktree(worktreePath, mainRepoPath)
+    return nodeProviderModule.previewWorktree(worktreePath, mainRepoPath)
   },
 
   async previewBranch(branchName, mainRepoPath, createWorktree) {
-    return npmDevProvider.previewBranch(branchName, mainRepoPath, createWorktree)
+    return nodeProviderModule.previewBranch(branchName, mainRepoPath, createWorktree)
   },
 
   async previewPR(prNumber, prBranchName, mainRepoPath, createWorktree) {
-    return npmDevProvider.previewPR(prNumber, prBranchName, mainRepoPath, createWorktree)
+    return nodeProviderModule.previewPR(prNumber, prBranchName, mainRepoPath, createWorktree)
   },
 
-  stop: npmDevProvider.stopServer,
-  stopAll: npmDevProvider.stopAllServers,
-  isRunning: npmDevProvider.isServerRunning,
-  getUrl: npmDevProvider.getServerUrl,
+  stop: nodeProviderModule.stopServer,
+  stopAll: nodeProviderModule.stopAllServers,
+  isRunning: nodeProviderModule.isServerRunning,
+  getUrl: nodeProviderModule.getServerUrl,
 }
 
-// Re-export npm-dev utilities for direct use
+// Re-export node provider utilities for direct use
 export {
-  getRunningServers as getNpmDevRunningServers,
-  stopServer as stopNpmDevServer,
-  stopAllServers as stopAllNpmDevServers,
-} from './providers/npm-dev-provider'
+  getRunningServers as getNodeRunningServers,
+  stopServer as stopNodeServer,
+  stopAllServers as stopAllNodeServers,
+} from './providers/node-provider'
 
 /**
  * Initialize the preview system with built-in providers
@@ -84,15 +90,17 @@ export {
  * Provider priority (first compatible wins):
  * 1. Laravel (Herd → artisan serve)
  * 2. Rails (puma-dev → bin/dev)
- * 3. npm-dev (universal JS/TS fallback)
+ * 3. Node (npm/yarn/pnpm run dev)
  *
- * Note: npm-dev is LAST because Laravel/Rails apps also have package.json
- * but we want to use the proper server (PHP/Ruby), not npm run dev.
+ * Note: Node is LAST because Laravel/Rails apps also have package.json
+ * but we want to use the proper server (PHP/Ruby), not a Node dev server.
+ *
+ * Future providers could include:
+ * - pythonProvider (Django, Flask, FastAPI)
+ * - goProvider (Go HTTP servers)
+ * - rustProvider (Actix, Rocket)
  */
 export function initializePreviewProviders(): void {
-  // Import here to avoid circular dependencies
-  const { previewRegistry } = require('./preview-registry')
-
   // Register built-in providers in priority order
   
   // 1. Laravel (Herd for .test domains, artisan serve fallback)
@@ -101,13 +109,14 @@ export function initializePreviewProviders(): void {
   // 2. Rails (puma-dev for .test domains, bin/dev fallback)
   previewRegistry.register(railsProvider)
 
-  // 3. npm-dev - LAST because it matches anything with package.json
-  //    Only use for pure JS apps (React, Vue, Next.js, etc.)
-  previewRegistry.register(npmDevPreviewProvider)
+  // 3. Node - LAST because it matches anything with package.json
+  //    Only use for pure JS/TS apps (React, Vue, Next.js, etc.)
+  previewRegistry.register(nodeProvider)
 
   console.info('[Preview] Initialized with built-in providers:', previewRegistry.getIds())
 }
 
 // Re-export providers for direct use
-export { railsProvider }
 export { laravelProvider }
+export { railsProvider }
+export { nodeProvider }

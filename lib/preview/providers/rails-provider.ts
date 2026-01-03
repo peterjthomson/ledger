@@ -340,7 +340,7 @@ async function setupRailsWorktree(
 
         await fs.promises.writeFile(worktreeDbConfig, dbConfig, 'utf-8')
         warnings.push(`Created database.yml with suffix _${worktreeName}`)
-      } catch (err) {
+      } catch (_err) {
         // Fallback: just copy as-is (will share DB with main)
         try {
           await fs.promises.copyFile(mainDbConfig, worktreeDbConfig)
@@ -523,7 +523,7 @@ export const railsProvider: PreviewProvider = {
     }
 
     // Check if it's a Rails project
-    const { isRails, hasBindev, version } = isRailsProject(checkPath)
+    const { isRails, hasBindev: _hasBindev, version } = isRailsProject(checkPath)
     if (!isRails) {
       return {
         available: true,

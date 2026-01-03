@@ -5,12 +5,17 @@ Extensible preview system for viewing branches, PRs, and worktrees in the browse
 ## Provider Priority
 
 ```
-1. Laravel  → Herd (.test) or artisan serve (ports)
-2. Rails    → puma-dev (.test) or bin/dev (ports)
-3. npm-dev  → npm run dev (ports) - LAST, catches pure JS apps
+1. laravelProvider  → Herd (.test) or artisan serve (ports)
+2. railsProvider    → puma-dev (.test) or bin/dev (ports)
+3. nodeProvider     → npm/yarn/pnpm run dev (ports) - LAST
 ```
 
-**Why npm-dev is last:** Laravel/Rails apps have `package.json` too, but we want the proper PHP/Ruby server, not `npm run dev`.
+**Why Node is last:** Laravel/Rails apps also have `package.json`, but we want the proper PHP/Ruby server, not a Node dev server.
+
+**Future providers:**
+- `pythonProvider` (Django, Flask, FastAPI)
+- `goProvider` (Go HTTP servers)
+- `rustProvider` (Actix, Rocket)
 
 ## Smart Asset Handling
 
@@ -33,7 +38,7 @@ Branch has changes in:
 
 ## Quick Start
 
-The `npm-dev` provider works out of the box for any JS/TS project:
+The `nodeProvider` works out of the box for any JS/TS project:
 
 ```
 Click "Preview" on any branch/PR/worktree
@@ -52,15 +57,16 @@ lib/preview/
 ├── preview-registry.ts   # Provider registry singleton
 ├── preview-handlers.ts   # IPC handlers for main process
 └── providers/
-    ├── npm-dev-provider.ts   # Universal JS/TS (npm run dev)
-    └── herd-provider.ts      # Laravel Herd (to be migrated)
+    ├── laravel-provider.ts   # Laravel (Herd / artisan serve)
+    ├── rails-provider.ts     # Rails (puma-dev / bin/dev)
+    └── node-provider.ts      # Node.js (npm/yarn/pnpm run dev)
 ```
 
 ## Built-in Providers
 
-### npm-dev (Default)
+### nodeProvider (Fallback)
 
-Works with **any** project that has `npm run dev`:
+Works with **any** Node.js project that has a `dev` script:
 
 | Framework | Detection | How It Works |
 |-----------|-----------|--------------|
@@ -78,9 +84,9 @@ Works with **any** project that has `npm run dev`:
 - Tracks running processes for cleanup
 - Port allocation (3001+) avoids conflicts
 
-### herd (Laravel)
+### laravelProvider
 
-For Laravel projects with [Laravel Herd](https://herd.laravel.com/):
+For Laravel projects. Uses [Laravel Herd](https://herd.laravel.com/) when available, falls back to `php artisan serve`:
 
 | Step | What Happens |
 |------|--------------|
@@ -187,14 +193,15 @@ registerPreviewHandlers(createWorktree)
 cleanupPreviewHandlers()
 ```
 
-## Future Providers
+## Provider Status
 
 | Provider | Type | Status |
 |----------|------|--------|
-| npm-dev | Local | ✅ Implemented |
-| herd | Local | 🔄 To migrate from herd-service.ts |
-| valet | Local | 📋 Planned |
-| docker-compose | Local | 📋 Planned |
-| vercel | Cloud | 📋 Planned |
-| netlify | Cloud | 📋 Planned |
-| railway | Cloud | 📋 Planned |
+| `laravelProvider` | Local | ✅ Implemented (Herd + artisan serve) |
+| `railsProvider` | Local | ✅ Implemented (puma-dev + bin/dev) |
+| `nodeProvider` | Local | ✅ Implemented (npm/yarn/pnpm/bun) |
+| `pythonProvider` | Local | 📋 Planned (Django, Flask, FastAPI) |
+| `goProvider` | Local | 📋 Planned |
+| `dockerProvider` | Local | 📋 Planned (docker-compose) |
+| `vercelProvider` | Cloud | 📋 Planned |
+| `netlifyProvider` | Cloud | 📋 Planned |
