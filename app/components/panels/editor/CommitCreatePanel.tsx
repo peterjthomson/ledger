@@ -275,10 +275,14 @@ export function StagingPanel({ workingStatus, currentBranch, onRefresh, onStatus
   }
 
   // Stage selected lines
+  // Process hunks in reverse order (highest index first) to avoid index drift
   const handleStageSelectedLines = async () => {
     if (!selectedFile) return
 
-    for (const [hunkIndex, lineIndices] of selectedLines.entries()) {
+    // Sort hunk indices in descending order to prevent index drift after each operation
+    const sortedHunks = Array.from(selectedLines.entries()).sort(([a], [b]) => b - a)
+
+    for (const [hunkIndex, lineIndices] of sortedHunks) {
       const result = await window.electronAPI.stageLines(selectedFile.path, hunkIndex, Array.from(lineIndices))
       if (!result.success) {
         onStatusChange({ type: 'error', message: result.message })
@@ -295,10 +299,14 @@ export function StagingPanel({ workingStatus, currentBranch, onRefresh, onStatus
   }
 
   // Unstage selected lines
+  // Process hunks in reverse order (highest index first) to avoid index drift
   const handleUnstageSelectedLines = async () => {
     if (!selectedFile) return
 
-    for (const [hunkIndex, lineIndices] of selectedLines.entries()) {
+    // Sort hunk indices in descending order to prevent index drift after each operation
+    const sortedHunks = Array.from(selectedLines.entries()).sort(([a], [b]) => b - a)
+
+    for (const [hunkIndex, lineIndices] of sortedHunks) {
       const result = await window.electronAPI.unstageLines(selectedFile.path, hunkIndex, Array.from(lineIndices))
       if (!result.success) {
         onStatusChange({ type: 'error', message: result.message })
@@ -316,6 +324,7 @@ export function StagingPanel({ workingStatus, currentBranch, onRefresh, onStatus
   // Discard selected lines
   const [discardLinesConfirm, setDiscardLinesConfirm] = useState(false)
 
+  // Process hunks in reverse order (highest index first) to avoid index drift
   const handleDiscardSelectedLines = async () => {
     if (!selectedFile) return
 
@@ -328,7 +337,10 @@ export function StagingPanel({ workingStatus, currentBranch, onRefresh, onStatus
 
     setDiscardLinesConfirm(false)
 
-    for (const [hunkIndex, lineIndices] of selectedLines.entries()) {
+    // Sort hunk indices in descending order to prevent index drift after each operation
+    const sortedHunks = Array.from(selectedLines.entries()).sort(([a], [b]) => b - a)
+
+    for (const [hunkIndex, lineIndices] of sortedHunks) {
       const result = await window.electronAPI.discardLines(selectedFile.path, hunkIndex, Array.from(lineIndices))
       if (!result.success) {
         onStatusChange({ type: 'error', message: result.message })
@@ -459,6 +471,8 @@ export function StagingPanel({ workingStatus, currentBranch, onRefresh, onStatus
     const result = await window.electronAPI.stageHunk(selectedFile.path, hunkIndex)
     if (result.success) {
       onStatusChange({ type: 'success', message: result.message })
+      // Clear stale line selections before reloading diff
+      clearLineSelection()
       // Reload diff and refresh file list
       const diff = await window.conveyor.staging.getFileDiff(selectedFile.path, selectedFile.staged)
       setFileDiff(diff)
@@ -474,6 +488,8 @@ export function StagingPanel({ workingStatus, currentBranch, onRefresh, onStatus
     const result = await window.electronAPI.unstageHunk(selectedFile.path, hunkIndex)
     if (result.success) {
       onStatusChange({ type: 'success', message: result.message })
+      // Clear stale line selections before reloading diff
+      clearLineSelection()
       // Reload diff and refresh file list
       const diff = await window.conveyor.staging.getFileDiff(selectedFile.path, selectedFile.staged)
       setFileDiff(diff)
@@ -502,6 +518,8 @@ export function StagingPanel({ workingStatus, currentBranch, onRefresh, onStatus
     const result = await window.electronAPI.discardHunk(selectedFile.path, hunkIndex)
     if (result.success) {
       onStatusChange({ type: 'success', message: result.message })
+      // Clear stale line selections before reloading diff
+      clearLineSelection()
       // Reload diff and refresh file list
       const diff = await window.conveyor.staging.getFileDiff(selectedFile.path, selectedFile.staged)
       setFileDiff(diff)

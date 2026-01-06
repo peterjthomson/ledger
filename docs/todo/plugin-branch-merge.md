@@ -137,7 +137,7 @@ All conflicts resolved by:
 - `app/components/panels/list/*` — List panel components
 - `app/components/panels/viz/ContributorChart.tsx`
 - `app/components/panels/viz/TechTreeChart.tsx`
-- `app/components/panels/editor/MailmapDetailsPanel.tsx`
+- `app/components/panels/editor/MailmapDetailPanel.tsx`
 - `app/components/panels/editor/RepoDetailPanel.tsx`
 
 ---

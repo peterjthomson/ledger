@@ -14,7 +14,7 @@ import { BranchDetailPanel } from './BranchDetailPanel'
 import { WorktreeDetailPanel } from './WorktreeDetailPanel'
 import { StashDetailPanel } from './StashDetailPanel'
 import { WorktreeCreatePanel } from './WorktreeCreatePanel'
-import { MailmapDetailsPanel } from './MailmapDetailsPanel'
+import { MailmapDetailPanel } from './MailmapDetailPanel'
 import { RepoDetailPanel } from './RepoDetailPanel'
 
 export interface EditorRouterProps {
@@ -211,7 +211,7 @@ export function EditorRouter({
 
     case 'mailmap': {
       return (
-        <MailmapDetailsPanel
+        <MailmapDetailPanel
           onStatusChange={onStatusChange}
         />
       )

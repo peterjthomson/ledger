@@ -95,6 +95,13 @@ export async function initializeHighlighter(
     return highlighterInstance
   }
 
+  // Dispose the old instance to prevent memory leaks
+  // Shiki uses WebAssembly which won't be garbage collected automatically
+  if (highlighterInstance) {
+    highlighterInstance.dispose()
+    highlighterInstance = null
+  }
+
   // Use bundled themes if no custom theme provided
   const themes = themeJson
     ? [{ name: 'ledger-theme', ...themeJson }]

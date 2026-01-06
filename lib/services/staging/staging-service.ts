@@ -237,8 +237,13 @@ export async function discardHunk(
 
 /**
  * Build a partial patch from a hunk with only selected lines.
- * Non-selected add lines become context lines.
- * Non-selected delete lines are excluded entirely.
+ *
+ * For staging (applying to index from unstaged diff):
+ * - Selected add lines: include as '+' (add to index)
+ * - Non-selected add lines: OMIT entirely (they don't exist in index, can't be context)
+ * - Selected delete lines: include as '-' (remove from index)
+ * - Non-selected delete lines: include as context ' ' (keep in index)
+ * - Context lines: include as context ' '
  */
 function buildPartialPatch(
   filePath: string,
@@ -265,20 +270,21 @@ function buildPartialPatch(
         // Selected add line - include as addition
         patchLines.push('+' + line.content)
         newCount++
-      } else {
-        // Non-selected add line - becomes context (already in new file)
-        patchLines.push(' ' + line.content)
-        oldCount++
-        newCount++
       }
+      // Non-selected add lines are OMITTED entirely.
+      // They exist in the working tree but NOT in the index,
+      // so they can't be used as context for git apply --cached.
     } else if (line.type === 'delete') {
       if (isSelected) {
         // Selected delete line - include as deletion
         patchLines.push('-' + line.content)
         oldCount++
+      } else {
+        // Non-selected delete line - keep as context (line stays in index)
+        patchLines.push(' ' + line.content)
+        oldCount++
+        newCount++
       }
-      // Non-selected delete lines are omitted entirely
-      // (the line stays in both old and new)
     }
   }
 

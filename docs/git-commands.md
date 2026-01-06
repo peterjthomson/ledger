@@ -185,7 +185,7 @@ Primary UI surfaces:
 Primary UI surfaces:
 
 - **Graph**: `app/components/panels/viz/GitGraph.tsx`
-- **Diff viewer**: `app/components/panels/editor/DiffPanel.tsx`
+- **Diff viewer**: `app/components/panels/editor/CommitDiffPanel.tsx`
 
 | UI intent (where)  | IPC / API call             | Implementation                                                                    | Git backend          | Commands (unique shapes)                                                                                           |
 | ------------------ | -------------------------- | --------------------------------------------------------------------------------- | -------------------- | ------------------------------------------------------------------------------------------------------------------ |

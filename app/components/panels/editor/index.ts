@@ -5,8 +5,11 @@
  * like staging. They render in the Editor slot which has global state.
  */
 
-export { DiffPanel } from './DiffPanel'
-export type { DiffPanelProps } from './DiffPanel'
+export { CommitDiffPanel } from './CommitDiffPanel'
+export type { CommitDiffPanelProps } from './CommitDiffPanel'
+// Alias for backwards compatibility
+export { CommitDiffPanel as DiffPanel } from './CommitDiffPanel'
+export type { CommitDiffPanelProps as DiffPanelProps } from './CommitDiffPanel'
 
 export { StagingPanel } from './CommitCreatePanel'
 export type { StagingPanelProps } from './CommitCreatePanel'
@@ -35,8 +38,11 @@ export type { WorktreeCreatePanelProps } from './WorktreeCreatePanel'
 export { EditorRouter, SidebarDetailPanel } from './EditorRouter'
 export type { EditorRouterProps, SidebarDetailPanelProps } from './EditorRouter'
 
-export { MailmapDetailsPanel } from './MailmapDetailsPanel'
-export type { MailmapDetailsPanelProps } from './MailmapDetailsPanel'
+export { MailmapDetailPanel } from './MailmapDetailPanel'
+export type { MailmapDetailPanelProps } from './MailmapDetailPanel'
+// Alias for backwards compatibility
+export { MailmapDetailPanel as MailmapDetailsPanel } from './MailmapDetailPanel'
+export type { MailmapDetailPanelProps as MailmapDetailsPanelProps } from './MailmapDetailPanel'
 
 export { RepoDetailPanel } from './RepoDetailPanel'
 export type { RepoDetailPanelProps } from './RepoDetailPanel'

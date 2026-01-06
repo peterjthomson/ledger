@@ -180,44 +180,6 @@ test.describe('Git URL Validation', () => {
 })
 
 /**
- * Safe Exec Behavior Tests
- *
- * Tests that verify the safeExec helper properly prevents injection
- * by testing the behavior patterns rather than the implementation.
- */
-test.describe('Safe Execution Patterns', () => {
-  test.describe('Argument array safety', () => {
-    test('arguments with spaces are treated as single arguments', () => {
-      // This test documents the expected behavior
-      // With safeExec, 'my file.txt' should be ONE argument, not two
-      const args = ['echo', 'hello world']
-      expect(args.length).toBe(2) // 'echo' and 'hello world' as separate elements
-      expect(args[1]).toBe('hello world') // Contains space but is one arg
-    })
-
-    test('arguments with special chars are not interpreted', () => {
-      // With safeExec (shell: false), these should NOT be interpreted
-      const maliciousBody = 'Hello"; rm -rf /; echo "'
-      const args = ['gh', 'pr', 'comment', '123', '--body', maliciousBody]
-      expect(args[5]).toBe(maliciousBody) // The body is preserved exactly
-      expect(args.length).toBe(6) // Not split on special chars
-    })
-
-    test('backticks are not expanded', () => {
-      const maliciousBody = 'Hello `whoami` world'
-      const args = ['gh', 'pr', 'comment', '123', '--body', maliciousBody]
-      expect(args[5]).toContain('`') // Backticks preserved
-    })
-
-    test('dollar signs are not expanded', () => {
-      const maliciousBody = 'Hello $HOME world'
-      const args = ['gh', 'pr', 'comment', '123', '--body', maliciousBody]
-      expect(args[5]).toContain('$HOME') // Not expanded
-    })
-  })
-})
-
-/**
  * Error Serialization Tests
  *
  * Tests for safe error handling that doesn't expose sensitive information.

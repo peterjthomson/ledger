@@ -6,6 +6,7 @@
 
 import { useState, useEffect, useMemo, useCallback, useRef, useLayoutEffect } from 'react'
 import type { PullRequest, PRDetail, PRReviewComment, StagingFileDiff } from '../../../types/electron'
+import { DiffViewer } from '../../ui/DiffViewer'
 
 export interface PRReviewPanelProps {
   pr: PullRequest
@@ -442,35 +443,13 @@ export function PRReviewPanel({ pr, formatRelativeTime, onCheckout, onPRMerged, 
                   </a>
                 </div>
                 <div className="pr-file-diff-content">
-                  {loadingDiff ? (
-                    <div className="pr-diff-loading">Loading diff...</div>
-                  ) : fileDiff?.isBinary ? (
-                    <div className="pr-diff-empty">Binary file</div>
-                  ) : fileDiff?.hunks.length === 0 ? (
-                    <div className="pr-diff-empty">No changes to display</div>
-                  ) : fileDiff ? (
-                    fileDiff.hunks.map((hunk, hunkIdx) => (
-                      <div key={hunkIdx} className="diff-hunk">
-                        <div className="diff-hunk-header">
-                          @@ -{hunk.oldStart},{hunk.oldLines} +{hunk.newStart},{hunk.newLines} @@
-                        </div>
-                        <div className="diff-hunk-lines">
-                          {hunk.lines.map((line, lineIdx) => (
-                            <div key={lineIdx} className={`diff-line diff-line-${line.type}`}>
-                              <span className="diff-line-number old">{line.oldLineNumber || ''}</span>
-                              <span className="diff-line-number new">{line.newLineNumber || ''}</span>
-                              <span className="diff-line-prefix">
-                                {line.type === 'add' ? '+' : line.type === 'delete' ? '-' : ' '}
-                              </span>
-                              <span className="diff-line-content">{line.content}</span>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    ))
-                  ) : (
-                    <div className="pr-diff-empty">Could not load diff</div>
-                  )}
+                  <DiffViewer
+                    diff={fileDiff}
+                    filePath={selectedFile}
+                    loading={loadingDiff}
+                    emptyMessage="Could not load diff"
+                    className="pr-diff-viewer"
+                  />
                 </div>
 
                 {/* Inline Review Comments */}

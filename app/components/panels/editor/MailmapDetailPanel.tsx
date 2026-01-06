@@ -1,5 +1,5 @@
 /**
- * MailmapDetailsPanel - Manage author identity mappings via .mailmap
+ * MailmapDetailPanel - Manage author identity mappings via .mailmap
  *
  * Shows all contributors and the current .mailmap file.
  * Drag users onto each other to combine identities.
@@ -9,7 +9,7 @@ import { useState, useEffect, useCallback, useMemo } from 'react'
 import type { AuthorIdentity, MailmapEntry } from '../../../types/electron'
 import type { StatusMessage } from '../../../types/app-types'
 
-export interface MailmapDetailsPanelProps {
+export interface MailmapDetailPanelProps {
   onStatusChange?: (status: StatusMessage | null) => void
 }
 
@@ -18,9 +18,9 @@ interface MergedIdentity {
   aliases: AuthorIdentity[]
 }
 
-export function MailmapDetailsPanel({
+export function MailmapDetailPanel({
   onStatusChange,
-}: MailmapDetailsPanelProps) {
+}: MailmapDetailPanelProps) {
   const [identities, setIdentities] = useState<AuthorIdentity[]>([])
   const [existingMailmap, setExistingMailmap] = useState<MailmapEntry[]>([])
   const [pendingMerges, setPendingMerges] = useState<MergedIdentity[]>([])
@@ -406,3 +406,4 @@ export function MailmapDetailsPanel({
     </div>
   )
 }
+

@@ -209,7 +209,7 @@ xcrun notarytool info <submission-id> --keychain-profile "AC_PASSWORD"
 
 ## Areas for Improvement
 
-1. The `git-service.ts` file is large (~3300 lines) - could be modularized
+1. The `git-service.ts` file is large (~5400 lines) - partially modularized into `lib/services/`
 2. No loading skeletons - just "Loading..." text
 3. No keyboard shortcuts yet
 4. PR integration requires `gh` CLI - could add fallback

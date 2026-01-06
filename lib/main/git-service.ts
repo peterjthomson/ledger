@@ -4512,6 +4512,13 @@ export async function discardHunk(
 
 /**
  * Build a partial patch from a hunk with only selected lines.
+ *
+ * For staging (applying to index from unstaged diff):
+ * - Selected add lines: include as '+' (add to index)
+ * - Non-selected add lines: OMIT entirely (they don't exist in index, can't be context)
+ * - Selected delete lines: include as '-' (remove from index)
+ * - Non-selected delete lines: include as context ' ' (keep in index)
+ * - Context lines: include as context ' '
  */
 function buildPartialPatch(
   filePath: string,
@@ -4528,22 +4535,29 @@ function buildPartialPatch(
     const isSelected = selectedSet.has(line.lineIndex)
 
     if (line.type === 'context') {
+      // Context lines are always included
       patchLines.push(' ' + line.content)
       oldCount++
       newCount++
     } else if (line.type === 'add') {
       if (isSelected) {
+        // Selected add line - include as addition
         patchLines.push('+' + line.content)
         newCount++
+      }
+      // Non-selected add lines are OMITTED entirely.
+      // They exist in the working tree but NOT in the index,
+      // so they can't be used as context for git apply --cached.
+    } else if (line.type === 'delete') {
+      if (isSelected) {
+        // Selected delete line - include as deletion
+        patchLines.push('-' + line.content)
+        oldCount++
       } else {
+        // Non-selected delete line - keep as context (line stays in index)
         patchLines.push(' ' + line.content)
         oldCount++
         newCount++
-      }
-    } else if (line.type === 'delete') {
-      if (isSelected) {
-        patchLines.push('-' + line.content)
-        oldCount++
       }
     }
   }

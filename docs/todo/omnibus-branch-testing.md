@@ -2,6 +2,26 @@
 
 This document contains the test checklist for the omnibus branch with 10 major features.
 
+## Bugs Fixed from Code Review
+
+The following bugs were identified by Cursor Bugbot and fixed:
+
+1. **Partial patch context bug (High)** - Fixed in `git-service.ts` and `staging-service.ts`
+   - Non-selected add lines were incorrectly converted to context, but they don't exist in the index
+   - Fix: Non-selected add lines are now omitted entirely; non-selected delete lines become context
+
+2. **Multi-hunk stale indices (Medium)** - Fixed in `CommitCreatePanel.tsx`
+   - Sequential hunk processing caused index drift after each operation
+   - Fix: Hunks are now processed in reverse order (highest index first)
+
+3. **Line selections not cleared (Low)** - Fixed in `CommitCreatePanel.tsx`
+   - Line selections persisted after hunk stage/unstage/discard operations
+   - Fix: `clearLineSelection()` is now called after each hunk operation
+
+4. **Highlighter memory leak (Medium)** - Fixed in `syntax-highlighter.ts`
+   - Old Shiki highlighter instance wasn't disposed when theme changed
+   - Fix: Old instance is now disposed before creating new one
+
 ---
 
 ## 1. Branch Renaming

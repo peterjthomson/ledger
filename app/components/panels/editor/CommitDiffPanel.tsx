@@ -1,5 +1,5 @@
 /**
- * DiffPanel - Displays commit diffs with expandable file sections
+ * CommitDiffPanel - Displays commit diffs with expandable file sections
  *
  * Shows commit metadata in a standardized panel format, then file-by-file diffs
  * with syntax highlighting for additions/deletions.
@@ -8,7 +8,7 @@
 import { useState, useEffect } from 'react'
 import type { CommitDiff, GraphCommit, Branch } from '../../../types/electron'
 
-export interface DiffPanelProps {
+export interface CommitDiffPanelProps {
   diff: CommitDiff
   selectedCommit?: GraphCommit | null
   formatRelativeTime: (date: string) => string
@@ -16,7 +16,7 @@ export interface DiffPanelProps {
   branches?: Branch[]
 }
 
-export function DiffPanel({ diff, selectedCommit, formatRelativeTime, onBranchClick, branches }: DiffPanelProps) {
+export function CommitDiffPanel({ diff, selectedCommit, formatRelativeTime, onBranchClick, branches }: CommitDiffPanelProps) {
   const [expandedFiles, setExpandedFiles] = useState<Set<string>>(new Set())
 
   const toggleFile = (path: string) => {

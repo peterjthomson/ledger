@@ -32,6 +32,8 @@ app.tsx
 | `BranchList.tsx` | Local/remote branches |
 | `WorktreeList.tsx` | Worktrees with parent filtering |
 | `StashList.tsx` | Stash entries |
+| `CommitList.tsx` | Commit history list |
+| `RepoList.tsx` | Multi-repo selector |
 | `Sidebar.tsx` | All items in collapsible sections |
 | `ListPanelHeader.tsx` | Shared header component |
 
@@ -40,6 +42,8 @@ app.tsx
 | Component | Purpose |
 |-----------|---------|
 | `GitGraph.tsx` | Git commit graph with lanes |
+| `ContributorChart.tsx` | Contributor activity over time |
+| `TechTreeChart.tsx` | Merged branches visualization |
 
 ## Canvas Presets
 
