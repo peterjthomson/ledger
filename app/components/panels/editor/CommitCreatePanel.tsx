@@ -140,11 +140,13 @@ export function StagingPanel({ workingStatus, currentBranch, onRefresh, onStatus
     }
   }, [selectedFile])
 
-  // Clear line selection when file changes
+  // Clear line selection and edit state when file changes
   useEffect(() => {
     setSelectedLines(new Map())
     setLastClickedLine(null)
     setHighlightedLines(new Map())
+    setIsEditing(false)
+    setEditContent('')
   }, [selectedFile])
 
   // Syntax highlighting for diff lines

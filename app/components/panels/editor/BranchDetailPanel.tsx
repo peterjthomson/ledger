@@ -53,6 +53,16 @@ export function BranchDetailPanel({
 
   const isMainOrMaster = branch.name === 'main' || branch.name === 'master'
 
+  // Reset form states when branch changes
+  useEffect(() => {
+    setShowRenameForm(false)
+    setNewBranchName('')
+    setShowPRForm(false)
+    setPrTitle('')
+    setPrBody('')
+    setPrDraft(false)
+  }, [branch.name])
+
   // Load branch diff when branch or diff type changes
   useEffect(() => {
     if (isMainOrMaster) {
