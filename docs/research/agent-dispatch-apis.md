@@ -11,9 +11,7 @@
 | **OpenAI Codex** | ✅ Full SDK (TypeScript) | SDK threads or CLI `exec` | Production |
 | **Cursor** | ✅ REST API (Cloud Agents) | HTTP POST to `/v0/agents` | Beta |
 | **Jules** | ✅ REST API + CLI | HTTP POST to `/v1alpha/sessions` | Alpha |
-| **Gemini CLI** | ⚠️ CLI only (headless mode) | CLI with `--output-format json` | Production |
 | **OpenCode** | ✅ SDK (TypeScript) | SDK sessions + chat | Production |
-| **Junie** | ❌ No public API | IDE plugin / ACP protocol | No API |
 
 ---
 
@@ -293,81 +291,7 @@ await fetch(`https://api.cursor.com/v0/agents/${agentId}/followup`, {
 
 ---
 
-## 4. Gemini CLI (Google)
-
-### Overview
-Gemini CLI is Google's open-source AI agent for the terminal. It supports **headless mode** for programmatic use but lacks a dedicated SDK—dispatch is CLI-based.
-
-### Installation
-```bash
-npm install -g @anthropic-ai/gemini-cli
-# or
-brew install gemini-cli
-```
-
-### Dispatch Method: CLI Headless Mode
-
-```bash
-# Basic prompt
-gemini "Fix the bug in auth.ts"
-
-# Non-interactive with JSON output
-gemini --headless --output-format json "List all TODO comments"
-
-# Pipe input
-git diff | gemini "Write a commit message for these changes"
-
-# With specific model
-gemini --model gemini-2.5-pro "Refactor the database module"
-```
-
-### JSON Output Format
-```json
-{
-  "response": "The analysis shows...",
-  "statistics": {
-    "inputTokens": 1234,
-    "outputTokens": 567
-  },
-  "metadata": {
-    "model": "gemini-2.5-pro",
-    "finishReason": "STOP"
-  }
-}
-```
-
-### Key Features
-- **ReAct loop**: Reason and act with built-in tools
-- **MCP support**: Extend with Model Context Protocol servers
-- **Custom commands**: TOML-based command definitions
-- **Tool integration**: File system, shell, web browsing
-
-### Limitations
-- **No SDK**: Must shell out to CLI
-- **No streaming API**: JSON output only after completion
-- **No session persistence**: Each call is independent
-
-### Workaround for SDK-like Usage
-```typescript
-import { execSync } from 'child_process';
-
-function dispatchToGemini(prompt: string, cwd: string): string {
-  const result = execSync(
-    `gemini --headless --output-format json "${prompt.replace(/"/g, '\\"')}"`,
-    { cwd, encoding: 'utf-8' }
-  );
-  return JSON.parse(result);
-}
-```
-
-### Resources
-- [Gemini CLI Docs](https://geminicli.com/docs/)
-- [GitHub](https://github.com/google-gemini/gemini-cli)
-- [Headless Mode](https://geminicli.com/docs/cli/headless/)
-
----
-
-## 5. OpenCode
+## 4. OpenCode
 
 ### Overview
 OpenCode is an **open-source** AI coding agent with a full **TypeScript SDK** (`@opencode-ai/sdk`). It's provider-agnostic and supports 75+ LLM providers.
@@ -444,34 +368,7 @@ opencode "Refactor auth module" --provider anthropic --model claude-sonnet-4
 
 ---
 
-## 6. Junie (JetBrains)
-
-### Overview
-Junie is JetBrains' AI coding agent integrated into their IDEs. Currently, there is **no public API or SDK** for programmatic dispatch.
-
-### Current Integration Methods
-1. **IDE Plugin**: Primary interface through JetBrains IDEs
-2. **AI Chat**: Integrated into JetBrains AI chat interface
-3. **GitHub Integration**: Delegate tasks via GitHub (async)
-4. **ACP Protocol**: Agent Communication Protocol (internal)
-
-### Future Possibilities
-JetBrains is developing the **Agent Communication Protocol (ACP)** in collaboration with Zed. This may eventually provide a standard interface for programmatic agent dispatch.
-
-### Workaround
-For Junie integration, the best current approach is:
-- Detect Junie worktrees by path patterns (as Ledger already does)
-- Use the MCP protocol if/when Junie exposes MCP servers
-- Monitor for ACP protocol documentation
-
-### Resources
-- [Junie Overview](https://www.jetbrains.com/junie/)
-- [Getting Started](https://www.jetbrains.com/help/junie/get-started-with-junie.html)
-- [ACP Announcement](https://blog.jetbrains.com/ai/2025/12/bring-your-own-ai-agent-to-jetbrains-ides/)
-
----
-
-## 7. Jules (Google)
+## 5. Jules (Google)
 
 ### Overview
 Jules is Google's **fully asynchronous** remote coding agent. Unlike IDE-based assistants, Jules works autonomously in the cloud—cloning your repo, editing code in a secure VM, running tests, and opening pull requests. Powered by Gemini 2.5/3 Pro.
@@ -618,7 +515,7 @@ jules task list
 
 ---
 
-## 8. Conductor (Melty Labs)
+## 6. Conductor (Melty Labs)
 
 ### Overview
 Conductor is a macOS app that runs multiple Claude Code instances in parallel. It uses Claude Code under the hood and doesn't have its own API.
@@ -645,7 +542,7 @@ Since Conductor wraps Claude Code, dispatch to Conductor effectively means:
 
 ```typescript
 interface AgentDispatcher {
-  type: 'claude' | 'codex' | 'cursor' | 'jules' | 'gemini' | 'opencode';
+  type: 'claude' | 'codex' | 'cursor' | 'jules' | 'opencode';
   dispatch(task: AgentTask): Promise<AgentResult>;
   getStatus(taskId: string): Promise<AgentStatus>;
   cancel(taskId: string): Promise<void>;
@@ -695,15 +592,6 @@ interface AgentResult {
    - Provider-agnostic
    - Good for self-hosted setups
 
-6. **Gemini CLI**
-   - CLI wrapper needed
-   - Less integration depth
-   - Good as fallback
-
-7. **Junie** (lowest priority)
-   - No API currently
-   - Wait for ACP protocol
-
 ---
 
 ## Common Patterns
@@ -712,7 +600,7 @@ interface AgentResult {
 All major agents support or are moving toward **Model Context Protocol (MCP)**:
 - Claude Code: Native MCP support
 - Codex: MCP server mode
-- Gemini CLI: MCP server support
+- Jules: MCP via Gemini
 - OpenCode: MCP integration
 - Cursor: MCP via extensions
 
@@ -740,8 +628,6 @@ Most SDKs support streaming:
 3. **Implement Cursor REST client** - For GitHub workflows
 4. **Add Jules REST client** - For async cloud tasks
 5. **Evaluate OpenCode** - For provider flexibility
-6. **CLI wrapper for Gemini** - Fallback option
-7. **Monitor Junie ACP** - Future integration
 
 ---
 
@@ -764,21 +650,10 @@ Most SDKs support streaming:
 - [Cloud Agents Overview](https://cursor.com/docs/cloud-agent)
 - [Cursor API Docs](https://cursor.com/docs/api)
 
-### Gemini
-- [Gemini CLI Documentation](https://geminicli.com/docs/)
-- [Headless Mode](https://geminicli.com/docs/cli/headless/)
-- [GitHub Repository](https://github.com/google-gemini/gemini-cli)
-- [Gemini Code Assist Agent Mode](https://developers.google.com/gemini-code-assist/docs/agent-mode)
-
 ### OpenCode
 - [OpenCode Documentation](https://opencode.ai/docs/)
 - [OpenCode SDK](https://opencode.ai/docs/sdk/)
 - [GitHub Repository](https://github.com/opencode-ai/opencode)
-
-### Junie
-- [Junie Overview](https://www.jetbrains.com/junie/)
-- [Getting Started with Junie](https://www.jetbrains.com/help/junie/get-started-with-junie.html)
-- [Bring Your Own Agent](https://blog.jetbrains.com/ai/2025/12/bring-your-own-ai-agent-to-jetbrains-ides/)
 
 ### Jules
 - [Jules Homepage](https://jules.google/)
