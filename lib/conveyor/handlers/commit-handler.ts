@@ -1,6 +1,8 @@
 import { handle } from '@/lib/main/shared'
 import {
   getCommitHistory,
+  getCommitHistoryForRef,
+  getCommitDetails,
   getWorkingStatus,
   resetToCommit,
   getCommitGraphHistory,
@@ -19,6 +21,22 @@ export const registerCommitHandlers = () => {
       return await getCommitHistory(limit)
     } catch (_error) {
       return []
+    }
+  })
+
+  handle('get-commit-history-for-ref', async (ref: string, limit?: number) => {
+    try {
+      return await getCommitHistoryForRef(ref, limit)
+    } catch (_error) {
+      return []
+    }
+  })
+
+  handle('get-commit-details', async (commitHash: string) => {
+    try {
+      return await getCommitDetails(commitHash)
+    } catch (_error) {
+      return null
     }
   })
 
