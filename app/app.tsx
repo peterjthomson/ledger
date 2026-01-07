@@ -1465,7 +1465,7 @@ export default function App() {
     sidebarFocus, workingStatus, currentBranch, refresh, switching, deleting, renaming,
     formatRelativeTime, formatDate, handlePRCheckout, handleBranchDoubleClick,
     handleRemoteBranchDoubleClick, handleWorktreeDoubleClick, handleDeleteBranch, handleRenameBranch,
-    handleDeleteRemoteBranch, branches, repoPath, worktrees, handleSidebarFocus,
+    handleDeleteRemoteBranch, branches, repoPath, worktrees, pullRequests, handleSidebarFocus,
     selectedCommit, loadingDiff, commitDiff
   ])
 
