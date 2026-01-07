@@ -10,6 +10,7 @@
 | **Claude Code** | ✅ Full SDK (TS/Python) + CLI | CLI (`-p` flag) or SDK `query()` | Production |
 | **OpenAI Codex** | ✅ Full SDK (TypeScript) | SDK threads or CLI `exec` | Production |
 | **Cursor** | ✅ REST API (Cloud Agents) | HTTP POST to `/v0/agents` | Beta |
+| **Jules** | ✅ REST API + CLI | HTTP POST to `/v1alpha/sessions` | Alpha |
 | **Gemini CLI** | ⚠️ CLI only (headless mode) | CLI with `--output-format json` | Production |
 | **OpenCode** | ✅ SDK (TypeScript) | SDK sessions + chat | Production |
 | **Junie** | ❌ No public API | IDE plugin / ACP protocol | No API |
@@ -470,7 +471,154 @@ For Junie integration, the best current approach is:
 
 ---
 
-## 7. Conductor (Melty Labs)
+## 7. Jules (Google)
+
+### Overview
+Jules is Google's **fully asynchronous** remote coding agent. Unlike IDE-based assistants, Jules works autonomously in the cloud—cloning your repo, editing code in a secure VM, running tests, and opening pull requests. Powered by Gemini 2.5/3 Pro.
+
+### Key Characteristics
+- **Async by design**: Dispatch a task and check back later
+- **Cloud VMs**: Runs in isolated Ubuntu environments
+- **GitHub-native**: Works directly with GitHub repos
+- **Auto-PR**: Creates pull requests when complete
+
+### Authentication
+```typescript
+// Get API key from Jules web app → Settings
+const headers = {
+  'X-Goog-Api-Key': process.env.JULES_API_KEY,
+  'Content-Type': 'application/json'
+};
+```
+
+### API Endpoints (v1alpha)
+
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `GET /v1alpha/sources` | List | List connected GitHub repos |
+| `POST /v1alpha/sessions` | **Create** | Create new coding session |
+| `GET /v1alpha/sessions/{id}` | Status | Get session status |
+| `GET /v1alpha/sessions/{id}/activities` | Activities | List session activities |
+| `POST /v1alpha/sessions/{id}:sendMessage` | Message | Send follow-up message |
+| `POST /v1alpha/sessions/{id}:approvePlan` | Approve | Approve pending plan |
+
+### Dispatch Method: REST API
+
+```typescript
+const JULES_API = 'https://jules.googleapis.com/v1alpha';
+
+// 1. Create a session (dispatch task)
+const response = await fetch(`${JULES_API}/sessions`, {
+  method: 'POST',
+  headers,
+  body: JSON.stringify({
+    prompt: "Fix the authentication bug in src/auth.ts",
+    sourceContext: {
+      source: "sources/github/owner/repo",
+      branch: "main"
+    },
+    requirePlanApproval: false  // Set true for human-in-the-loop
+  })
+});
+
+const session = await response.json();
+// { name: "sessions/abc123", state: "ACTIVE", ... }
+```
+
+### Polling for Activities
+```typescript
+// 2. Check session activities for progress/completion
+async function getSessionActivities(sessionId: string) {
+  const res = await fetch(
+    `${JULES_API}/sessions/${sessionId}/activities`,
+    { headers }
+  );
+  return res.json();
+}
+
+// Activities include: plan generation, code changes, test runs, PR creation
+```
+
+### Send Follow-up Message
+```typescript
+// 3. Send additional instructions during session
+await fetch(`${JULES_API}/sessions/${sessionId}:sendMessage`, {
+  method: 'POST',
+  headers,
+  body: JSON.stringify({
+    message: "Also add unit tests for the changes"
+  })
+});
+```
+
+### Approve Plan (if requirePlanApproval=true)
+```typescript
+await fetch(`${JULES_API}/sessions/${sessionId}:approvePlan`, {
+  method: 'POST',
+  headers
+});
+```
+
+### Jules Tools CLI
+```bash
+# Install Jules CLI
+npm install -g @google/jules-tools
+
+# List connected repos
+jules sources list
+
+# Create a task
+jules task create "Fix the TypeScript errors" --repo owner/repo
+
+# Check task status
+jules task status <task-id>
+
+# List recent tasks
+jules task list
+```
+
+### Alternative: GitHub Label Dispatch
+```markdown
+# In a GitHub issue, add the "jules" label
+# Jules will automatically:
+# 1. Fetch the repository
+# 2. Clone to a cloud VM
+# 3. Generate a plan
+# 4. Implement the fix
+# 5. Open a PR
+```
+
+### Key Features
+- **Async execution**: Fire-and-forget task dispatch
+- **Cloud VMs**: Secure, isolated execution environment
+- **Auto-dependency**: Installs project dependencies automatically
+- **AGENTS.md support**: Reads repo-specific instructions
+- **Plan approval**: Optional human-in-the-loop for plans
+- **GitHub integration**: Direct PR creation
+- **Slack/Linear webhooks**: Integration with project tools
+
+### Pricing Tiers
+- **Free**: 15 daily tasks, 3 concurrent
+- **AI Pro** ($19.99/mo): Higher limits
+- **AI Ultra** ($124.99/mo): Maximum limits
+
+### Limitations
+- **Alpha API**: Specifications may change
+- **GitHub only**: No local repo support
+- **Async only**: No real-time streaming (poll for status)
+- **Rate limits**: API key limits apply
+
+### Resources
+- [Jules Homepage](https://jules.google/)
+- [Jules API Documentation](https://developers.google.com/jules/api)
+- [API Reference](https://jules.google/docs/api/reference/)
+- [Sessions Reference](https://jules.google/docs/api/reference/sessions/)
+- [Jules Tools CLI](https://developers.googleblog.com/en/meet-jules-tools-a-command-line-companion-for-googles-async-coding-agent/)
+- [Getting Started](https://jules.google/docs/)
+
+---
+
+## 8. Conductor (Melty Labs)
 
 ### Overview
 Conductor is a macOS app that runs multiple Claude Code instances in parallel. It uses Claude Code under the hood and doesn't have its own API.
@@ -497,7 +645,7 @@ Since Conductor wraps Claude Code, dispatch to Conductor effectively means:
 
 ```typescript
 interface AgentDispatcher {
-  type: 'claude' | 'codex' | 'cursor' | 'gemini' | 'opencode';
+  type: 'claude' | 'codex' | 'cursor' | 'jules' | 'gemini' | 'opencode';
   dispatch(task: AgentTask): Promise<AgentResult>;
   getStatus(taskId: string): Promise<AgentStatus>;
   cancel(taskId: string): Promise<void>;
@@ -537,17 +685,22 @@ interface AgentResult {
    - GitHub-only limitation
    - Good for cloud-native workflows
 
-4. **OpenCode**
+4. **Jules**
+   - REST API available (alpha)
+   - Async/cloud-native model
+   - Good for fire-and-forget tasks
+
+5. **OpenCode**
    - Full SDK available
    - Provider-agnostic
    - Good for self-hosted setups
 
-5. **Gemini CLI**
+6. **Gemini CLI**
    - CLI wrapper needed
    - Less integration depth
    - Good as fallback
 
-6. **Junie** (lowest priority)
+7. **Junie** (lowest priority)
    - No API currently
    - Wait for ACP protocol
 
@@ -575,6 +728,7 @@ Most SDKs support streaming:
 - Claude: Async iterator from `query()`
 - Codex: `runStreamed()` returns event generator
 - Cursor: Polling + webhooks
+- Jules: Polling activities + webhooks
 - OpenCode: SSE via `event.subscribe()`
 
 ---
@@ -584,9 +738,10 @@ Most SDKs support streaming:
 1. **Prototype Claude Code integration** - Most complete SDK
 2. **Add Codex support** - Similar patterns to Claude
 3. **Implement Cursor REST client** - For GitHub workflows
-4. **Evaluate OpenCode** - For provider flexibility
-5. **CLI wrapper for Gemini** - Fallback option
-6. **Monitor Junie ACP** - Future integration
+4. **Add Jules REST client** - For async cloud tasks
+5. **Evaluate OpenCode** - For provider flexibility
+6. **CLI wrapper for Gemini** - Fallback option
+7. **Monitor Junie ACP** - Future integration
 
 ---
 
@@ -624,6 +779,14 @@ Most SDKs support streaming:
 - [Junie Overview](https://www.jetbrains.com/junie/)
 - [Getting Started with Junie](https://www.jetbrains.com/help/junie/get-started-with-junie.html)
 - [Bring Your Own Agent](https://blog.jetbrains.com/ai/2025/12/bring-your-own-ai-agent-to-jetbrains-ides/)
+
+### Jules
+- [Jules Homepage](https://jules.google/)
+- [Jules API Documentation](https://developers.google.com/jules/api)
+- [API Reference](https://jules.google/docs/api/reference/)
+- [Sessions Reference](https://jules.google/docs/api/reference/sessions/)
+- [Jules Tools CLI](https://developers.googleblog.com/en/meet-jules-tools-a-command-line-companion-for-googles-async-coding-agent/)
+- [Jules Announcement](https://blog.google/technology/google-labs/jules-tools-jules-api/)
 
 ### Conductor
 - [Conductor by Melty Labs](https://www.conductor.build/)
