@@ -48,8 +48,11 @@
     ]
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.50.0",
+    "@google/generative-ai": "^0.21.0",
     "@electron-toolkit/preload": "^3.0.2",
     "@electron-toolkit/utils": "^4.0.0",
+    "openai": "^4.76.0",
     "@radix-ui/react-slot": "^1.2.3",
     "better-sqlite3": "^11.7.0",
     "class-variance-authority": "^0.7.1",

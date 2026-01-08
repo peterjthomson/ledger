@@ -1,6 +1,7 @@
 import { app, dialog } from 'electron';
 import * as fs from 'fs';
 import * as path from 'path';
+import type { AISettings } from './ai/types';
 
 type ViewMode = 'columns' | 'work';
 type ThemeMode = 'light' | 'dark' | 'system' | 'custom';
@@ -46,6 +47,8 @@ interface Settings {
   // Canvas settings
   canvases?: CanvasConfig[];
   activeCanvasId?: string;
+  // AI settings
+  ai?: AISettings;
 }
 
 // Allow tests (and power users) to override the settings location to avoid coupling to
@@ -296,5 +299,82 @@ export function removeRecentRepo(repoPath: string): void {
   const settings = loadSettings() as Settings & { recentRepos?: string[] };
   (settings as Settings & { recentRepos: string[] }).recentRepos = (settings.recentRepos || []).filter((p) => p !== repoPath);
   saveSettings(settings);
+}
+
+// AI Settings functions
+export function getAISettings(): AISettings | null {
+  const settings = loadSettings();
+  return settings.ai || null;
+}
+
+export function saveAISettings(aiSettings: AISettings): void {
+  const settings = loadSettings();
+  settings.ai = aiSettings;
+  saveSettings(settings);
+}
+
+export function updateAISettings(updates: Partial<AISettings>): AISettings {
+  const settings = loadSettings();
+  const currentAI = settings.ai || {
+    providers: {},
+    defaults: {
+      provider: 'anthropic',
+      models: {
+        quick: 'claude-3-5-haiku-20241022',
+        balanced: 'claude-sonnet-4-20250514',
+        powerful: 'claude-opus-4-20250514',
+      },
+    },
+  };
+
+  settings.ai = { ...currentAI, ...updates };
+  saveSettings(settings);
+  return settings.ai;
+}
+
+export function setAIProviderKey(
+  provider: 'anthropic' | 'openai' | 'gemini',
+  apiKey: string,
+  enabled: boolean = true,
+  organization?: string
+): void {
+  const settings = loadSettings();
+  const currentAI = settings.ai || {
+    providers: {},
+    defaults: {
+      provider: 'anthropic',
+      models: {
+        quick: 'claude-3-5-haiku-20241022',
+        balanced: 'claude-sonnet-4-20250514',
+        powerful: 'claude-opus-4-20250514',
+      },
+    },
+  };
+
+  currentAI.providers = currentAI.providers || {};
+  currentAI.providers[provider] = {
+    apiKey,
+    enabled,
+    ...(organization && { organization }),
+  };
+
+  settings.ai = currentAI;
+  saveSettings(settings);
+}
+
+export function removeAIProviderKey(provider: 'anthropic' | 'openai' | 'gemini'): void {
+  const settings = loadSettings();
+  if (settings.ai?.providers) {
+    delete settings.ai.providers[provider];
+    saveSettings(settings);
+  }
+}
+
+export function setDefaultAIProvider(provider: 'anthropic' | 'openai' | 'gemini'): void {
+  const settings = loadSettings();
+  if (settings.ai) {
+    settings.ai.defaults.provider = provider;
+    saveSettings(settings);
+  }
 }
 
