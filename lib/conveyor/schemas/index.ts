@@ -11,6 +11,7 @@ import { stagingIpcSchema } from './staging-schema'
 import { themeIpcSchema } from './theme-schema'
 import { pluginIpcSchema } from './plugin-schema'
 import { aiIpcSchema } from './ai-schema'
+import { notionIpcSchema } from './notion-schema'
 
 // Define all IPC channel schemas in one place
 export const ipcSchemas = {
@@ -26,6 +27,7 @@ export const ipcSchemas = {
   ...themeIpcSchema,
   ...pluginIpcSchema,
   ...aiIpcSchema,
+  ...notionIpcSchema,
 } as const
 
 // Extract types from Zod schemas

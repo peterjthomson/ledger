@@ -2,6 +2,7 @@ import { app, dialog } from 'electron';
 import * as fs from 'fs';
 import * as path from 'path';
 import type { AISettings } from './ai/types';
+import type { NotionSettings } from './notion/types';
 
 type ViewMode = 'columns' | 'work';
 type ThemeMode = 'light' | 'dark' | 'system' | 'custom';
@@ -49,6 +50,8 @@ interface Settings {
   activeCanvasId?: string;
   // AI settings
   ai?: AISettings;
+  // Notion settings
+  notion?: NotionSettings;
 }
 
 // Allow tests (and power users) to override the settings location to avoid coupling to
@@ -374,6 +377,43 @@ export function setDefaultAIProvider(provider: 'anthropic' | 'openai' | 'gemini'
   const settings = loadSettings();
   if (settings.ai) {
     settings.ai.defaults.provider = provider;
+    saveSettings(settings);
+  }
+}
+
+// Notion Settings functions
+export function getNotionSettings(): NotionSettings | null {
+  const settings = loadSettings();
+  return settings.notion || null;
+}
+
+export function saveNotionSettings(notionSettings: NotionSettings): void {
+  const settings = loadSettings();
+  settings.notion = notionSettings;
+  saveSettings(settings);
+}
+
+export function updateNotionSettings(updates: Partial<NotionSettings>): NotionSettings {
+  const settings = loadSettings();
+  const currentNotion = settings.notion || {};
+
+  settings.notion = { ...currentNotion, ...updates };
+  saveSettings(settings);
+  return settings.notion;
+}
+
+export function setNotionApiKey(apiKey: string): void {
+  const settings = loadSettings();
+  settings.notion = settings.notion || {};
+  settings.notion.apiKey = apiKey;
+  saveSettings(settings);
+}
+
+export function removeNotionApiKey(): void {
+  const settings = loadSettings();
+  if (settings.notion) {
+    delete settings.notion.apiKey;
+    delete settings.notion.workspaceName;
     saveSettings(settings);
   }
 }

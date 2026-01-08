@@ -25,6 +25,7 @@ import './example-plugin-styles.css'
 export { TeamDashboardApp } from './TeamDashboardApp'
 export { AIReviewApp } from './AIReviewApp'
 export { AgentEventsInboxApp } from './AgentEventsInboxApp'
+export { NotionViewerApp } from './NotionViewerApp'
 
 // Panel Components
 export { PRReviewQueuePanel } from './PRReviewQueuePanel'
@@ -56,6 +57,10 @@ export function registerExampleComponents(
 
   import('./AgentEventsInboxApp').then(({ AgentEventsInboxApp }) => {
     registry.register('AgentEventsInboxApp', 'app', AgentEventsInboxApp)
+  })
+
+  import('./NotionViewerApp').then(({ NotionViewerApp }) => {
+    registry.register('NotionViewerApp', 'app', NotionViewerApp)
   })
 
   import('./PRReviewQueuePanel').then(({ PRReviewQueuePanel }) => {

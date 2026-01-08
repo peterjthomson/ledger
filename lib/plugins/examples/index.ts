@@ -23,6 +23,9 @@ export { teamDashboardPlugin } from './team-dashboard-app'
 /** Agent Events Inbox - Real-time agent event monitoring */
 export { agentEventsInboxPlugin } from './agent-events-inbox-app'
 
+/** Notion Viewer - Browse Notion databases and cards */
+export { notionViewerAppPlugin } from './notion-viewer-app'
+
 // ============================================================================
 // Panel Plugins
 // ============================================================================
@@ -69,6 +72,7 @@ export { commitAnalyzerPlugin } from './commit-analyzer-plugin'
 import { aiReviewAppPlugin } from './ai-review-app'
 import { teamDashboardPlugin } from './team-dashboard-app'
 import { agentEventsInboxPlugin } from './agent-events-inbox-app'
+import { notionViewerAppPlugin } from './notion-viewer-app'
 import { aiChatPanelPlugin } from './ai-chat-panel'
 import { prReviewQueuePlugin } from './pr-review-queue-panel'
 import { standupNotesPlugin } from './standup-notes-panel'
@@ -86,6 +90,7 @@ export const examplePlugins = [
   aiReviewAppPlugin,
   teamDashboardPlugin,
   agentEventsInboxPlugin,
+  notionViewerAppPlugin,
   // Panels
   aiChatPanelPlugin,
   prReviewQueuePlugin,
@@ -103,7 +108,7 @@ export const examplePlugins = [
  * Example plugins by type
  */
 export const examplePluginsByType = {
-  app: [aiReviewAppPlugin, teamDashboardPlugin, agentEventsInboxPlugin],
+  app: [aiReviewAppPlugin, teamDashboardPlugin, agentEventsInboxPlugin, notionViewerAppPlugin],
   panel: [aiChatPanelPlugin, prReviewQueuePlugin, standupNotesPlugin, repositoryManagerPlugin],
   widget: [commitSuggesterWidgetPlugin, branchHealthWidgetPlugin],
   service: [autoFetchServicePlugin, slackNotificationsPlugin],

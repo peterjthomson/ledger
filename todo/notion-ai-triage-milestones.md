@@ -13,7 +13,7 @@ Building AI-powered card triage for Notion databases in 4 layers:
 | Layer | Name | Status | Commit |
 |-------|------|--------|--------|
 | 0 | Core AI Infrastructure | Complete | 4e3b6a4 |
-| 1 | Notion Database Viewer | Pending | - |
+| 1 | Notion Database Viewer | Complete | 3387ab6 |
 | 2 | Card Actions (Write-back) | Pending | - |
 | 3 | Pokemon Triage Game | Pending | - |
 
@@ -70,17 +70,17 @@ package.json                    # Add SDK dependencies
 
 ### Milestones
 
-- [ ] **1.1** Add Notion SDK dependency
-- [ ] **1.2** Create Notion service with API wrapper
-- [ ] **1.3** Handle 2025-09-03 API changes (data_source_id)
-- [ ] **1.4** Add Notion settings to settings service
-- [ ] **1.5** Create IPC schemas and handlers
-- [ ] **1.6** Create viewer plugin structure
-- [ ] **1.7** Build DatabasePicker component
-- [ ] **1.8** Build CardList component
-- [ ] **1.9** Build CardDetail component
-- [ ] **1.10** Lint, test, self-inspect
-- [ ] **1.11** Atomic commit for Layer 1
+- [x] **1.1** Add Notion SDK dependency
+- [x] **1.2** Create Notion service with API wrapper
+- [x] **1.3** Handle 2025-09-03 API changes (data_source_id)
+- [x] **1.4** Add Notion settings to settings service
+- [x] **1.5** Create IPC schemas and handlers
+- [x] **1.6** Create viewer plugin structure
+- [x] **1.7** Build DatabasePicker component
+- [x] **1.8** Build CardList component
+- [x] **1.9** Build CardDetail component
+- [x] **1.10** Lint, test, self-inspect
+- [x] **1.11** Atomic commit for Layer 1
 
 ---
 
@@ -154,5 +154,28 @@ After each layer:
   - Created IPC schemas (ai-schema.ts) with Zod validation
   - Created IPC handlers (ai-handler.ts)
   - Created renderer API (ai-api.ts)
+  - TypeScript compiles without errors
+
+- **Layer 1 Complete:**
+  - Added @notionhq/client SDK dependency
+  - Created Notion service types (lib/main/notion/types.ts)
+  - Created Notion service with full API wrapper (lib/main/notion/notion-service.ts)
+    - Database listing and retrieval
+    - Card querying with pagination and filtering
+    - Card detail fetching with content blocks
+    - Property value transformation for display
+    - Block to markdown conversion
+    - Markdown to blocks conversion for writing
+  - Added Notion settings to settings-service.ts (getNotionSettings, saveNotionSettings, etc.)
+  - Created IPC schemas (lib/conveyor/schemas/notion-schema.ts) with Zod validation
+  - Created IPC handlers (lib/conveyor/handlers/notion-handler.ts)
+  - Created renderer API (lib/conveyor/api/notion-api.ts)
+  - Created Notion Viewer App plugin (lib/plugins/examples/notion-viewer-app.ts)
+  - Built NotionViewerApp React component with:
+    - DatabasesView (DatabasePicker) - Browse and select databases
+    - CardsView (CardList) - Paginated card list with search
+    - CardDetailView - Full card details with properties and content
+  - Registered plugin and component in the plugin system
+  - Lint passes (0 errors, 4 warnings in pre-existing code)
   - TypeScript compiles without errors
 
