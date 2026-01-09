@@ -267,12 +267,12 @@ export function AISettingsSection() {
   )
 
   return (
-    <div className="settings-section settings-section-ai">
+    <div className="settings-section settings-section-ai" data-testid="ai-settings-section">
       <h4 className="settings-section-title">AI Providers</h4>
       <p className="settings-hint">Configure API keys for AI-powered features. OpenRouter provides free models with no API key required.</p>
 
       {/* Provider Cards */}
-      <div className="ai-provider-list">
+      <div className="ai-provider-list" data-testid="ai-provider-list">
         {(['openrouter', 'anthropic', 'openai', 'gemini'] as AIProvider[]).map((provider) => {
           const info = PROVIDER_INFO[provider]
           const configured = isProviderConfigured(provider)
@@ -286,8 +286,9 @@ export function AISettingsSection() {
             <div
               key={provider}
               className={`ai-provider-card ${configured ? 'configured' : ''} ${isExpanded ? 'expanded' : ''} ${isFreeProvider ? 'free-tier' : ''}`}
+              data-testid={`ai-provider-card-${provider}`}
             >
-              <div className="ai-provider-header" onClick={() => toggleExpanded(provider)}>
+              <div className="ai-provider-header" onClick={() => toggleExpanded(provider)} data-testid={`ai-provider-header-${provider}`}>
                 <div className="ai-provider-status">
                   <span className={`ai-provider-dot ${configured ? 'active' : ''}`} />
                   <span className="ai-provider-name">{info.name}</span>
@@ -298,6 +299,7 @@ export function AISettingsSection() {
                   {configured && testResult.status === 'idle' && (
                     <button
                       className="ai-test-btn"
+                      data-testid={`ai-test-btn-${provider}`}
                       onClick={(e) => {
                         e.stopPropagation()
                         handleTestConnection(provider)
@@ -309,13 +311,13 @@ export function AISettingsSection() {
                     </button>
                   )}
                   {testResult.status === 'testing' && (
-                    <span className="ai-test-status testing">Testing...</span>
+                    <span className="ai-test-status testing" data-testid={`ai-test-status-${provider}`}>Testing...</span>
                   )}
                   {testResult.status === 'success' && (
-                    <span className="ai-test-status success">✓ Connected</span>
+                    <span className="ai-test-status success" data-testid={`ai-test-status-${provider}`}>✓ Connected</span>
                   )}
                   {testResult.status === 'error' && (
-                    <span className="ai-test-status error" title={testResult.message}>
+                    <span className="ai-test-status error" data-testid={`ai-test-status-${provider}`} title={testResult.message}>
                       ✗ Failed
                     </span>
                   )}

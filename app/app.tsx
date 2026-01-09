@@ -245,6 +245,7 @@ export default function App() {
       <button
         key="settings"
         className={`panel-toggle-btn ${isSettingsActive ? 'active' : ''}`}
+        data-testid="settings-button"
         onClick={() => {
           if (isSettingsActive) {
             // Already showing settings in Focus - toggle back to history
