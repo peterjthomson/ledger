@@ -27,8 +27,8 @@ export class AIApi extends ConveyorApi {
 
   // Provider status
   getConfiguredProviders = () => this.invoke('ai:get-configured-providers')
-  isProviderConfigured = (provider: AIProvider) =>
-    this.invoke('ai:is-provider-configured', provider)
+  isProviderAvailable = (provider: AIProvider) =>
+    this.invoke('ai:is-provider-available', provider)
 
   // Models
   getModels = () => this.invoke('ai:get-models')

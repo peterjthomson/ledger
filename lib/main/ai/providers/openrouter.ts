@@ -218,30 +218,48 @@ export class OpenRouterProvider implements AIProviderInterface {
     const modelId = options.model || OPENROUTER_DEFAULTS.balanced
     const convertedMessages = this.convertMessages(messages, options)
 
-    const response = await this.client!.chat.completions.create({
-      model: modelId,
-      messages: convertedMessages,
-      ...(options.maxTokens && { max_tokens: options.maxTokens }),
-      ...(options.temperature !== undefined && { temperature: options.temperature }),
-      ...(options.stopSequences && { stop: options.stopSequences }),
-    })
+    try {
+      const response = await this.client!.chat.completions.create({
+        model: modelId,
+        messages: convertedMessages,
+        ...(options.maxTokens && { max_tokens: options.maxTokens }),
+        ...(options.temperature !== undefined && { temperature: options.temperature }),
+        ...(options.stopSequences && { stop: options.stopSequences }),
+      })
 
-    const choice = response.choices?.[0]
-    const content = choice?.message?.content || ''
+      const choice = response.choices?.[0]
+      const content = choice?.message?.content || ''
 
-    // Handle usage - may be undefined or have different field names
-    const usage: AIUsage = {
-      inputTokens: response.usage?.prompt_tokens ?? response.usage?.input_tokens ?? 0,
-      outputTokens: response.usage?.completion_tokens ?? response.usage?.output_tokens ?? 0,
-      estimatedCost: 0, // Free models
-    }
+      // Handle usage - may be undefined or have different field names
+      const usage: AIUsage = {
+        inputTokens: response.usage?.prompt_tokens ?? response.usage?.input_tokens ?? 0,
+        outputTokens: response.usage?.completion_tokens ?? response.usage?.output_tokens ?? 0,
+        estimatedCost: 0, // Free models
+      }
 
-    return {
-      content,
-      model: response.model || modelId,
-      provider: 'openrouter' as const,
-      usage,
-      finishReason: this.mapFinishReason(choice?.finish_reason || null),
+      return {
+        content,
+        model: response.model || modelId,
+        provider: 'openrouter' as const,
+        usage,
+        finishReason: this.mapFinishReason(choice?.finish_reason || null),
+      }
+    } catch (error) {
+      // Handle specific network and API errors with user-friendly messages
+      const err = error as { code?: string; status?: number; message?: string }
+      if (err.code === 'ENOTFOUND' || err.code === 'ETIMEDOUT' || err.code === 'ECONNREFUSED') {
+        throw new Error('OpenRouter/OpenCode Zen is currently unavailable. Please check your internet connection and try again.')
+      }
+      if (err.status === 429) {
+        throw new Error('Rate limit exceeded. Please wait a moment and try again.')
+      }
+      if (err.status === 401) {
+        throw new Error('Invalid API key. Please check your OpenRouter API key in settings.')
+      }
+      if (err.status === 503 || err.status === 502) {
+        throw new Error('OpenRouter/OpenCode Zen service is temporarily unavailable. Please try again later.')
+      }
+      throw error
     }
   }
 

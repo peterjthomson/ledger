@@ -102,9 +102,11 @@ class AIService {
   }
 
   /**
-   * Check if a provider is configured and ready
+   * Check if a provider is available and ready to handle requests.
+   * Note: OpenRouter is always available via free tier (OpenCode Zen).
+   * For checking user-configured providers only, use getConfiguredProviders().
    */
-  isProviderConfigured(provider: AIProvider): boolean {
+  isProviderAvailable(provider: AIProvider): boolean {
     switch (provider) {
       case 'anthropic':
         return anthropicProvider.isConfigured()
@@ -170,8 +172,8 @@ class AIService {
       if (!model) {
         throw new Error(`Unknown model: ${options.model}`)
       }
-      // If the model's provider is configured, use it
-      if (this.isProviderConfigured(model.provider)) {
+      // If the model's provider is available, use it
+      if (this.isProviderAvailable(model.provider)) {
         return { modelId: options.model, provider: model.provider }
       }
       // Otherwise, fall through to fallback logic
@@ -182,17 +184,17 @@ class AIService {
       if (options.provider === 'openrouter') {
         return { modelId: DEFAULT_MODELS.openrouter.balanced, provider: 'openrouter' }
       }
-      // Check if the explicit provider is configured
-      if (this.isProviderConfigured(options.provider)) {
+      // Check if the explicit provider is available
+      if (this.isProviderAvailable(options.provider)) {
         const modelId = this.settings.defaults.models.balanced
         return { modelId, provider: options.provider }
       }
       // Otherwise, fall through to fallback logic
     }
 
-    // Check if the default provider is configured
+    // Check if the default provider is available
     const defaultProvider = this.settings.defaults.provider
-    if (this.isProviderConfigured(defaultProvider)) {
+    if (this.isProviderAvailable(defaultProvider)) {
       return {
         modelId: this.settings.defaults.models.balanced,
         provider: defaultProvider,
@@ -257,7 +259,7 @@ class AIService {
     const { modelId, provider } = this.resolveModelAndProvider(options)
 
     // OpenRouter is always available (free tier via OpenCode Zen)
-    if (provider !== 'openrouter' && !this.isProviderConfigured(provider)) {
+    if (provider !== 'openrouter' && !this.isProviderAvailable(provider)) {
       throw new Error(
         `Provider ${provider} is not configured. Please add an API key in settings.`
       )
@@ -284,7 +286,7 @@ class AIService {
     const { modelId, provider } = this.resolveModelAndProvider(options)
 
     // OpenRouter is always available (free tier via OpenCode Zen)
-    if (provider !== 'openrouter' && !this.isProviderConfigured(provider)) {
+    if (provider !== 'openrouter' && !this.isProviderAvailable(provider)) {
       throw new Error(
         `Provider ${provider} is not configured. Please add an API key in settings.`
       )
@@ -301,9 +303,9 @@ class AIService {
    * Get the model for a tier, respecting provider override and configuration status
    */
   private getModelForTier(tier: 'quick' | 'balanced' | 'powerful', provider?: AIProvider): { modelId: string; provider: AIProvider } {
-    // If provider is specified and configured, use its model for this tier
+    // If provider is specified and available, use its model for this tier
     if (provider) {
-      if (provider === 'openrouter' || this.isProviderConfigured(provider)) {
+      if (provider === 'openrouter' || this.isProviderAvailable(provider)) {
         return {
           modelId: DEFAULT_MODELS[provider][tier],
           provider,
@@ -312,9 +314,9 @@ class AIService {
       // Provider specified but not configured, fall through to fallback
     }
 
-    // Check if default provider is configured
+    // Check if default provider is available
     const defaultProvider = this.settings.defaults.provider
-    if (this.isProviderConfigured(defaultProvider)) {
+    if (this.isProviderAvailable(defaultProvider)) {
       return {
         modelId: this.settings.defaults.models[tier],
         provider: defaultProvider,
