@@ -42,6 +42,20 @@ const PluginInstallResultSchema = z.object({
   message: z.string().optional(),
 })
 
+// Plugin storage options schema (mirrors lib/data PluginStorageOptions)
+const PluginStorageOptionsSchema = z
+  .object({
+    ttl: z.number().optional(),
+  })
+  .optional()
+
+const PluginDataInfoSchema = z.object({
+  pluginId: z.string(),
+  path: z.string(),
+  sizeBytes: z.number(),
+  connected: z.boolean(),
+})
+
 export const pluginIpcSchema = {
   // List installed plugins
   'plugin-list-installed': {
@@ -101,5 +115,57 @@ export const pluginIpcSchema = {
   'plugin-download': {
     args: z.tuple([z.string(), z.string()]), // url, targetPath
     return: SuccessResultSchema,
+  },
+
+  // ===========================================================================
+  // Plugin Data Storage (SQLite-backed)
+  // ===========================================================================
+
+  'plugin-data-get': {
+    args: z.tuple([z.string(), z.string()]), // pluginId, key
+    return: z.object({
+      success: z.boolean(),
+      data: z.unknown().nullable().optional(),
+      message: z.string().optional(),
+    }),
+  },
+  'plugin-data-set': {
+    args: z.tuple([z.string(), z.string(), z.unknown(), PluginStorageOptionsSchema]), // pluginId, key, value, options?
+    return: z.object({
+      success: z.boolean(),
+      message: z.string().optional(),
+    }),
+  },
+  'plugin-data-delete': {
+    args: z.tuple([z.string(), z.string()]), // pluginId, key
+    return: z.object({
+      success: z.boolean(),
+      deleted: z.boolean().optional(),
+      message: z.string().optional(),
+    }),
+  },
+  'plugin-data-keys': {
+    args: z.tuple([z.string()]), // pluginId
+    return: z.object({
+      success: z.boolean(),
+      keys: z.array(z.string()),
+      message: z.string().optional(),
+    }),
+  },
+  'plugin-data-clear': {
+    args: z.tuple([z.string()]), // pluginId
+    return: z.object({
+      success: z.boolean(),
+      count: z.number(),
+      message: z.string().optional(),
+    }),
+  },
+  'plugin-data-info': {
+    args: z.tuple([z.string()]), // pluginId
+    return: z.object({
+      success: z.boolean(),
+      info: PluginDataInfoSchema.optional(),
+      message: z.string().optional(),
+    }),
   },
 }

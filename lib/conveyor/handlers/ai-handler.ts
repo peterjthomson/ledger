@@ -115,11 +115,11 @@ export const registerAIHandlers = () => {
     }
   })
 
-  handle('ai:is-provider-configured', async (provider: AIProvider) => {
+  handle('ai:is-provider-available', async (provider: AIProvider) => {
     try {
-      return aiService.isProviderConfigured(provider)
+      return aiService.isProviderAvailable(provider)
     } catch (error) {
-      logHandlerError('ai:is-provider-configured', error)
+      logHandlerError('ai:is-provider-available', error)
       return false
     }
   })
@@ -207,6 +207,7 @@ export const registerAIHandlers = () => {
           anthropic: { cost: 0, requests: 0 },
           openai: { cost: 0, requests: 0 },
           gemini: { cost: 0, requests: 0 },
+          openrouter: { cost: 0, requests: 0 },
         },
       }
     }

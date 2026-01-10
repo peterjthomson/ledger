@@ -14,8 +14,13 @@ import type {
   CompletionOptions,
   StreamCallbacks,
 } from './types'
-import { anthropicProvider, openaiProvider, geminiProvider } from './providers'
-import { getModel, getDefaultModel, MODEL_REGISTRY } from './models'
+import {
+  anthropicProvider,
+  openaiProvider,
+  geminiProvider,
+  openrouterProvider,
+} from './providers'
+import { getModel, MODEL_REGISTRY, DEFAULT_MODELS } from './models'
 
 /**
  * Default AI settings
@@ -44,10 +49,35 @@ class AIService {
   private onSettingsChange?: (settings: AISettings) => void
 
   /**
+   * Normalize settings to preserve invariants.
+   * Invariant: defaults.models must belong to defaults.provider.
+   */
+  private normalizeSettings(settings: AISettings): AISettings {
+    const provider = settings.defaults.provider
+    const models = { ...settings.defaults.models }
+
+    ;(['quick', 'balanced', 'powerful'] as const).forEach((tier) => {
+      const modelId = models[tier]
+      const model = modelId ? getModel(modelId) : undefined
+      if (!model || model.provider !== provider) {
+        models[tier] = DEFAULT_MODELS[provider][tier]
+      }
+    })
+
+    return {
+      ...settings,
+      defaults: {
+        ...settings.defaults,
+        models,
+      },
+    }
+  }
+
+  /**
    * Initialize the service with settings and optional change callback
    */
   initialize(settings: AISettings, onSettingsChange?: (settings: AISettings) => void): void {
-    this.settings = { ...DEFAULT_AI_SETTINGS, ...settings }
+    this.settings = this.normalizeSettings({ ...DEFAULT_AI_SETTINGS, ...settings })
     this.onSettingsChange = onSettingsChange
 
     // Configure providers with stored API keys
@@ -71,13 +101,20 @@ class AIService {
     if (providers.gemini?.apiKey && providers.gemini.enabled) {
       geminiProvider.configure(providers.gemini.apiKey)
     }
+
+    if (providers.openrouter?.apiKey && providers.openrouter.enabled) {
+      openrouterProvider.configure(providers.openrouter.apiKey)
+    } else {
+      // Always configure OpenRouter for free tier (OpenCode Zen)
+      openrouterProvider.configure() // No API key = free tier
+    }
   }
 
   /**
    * Update settings
    */
   updateSettings(settings: Partial<AISettings>): void {
-    this.settings = { ...this.settings, ...settings }
+    this.settings = this.normalizeSettings({ ...this.settings, ...settings })
     this.configureProviders()
     this.onSettingsChange?.(this.settings)
   }
@@ -90,9 +127,11 @@ class AIService {
   }
 
   /**
-   * Check if a provider is configured and ready
+   * Check if a provider is available and ready to handle requests.
+   * Note: OpenRouter is always available via free tier (OpenCode Zen).
+   * For checking user-configured providers only, use getConfiguredProviders().
    */
-  isProviderConfigured(provider: AIProvider): boolean {
+  isProviderAvailable(provider: AIProvider): boolean {
     switch (provider) {
       case 'anthropic':
         return anthropicProvider.isConfigured()
@@ -100,20 +139,31 @@ class AIService {
         return openaiProvider.isConfigured()
       case 'gemini':
         return geminiProvider.isConfigured()
+      case 'openrouter':
+        return openrouterProvider.isConfigured()
       default:
         return false
     }
   }
 
   /**
-   * Get all configured providers
+   * Get all configured providers (excludes OpenRouter free tier from this list)
    */
   getConfiguredProviders(): AIProvider[] {
     const providers: AIProvider[] = []
     if (anthropicProvider.isConfigured()) providers.push('anthropic')
     if (openaiProvider.isConfigured()) providers.push('openai')
     if (geminiProvider.isConfigured()) providers.push('gemini')
+    // Only include OpenRouter if user has added their own API key
+    if (this.settings.providers.openrouter?.apiKey) providers.push('openrouter')
     return providers
+  }
+
+  /**
+   * Check if any provider is available
+   */
+  hasAnyProvider(): boolean {
+    return this.getConfiguredProviders().length > 0 || openrouterProvider.isConfigured()
   }
 
   /**
@@ -127,6 +177,8 @@ class AIService {
         return openaiProvider
       case 'gemini':
         return geminiProvider
+      case 'openrouter':
+        return openrouterProvider
       default:
         throw new Error(`Unknown provider: ${provider}`)
     }
@@ -134,30 +186,26 @@ class AIService {
 
   /**
    * Resolve the model and provider to use based on options and defaults
+   * Falls back to OpenRouter free tier if no provider is configured
    */
   private resolveModelAndProvider(
     options: CompletionOptions
   ): { modelId: string; provider: AIProvider } {
-    // If explicit model is provided, use it
+    // If explicit model is provided, check if its provider is configured
     if (options.model) {
       const model = getModel(options.model)
       if (!model) {
         throw new Error(`Unknown model: ${options.model}`)
       }
-      return { modelId: options.model, provider: model.provider }
+      // If the model's provider is available, use it
+      if (this.isProviderAvailable(model.provider)) {
+        return { modelId: options.model, provider: model.provider }
+      }
+      // Otherwise, fall through to fallback logic
     }
 
-    // If explicit provider is provided, use default model for that provider
-    if (options.provider) {
-      const modelId = this.settings.defaults.models.balanced
-      return { modelId, provider: options.provider }
-    }
-
-    // Use defaults
-    return {
-      modelId: this.settings.defaults.models.balanced,
-      provider: this.settings.defaults.provider,
-    }
+    // Otherwise, pick the balanced-tier model respecting provider override + fallbacks
+    return this.getModelForTier('balanced', options.provider)
   }
 
   /**
@@ -200,7 +248,8 @@ class AIService {
   ): Promise<AIResponse> {
     const { modelId, provider } = this.resolveModelAndProvider(options)
 
-    if (!this.isProviderConfigured(provider)) {
+    // OpenRouter is always available (free tier via OpenCode Zen)
+    if (provider !== 'openrouter' && !this.isProviderAvailable(provider)) {
       throw new Error(
         `Provider ${provider} is not configured. Please add an API key in settings.`
       )
@@ -226,7 +275,8 @@ class AIService {
   ): Promise<void> {
     const { modelId, provider } = this.resolveModelAndProvider(options)
 
-    if (!this.isProviderConfigured(provider)) {
+    // OpenRouter is always available (free tier via OpenCode Zen)
+    if (provider !== 'openrouter' && !this.isProviderAvailable(provider)) {
       throw new Error(
         `Provider ${provider} is not configured. Please add an API key in settings.`
       )
@@ -240,14 +290,55 @@ class AIService {
   }
 
   /**
+   * Get the model for a tier, respecting provider override and configuration status
+   */
+  private getModelForTier(tier: 'quick' | 'balanced' | 'powerful', provider?: AIProvider): { modelId: string; provider: AIProvider } {
+    // If provider is specified and available, use its model for this tier
+    if (provider) {
+      if (provider === 'openrouter' || this.isProviderAvailable(provider)) {
+        return {
+          modelId: DEFAULT_MODELS[provider][tier],
+          provider,
+        }
+      }
+      // Provider specified but not configured, fall through to fallback
+    }
+
+    // Check if default provider is available
+    const defaultProvider = this.settings.defaults.provider
+    if (this.isProviderAvailable(defaultProvider)) {
+      return {
+        modelId: this.settings.defaults.models[tier],
+        provider: defaultProvider,
+      }
+    }
+
+    // Fall back to any configured provider
+    const configuredProviders = this.getConfiguredProviders()
+    if (configuredProviders.length > 0) {
+      const fallbackProvider = configuredProviders[0]
+      return {
+        modelId: DEFAULT_MODELS[fallbackProvider][tier],
+        provider: fallbackProvider,
+      }
+    }
+
+    // Ultimate fallback: OpenRouter free tier with correct tier
+    return {
+      modelId: DEFAULT_MODELS.openrouter[tier],
+      provider: 'openrouter',
+    }
+  }
+
+  /**
    * Quick completion using the fast tier model
    */
   async quick(
     messages: AIMessage[],
     options: Omit<CompletionOptions, 'model'> = {}
   ): Promise<AIResponse> {
-    const modelId = this.settings.defaults.models.quick
-    return this.complete(messages, { ...options, model: modelId })
+    const { modelId, provider } = this.getModelForTier('quick', options.provider)
+    return this.complete(messages, { ...options, model: modelId, provider })
   }
 
   /**
@@ -257,8 +348,8 @@ class AIService {
     messages: AIMessage[],
     options: Omit<CompletionOptions, 'model'> = {}
   ): Promise<AIResponse> {
-    const modelId = this.settings.defaults.models.balanced
-    return this.complete(messages, { ...options, model: modelId })
+    const { modelId, provider } = this.getModelForTier('balanced', options.provider)
+    return this.complete(messages, { ...options, model: modelId, provider })
   }
 
   /**
@@ -268,8 +359,8 @@ class AIService {
     messages: AIMessage[],
     options: Omit<CompletionOptions, 'model'> = {}
   ): Promise<AIResponse> {
-    const modelId = this.settings.defaults.models.powerful
-    return this.complete(messages, { ...options, model: modelId })
+    const { modelId, provider } = this.getModelForTier('powerful', options.provider)
+    return this.complete(messages, { ...options, model: modelId, provider })
   }
 
   /**
@@ -288,6 +379,7 @@ class AIService {
       anthropic: { cost: 0, requests: 0 },
       openai: { cost: 0, requests: 0 },
       gemini: { cost: 0, requests: 0 },
+      openrouter: { cost: 0, requests: 0 },
     }
 
     let totalCost = 0

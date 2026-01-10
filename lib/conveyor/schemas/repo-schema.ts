@@ -99,3 +99,7 @@ export const repoIpcSchema = {
     }),
   },
 }
+
+// Type exports
+export type RemoteInfo = z.infer<typeof RemoteInfoSchema>
+export type RepositorySummary = z.infer<typeof RepositorySummarySchema>

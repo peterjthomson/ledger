@@ -2,6 +2,7 @@ import { app, dialog } from 'electron';
 import * as fs from 'fs';
 import * as path from 'path';
 import type { AISettings } from './ai/types';
+import { DEFAULT_MODELS } from './ai/models';
 
 type ViewMode = 'columns' | 'work';
 type ThemeMode = 'light' | 'dark' | 'system' | 'custom';
@@ -333,7 +334,7 @@ export function updateAISettings(updates: Partial<AISettings>): AISettings {
 }
 
 export function setAIProviderKey(
-  provider: 'anthropic' | 'openai' | 'gemini',
+  provider: 'anthropic' | 'openai' | 'gemini' | 'openrouter',
   apiKey: string,
   enabled: boolean = true,
   organization?: string
@@ -362,7 +363,7 @@ export function setAIProviderKey(
   saveSettings(settings);
 }
 
-export function removeAIProviderKey(provider: 'anthropic' | 'openai' | 'gemini'): void {
+export function removeAIProviderKey(provider: 'anthropic' | 'openai' | 'gemini' | 'openrouter'): void {
   const settings = loadSettings();
   if (settings.ai?.providers) {
     delete settings.ai.providers[provider];
@@ -370,10 +371,17 @@ export function removeAIProviderKey(provider: 'anthropic' | 'openai' | 'gemini')
   }
 }
 
-export function setDefaultAIProvider(provider: 'anthropic' | 'openai' | 'gemini'): void {
+export function setDefaultAIProvider(provider: 'anthropic' | 'openai' | 'gemini' | 'openrouter'): void {
   const settings = loadSettings();
   if (settings.ai) {
     settings.ai.defaults.provider = provider;
+    // Keep defaults.models consistent with the selected provider.
+    // (UI currently allows changing default provider without selecting models.)
+    settings.ai.defaults.models = {
+      quick: DEFAULT_MODELS[provider].quick,
+      balanced: DEFAULT_MODELS[provider].balanced,
+      powerful: DEFAULT_MODELS[provider].powerful,
+    };
     saveSettings(settings);
   }
 }

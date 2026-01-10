@@ -59,7 +59,7 @@ export class GeminiProvider implements AIProviderInterface {
   /**
    * Convert our message format to Gemini's format
    */
-  private convertMessages(messages: AIMessage[], options: CompletionOptions): Content[] {
+  private convertMessages(messages: AIMessage[], _options: CompletionOptions): Content[] {
     const contents: Content[] = []
 
     for (const msg of messages) {
