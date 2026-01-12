@@ -31,6 +31,7 @@ import {
 } from 'lucide-react'
 import type { PluginAppProps } from '@/lib/plugins/plugin-types'
 import type { AgentEvent, AgentEventType, AgentState } from '@/lib/plugins/agent-events'
+import { formatRelativeTime } from '@/app/utils/time'
 import './example-plugin-styles.css'
 
 // Type guard for AgentEvent - validates event structure at runtime
@@ -261,20 +262,6 @@ export function AgentEventsInboxApp({ context, repoPath, activeNavItem, onNaviga
       return newValue
     })
   }, [context])
-
-  // Format relative time
-  const formatRelativeTime = (date: Date) => {
-    const now = new Date()
-    const diff = now.getTime() - new Date(date).getTime()
-    const minutes = Math.floor(diff / 60000)
-    const hours = Math.floor(diff / 3600000)
-    const days = Math.floor(diff / 86400000)
-
-    if (minutes < 1) return 'just now'
-    if (minutes < 60) return `${minutes}m ago`
-    if (hours < 24) return `${hours}h ago`
-    return `${days}d ago`
-  }
 
   // Render inbox view
   const renderInboxView = () => (

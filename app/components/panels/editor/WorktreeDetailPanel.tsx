@@ -8,36 +8,9 @@
 import { useState, useEffect, useRef } from 'react'
 import type { Worktree, UncommittedFile, StagingFileDiff, WorkingStatus } from '../../../types/electron'
 import type { StatusMessage } from '../../../types/app-types'
+import { formatRelativeTime } from '@/app/utils/time'
 
-/**
- * Format a timestamp as relative time (e.g., "2 mins ago", "1 hour ago")
- */
-function formatRelativeTime(isoString: string): string {
-  const now = Date.now()
-  const timestamp = new Date(isoString).getTime()
-  const diffSeconds = Math.floor((now - timestamp) / 1000)
-
-  if (diffSeconds < 60) {
-    return 'just now'
-  }
-  
-  const diffMinutes = Math.floor(diffSeconds / 60)
-  if (diffMinutes < 60) {
-    return `${diffMinutes} min${diffMinutes !== 1 ? 's' : ''} ago`
-  }
-  
-  const diffHours = Math.floor(diffMinutes / 60)
-  if (diffHours < 24) {
-    return `${diffHours} hour${diffHours !== 1 ? 's' : ''} ago`
-  }
-  
-  const diffDays = Math.floor(diffHours / 24)
-  if (diffDays < 7) {
-    return `${diffDays} day${diffDays !== 1 ? 's' : ''} ago`
-  }
-  
-  return new Date(isoString).toLocaleDateString()
-}
+// Local time formatting helpers are centralized in `app/utils/time.ts`
 
 export interface WorktreeDetailPanelProps {
   worktree: Worktree
