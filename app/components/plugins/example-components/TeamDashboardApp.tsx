@@ -124,7 +124,7 @@ export function TeamDashboardApp({ context, activeNavItem }: PluginAppProps) {
       const commitDate = new Date(commit.date)
       if (commitDate > existing.lastActiveDate) {
         existing.lastActiveDate = commitDate
-        existing.lastActive = formatTimeAgo(commitDate)
+        existing.lastActive = formatRelativeTime(commitDate)
       }
 
       authorMap.set(commit.author, existing)
