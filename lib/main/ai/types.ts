@@ -4,7 +4,7 @@
  * Shared types for the AI infrastructure supporting Anthropic, OpenAI, and Gemini.
  */
 
-export type AIProvider = 'anthropic' | 'openai' | 'gemini'
+export type AIProvider = 'anthropic' | 'openai' | 'gemini' | 'openrouter'
 
 export interface AIMessage {
   role: 'user' | 'assistant' | 'system'
@@ -138,6 +138,7 @@ export interface AISettings {
     anthropic?: AIProviderSettings
     openai?: AIProviderSettings
     gemini?: AIProviderSettings
+    openrouter?: AIProviderSettings
   }
   defaults: {
     provider: AIProvider

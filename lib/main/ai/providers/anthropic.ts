@@ -212,8 +212,9 @@ export class AnthropicProvider implements AIProviderInterface {
     const convertedMessages = this.convertMessages(messages)
 
     let fullText = ''
-    let inputTokens = 0
-    let outputTokens = 0
+    // Track tokens for potential future usage reporting
+    let _inputTokens = 0
+    let _outputTokens = 0
 
     try {
       const stream = await this.client.messages.stream({
@@ -235,12 +236,12 @@ export class AnthropicProvider implements AIProviderInterface {
         }
         if (event.type === 'message_delta') {
           if (event.usage) {
-            outputTokens = event.usage.output_tokens
+            _outputTokens = event.usage.output_tokens
           }
         }
         if (event.type === 'message_start') {
           if (event.message.usage) {
-            inputTokens = event.message.usage.input_tokens
+            _inputTokens = event.message.usage.input_tokens
           }
         }
       }

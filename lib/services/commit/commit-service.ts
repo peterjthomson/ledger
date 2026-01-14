@@ -560,7 +560,13 @@ export async function commitChanges(
     const fullMessage = description ? `${message}\n\n${description}` : message
 
     await ctx.git.commit(fullMessage)
-    return { success: true, message: `Committed: ${message}` }
+    let hash: string | undefined
+    try {
+      hash = (await ctx.git.revparse(['HEAD'])).trim()
+    } catch {
+      // Best-effort: commit succeeded but we couldn't resolve HEAD
+    }
+    return { success: true, message: `Committed: ${message}`, ...(hash && { hash }) }
   } catch (error) {
     return { success: false, message: (error as Error).message }
   }

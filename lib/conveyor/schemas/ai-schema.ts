@@ -1,7 +1,7 @@
 import { z } from 'zod'
 
 // AI Provider schema
-export const AIProviderSchema = z.enum(['anthropic', 'openai', 'gemini'])
+export const AIProviderSchema = z.enum(['anthropic', 'openai', 'gemini', 'openrouter'])
 
 // AI Content block schema
 export const AIContentBlockSchema = z.object({
@@ -58,6 +58,7 @@ export const AISettingsSchema = z.object({
     anthropic: AIProviderSettingsSchema.optional(),
     openai: AIProviderSettingsSchema.optional(),
     gemini: AIProviderSettingsSchema.optional(),
+    openrouter: AIProviderSettingsSchema.optional(),
   }),
   defaults: z.object({
     provider: AIProviderSchema,
@@ -156,7 +157,7 @@ export const aiIpcSchema = {
     args: z.tuple([]),
     return: z.array(AIProviderSchema),
   },
-  'ai:is-provider-configured': {
+  'ai:is-provider-available': {
     args: z.tuple([AIProviderSchema]),
     return: z.boolean(),
   },

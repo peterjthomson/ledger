@@ -1,7 +1,7 @@
 /**
  * AI Model Registry
  *
- * Definitions for all supported models across Anthropic, OpenAI, and Gemini.
+ * Definitions for all supported models across Anthropic, OpenAI, Gemini, and OpenRouter.
  */
 
 import type { AIProvider } from './types'
@@ -168,6 +168,37 @@ export const MODEL_REGISTRY: Record<string, ModelDefinition> = {
     supportsStreaming: true,
     description: 'Most capable Gemini model',
   },
+
+  // OpenCode Zen Free Models (anonymous access, no API key required)
+  // Only models verified to work with "public" API key
+  'big-pickle': {
+    id: 'big-pickle',
+    name: 'Big Pickle (Free)',
+    provider: 'openrouter',
+    tier: 'balanced',
+    contextWindow: 200000,
+    maxOutputTokens: 8192,
+    inputCostPer1M: 0,
+    outputCostPer1M: 0,
+    supportsVision: false,
+    supportsJsonMode: true,
+    supportsStreaming: true,
+    description: 'Fast balanced model via OpenCode Zen',
+  },
+  'grok-code': {
+    id: 'grok-code',
+    name: 'Grok Code (Free)',
+    provider: 'openrouter',
+    tier: 'powerful',
+    contextWindow: 256000,
+    maxOutputTokens: 8192,
+    inputCostPer1M: 0,
+    outputCostPer1M: 0,
+    supportsVision: false,
+    supportsJsonMode: true,
+    supportsStreaming: true,
+    description: 'Code-optimized model via OpenCode Zen',
+  },
 }
 
 /**
@@ -188,6 +219,11 @@ export const DEFAULT_MODELS = {
     quick: 'gemini-2.0-flash',
     balanced: 'gemini-2.0-pro',
     powerful: 'gemini-2.5-pro',
+  },
+  openrouter: {
+    quick: 'big-pickle',
+    balanced: 'big-pickle',
+    powerful: 'grok-code',
   },
 } as const
 

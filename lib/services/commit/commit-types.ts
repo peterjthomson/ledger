@@ -126,6 +126,7 @@ export interface CommitResult {
   success: boolean
   message: string
   behindCount?: number
+  hash?: string
 }
 
 /**

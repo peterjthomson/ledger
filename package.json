@@ -15,6 +15,7 @@
     "dev": "cross-env ELECTRON_DISABLE_SANDBOX=1 electron-vite dev -w",
     "format": "prettier --write .",
     "lint": "eslint . --ext .ts,.tsx --fix",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
     "start": "electron-vite preview",
     "postinstall": "electron-builder install-app-deps",
     "vite:build:app": "electron-vite build",

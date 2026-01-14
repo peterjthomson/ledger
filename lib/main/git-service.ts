@@ -5419,7 +5419,7 @@ export async function commitChanges(
   message: string,
   description?: string,
   force: boolean = false
-): Promise<{ success: boolean; message: string; behindCount?: number }> {
+): Promise<{ success: boolean; message: string; behindCount?: number; hash?: string }> {
   if (!git) throw new Error('No repository selected')
 
   try {
@@ -5450,7 +5450,13 @@ export async function commitChanges(
     const fullMessage = description ? `${message}\n\n${description}` : message
 
     await git.commit(fullMessage)
-    return { success: true, message: `Committed: ${message}` }
+    let hash: string | undefined
+    try {
+      hash = (await git.revparse(['HEAD'])).trim()
+    } catch {
+      // Best-effort: commit succeeded but we couldn't resolve HEAD
+    }
+    return { success: true, message: `Committed: ${message}`, ...(hash && { hash }) }
   } catch (error) {
     return { success: false, message: (error as Error).message }
   }
