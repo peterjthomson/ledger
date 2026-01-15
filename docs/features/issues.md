@@ -18,6 +18,111 @@ gh auth login
 
 ---
 
+## Benchmark: Taska
+
+[Taska](https://taska.now) is a native Mac app for GitHub & GitLab issues that provides excellent design inspiration. Key patterns to adopt:
+
+### Inline Editing (High Priority)
+
+Taska's standout feature: **edit title, assignees, and labels all on one line**. No modal dialogs.
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│ ○ Fix memory leak in worker  [@dev]  [bug] [P1]        ✓ ☰ │
+│   ↑ title (editable)          ↑       ↑      ↑             │
+│                            assignee labels priority        │
+└─────────────────────────────────────────────────────────────┘
+```
+
+**Inspiration for Ledger:**
+- Click title → inline text edit
+- Click assignee badge → dropdown picker
+- Click label → add/remove labels inline
+- Checkbox to close → single click to mark done
+
+### Multi-Select Bulk Edit
+
+Select multiple issues → edit attributes in Inspector panel simultaneously.
+
+```
+Selected: 3 issues
+┌─────────────────────────────┐
+│ Assignee:  [Mixed → @dev ▾] │
+│ Labels:    [+ Add label]    │
+│ Priority:  [P2 ▾]           │
+│ Milestone: [v1.0 ▾]         │
+└─────────────────────────────┘
+```
+
+**Inspiration for Ledger:**
+- Shift+click / ⌘+click to multi-select
+- Inspector shows shared/mixed attributes
+- Bulk assign, label, or close
+
+### Priority as First-Class Citizen
+
+Taska treats priority specially—not just another label:
+
+| System | Values | Display |
+|--------|--------|---------|
+| Agile | Critical, High, Medium, Low | Colored badges |
+| Simple | High, Low | Binary indicator |
+| Fruit Co (Apple-style) | P1, P2, P3, P4 | Numbered badges |
+
+**Inspiration for Ledger:**
+- Detect priority labels (`priority:*`, `P1-P4`, `high/medium/low`)
+- Surface priority prominently in list view
+- Sort by priority as first-class option
+
+### Grouping by Milestones/Labels
+
+```
+┌─────────────────────────────────────────┐
+│ ▼ v1.0 Release (3)                      │
+│   ○ Add authentication       [feature]  │
+│   ○ Fix login redirect       [bug]      │
+│   ○ Update dependencies      [chore]    │
+│ ▼ v1.1 Release (2)                      │
+│   ○ Dark mode support        [feature]  │
+│   ○ Performance optimization [perf]     │
+│ ▼ No Milestone (5)                      │
+│   ...                                   │
+└─────────────────────────────────────────┘
+```
+
+**Inspiration for Ledger:**
+- Group by: None / Milestone / Label / Assignee
+- Collapsible groups with counts
+- Drag issues between groups to reassign
+
+### Live Search
+
+Search results update as you type—no "Enter" required.
+
+**Inspiration for Ledger:**
+- Debounced search (150ms)
+- Highlight matches in title
+- Search across title + body
+
+### Quick Actions
+
+| Action | Gesture |
+|--------|---------|
+| Close issue | Click checkbox |
+| Open in browser | Double-click |
+| Edit inline | Single-click on field |
+| Quick comment | ⌘+Enter from detail |
+
+### Visual Design Notes
+
+- **Pinned issues**: 📌 icon + sorted to top
+- **Priority colors**: Red (P1) → Orange (P2) → Yellow (P3) → Gray (P4)
+- **Assignee avatars**: Small circular avatars, stack if multiple
+- **Label pills**: Colored background from GitHub label color
+- **Activity indicator**: Show recent comment/update timestamp
+
+---
+
 ## Research Summary: Available Affordances
 
 ### GitHub CLI (`gh issue`) Commands
@@ -628,56 +733,80 @@ New collapsible section in sidebar.
 
 ## Implementation Plan
 
-### Phase 1: Core List & View
+### Phase 1: Core List & View (MVP)
 
 1. **Types & Schemas**
    - Create `issue-types.ts` with interfaces
    - Create `issue-schema.ts` with Zod schemas
+   - Include priority detection types
 
 2. **Service Layer**
    - Create `issue-service.ts` with `getIssues()`, `getIssueDetail()`
    - Create `issue-handler.ts` with IPC handlers
+   - Fetch repo labels/milestones for filters
 
 3. **UI Components**
-   - Create `IssueList.tsx` component
-   - Create `IssueDetailPanel.tsx` component
+   - Create `IssueList.tsx` component with basic filters
+   - Create `IssueDetailPanel.tsx` component with tabs
+   - Implement priority badge detection (P1-P4, high/low)
 
 4. **Integration**
    - Add Issues to app.tsx state management
    - Add Issues column to Radar mode
    - Add Issues section to Focus mode sidebar
 
-### Phase 2: Actions
+### Phase 2: Actions & Taska-Inspired UX
 
-5. **Basic Actions**
-   - Open in browser
-   - Close/Reopen issue
-   - Add comment
+5. **Quick Actions** (Taska-inspired)
+   - Checkbox to close issue (single click)
+   - Double-click to open in browser
+   - Close with reason menu (completed / not planned)
 
 6. **Branch Integration**
    - Create branch from issue (`gh issue develop`)
-   - Show linked branches in detail
+   - Show linked branches in detail panel
+   - Auto-naming: `{number}-{title-slug}`
 
-### Phase 3: Advanced Features
+7. **Live Search** (Taska-inspired)
+   - Debounced search as-you-type (150ms)
+   - Search across title + body
+   - Highlight matches in results
 
-7. **Create & Edit**
-   - Create new issue modal
-   - Edit issue (labels, assignees, milestone)
+### Phase 3: Inline Editing (Taska-inspired)
 
-8. **Filtering & Search**
-   - Multi-label filtering
-   - Milestone filtering
-   - Full-text search
+8. **Inline Field Editing**
+   - Click title → inline text edit
+   - Click assignee → dropdown picker
+   - Click labels → add/remove inline
+   - Escape to cancel, Enter to save
 
-### Phase 4: Polish
+9. **Grouping**
+   - Group by: None / Milestone / Label / Assignee
+   - Collapsible groups with counts
+   - Pinned issues sorted to top
 
-9. **Cross-linking**
-   - Show linked PRs
-   - Show linked commits
+### Phase 4: Multi-Select & Bulk Edit (Taska-inspired)
 
-10. **Performance**
-    - Lazy-load closed issues
-    - Cache labels/milestones
+10. **Multi-Selection**
+    - Shift+click for range select
+    - ⌘+click for individual toggle
+    - Selection count indicator
+
+11. **Bulk Operations**
+    - Inspector panel for selected issues
+    - Bulk assign/label/close
+    - Mixed state indicators
+
+### Phase 5: Polish & Performance
+
+12. **Cross-linking**
+    - Show linked PRs in detail
+    - Show commits referencing issue
+
+13. **Performance**
+    - Lazy-load closed issues (collapsed section)
+    - Cache labels/milestones at repo level
+    - Virtualized list for 100+ issues
 
 ---
 
@@ -715,14 +844,25 @@ New collapsible section in sidebar.
 
 ## Future Enhancements
 
-- [ ] GitLab/Bitbucket support
+### High Priority (Taska Parity)
+- [ ] Drag-and-drop to reassign milestones (drag issue between groups)
+- [ ] Priority system presets (Agile, Simple, Fruit Co P1-P4)
+- [ ] Separate windows for multi-repo management
+- [ ] Assignee avatars with GitHub profile images
+
+### Medium Priority
+- [ ] GitLab support (similar API via `glab` CLI)
 - [ ] Issue templates integration
 - [ ] Project board integration
 - [ ] Issue timeline/activity view
-- [ ] Batch operations (close multiple)
+- [ ] Keyboard shortcuts (n: new, c: close, e: edit, /: search)
 - [ ] Quick issue creation from context menu
-- [ ] Keyboard shortcuts (n: new issue, c: close, etc.)
-- [ ] Issue search with GitHub syntax
+
+### Lower Priority
+- [ ] Bitbucket support
+- [ ] Issue search with full GitHub syntax
+- [ ] Custom priority label mapping
+- [ ] Issue notifications/watching
 
 ---
 
