@@ -247,7 +247,7 @@ test.describe('Ledger App - AI Settings', () => {
     await expect(page.getByTestId('ai-settings-section')).toBeVisible()
   })
 
-  test('displays AI provider list', async () => {
+  test('displays all AI providers', async () => {
     test.skip(!repoLoaded, 'Repo did not auto-load')
     
     // Ensure settings are open (check if not already active)
@@ -261,8 +261,11 @@ test.describe('Ledger App - AI Settings', () => {
     // Verify provider list is visible
     await expect(page.getByTestId('ai-provider-list')).toBeVisible()
     
-    // Verify OpenRouter card is present (free tier)
+    // Verify all provider cards are present
     await expect(page.getByTestId('ai-provider-card-openrouter')).toBeVisible()
+    await expect(page.getByTestId('ai-provider-card-anthropic')).toBeVisible()
+    await expect(page.getByTestId('ai-provider-card-openai')).toBeVisible()
+    await expect(page.getByTestId('ai-provider-card-gemini')).toBeVisible()
   })
 
   test('OpenRouter free tier works after enabling without API key', async () => {
@@ -314,23 +317,5 @@ test.describe('Ledger App - AI Settings', () => {
     // Verify success (should work with free tier)
     const statusText = await testStatus.textContent()
     expect(statusText).toContain('Connected')
-  })
-
-  test('displays all AI providers', async () => {
-    test.skip(!repoLoaded, 'Repo did not auto-load')
-    
-    // Ensure settings are open (check if not already active)
-    const settingsButton = page.getByTestId('settings-button')
-    const isActive = await settingsButton.evaluate((el) => el.classList.contains('active'))
-    if (!isActive) {
-      await settingsButton.click()
-    }
-    await page.waitForSelector('[data-testid="ai-settings-section"]', { timeout: 5000 })
-    
-    // Verify all provider cards are present
-    await expect(page.getByTestId('ai-provider-card-openrouter')).toBeVisible()
-    await expect(page.getByTestId('ai-provider-card-anthropic')).toBeVisible()
-    await expect(page.getByTestId('ai-provider-card-openai')).toBeVisible()
-    await expect(page.getByTestId('ai-provider-card-gemini')).toBeVisible()
   })
 })

@@ -10,6 +10,5 @@ export { GeminiProvider, geminiProvider } from './gemini'
 export {
   OpenRouterProvider,
   openrouterProvider,
-  OPENROUTER_MODELS,
   OPENROUTER_DEFAULTS,
 } from './openrouter'

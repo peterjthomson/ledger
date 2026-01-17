@@ -25,39 +25,8 @@ import type {
   AIContentBlock,
 } from '../types'
 
-// Free models available via OpenCode Zen (no API key required)
-// Note: Only models verified to work with anonymous "public" key are included
-export const OPENROUTER_MODELS = {
-  // OpenCode Zen free models (anonymous access)
-  'big-pickle': {
-    id: 'big-pickle',
-    name: 'Big Pickle (Free)',
-    tier: 'balanced' as const,
-    contextWindow: 200000,
-    maxOutputTokens: 8192,
-    inputCostPer1M: 0,
-    outputCostPer1M: 0,
-    supportsVision: false,
-    supportsJsonMode: true,
-    supportsStreaming: true,
-    description: 'Fast balanced model via OpenCode Zen',
-  },
-  'grok-code': {
-    id: 'grok-code',
-    name: 'Grok Code (Free)',
-    tier: 'powerful' as const,
-    contextWindow: 256000,
-    maxOutputTokens: 8192,
-    inputCostPer1M: 0,
-    outputCostPer1M: 0,
-    supportsVision: false,
-    supportsJsonMode: true,
-    supportsStreaming: true,
-    description: 'Code-optimized model via OpenCode Zen',
-  },
-}
-
 // Default free models by tier (OpenCode Zen)
+// Model definitions are in lib/main/ai/models.ts (MODEL_REGISTRY)
 // Using big-pickle for quick/balanced since it's fast and reliable
 export const OPENROUTER_DEFAULTS = {
   quick: 'big-pickle',

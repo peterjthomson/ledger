@@ -49,6 +49,5 @@ export {
   OpenAIProvider,
   GeminiProvider,
   OpenRouterProvider,
-  OPENROUTER_MODELS,
   OPENROUTER_DEFAULTS,
 } from './providers'
