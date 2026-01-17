@@ -222,8 +222,8 @@ function canvasReducer(state: CanvasState, action: CanvasAction): CanvasState {
           ? state.editorState.history.slice(0, state.editorState.historyIndex + 1)
           : [...state.editorState.history]
       history.push(entry)
-      // Limit history to 50 entries
-      if (history.length > 50) history.shift()
+      // Limit history to 50 entries (using splice for robustness)
+      if (history.length > 50) history.splice(0, history.length - 50)
       return {
         ...state,
         editorState: {

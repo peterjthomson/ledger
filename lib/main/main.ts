@@ -27,6 +27,7 @@ import { registerStashHandlers } from '@/lib/conveyor/handlers/stash-handler'
 import { registerStagingHandlers } from '@/lib/conveyor/handlers/staging-handler'
 import { registerThemeHandlers } from '@/lib/conveyor/handlers/theme-handler'
 import { registerPluginHandlers } from '@/lib/conveyor/handlers/plugin-handler'
+import { registerAIHandlers } from '@/lib/conveyor/handlers/ai-handler'
 import { markChannelRegistered } from '@/lib/main/shared'
 
 // IPC channels registered below via ipcMain.handle
@@ -200,6 +201,7 @@ app.whenReady().then(() => {
   registerStagingHandlers()
   registerThemeHandlers()
   registerPluginHandlers()
+  registerAIHandlers()
 
   // Register git IPC handlers
   ipcMain.handle('select-repo', async () => {

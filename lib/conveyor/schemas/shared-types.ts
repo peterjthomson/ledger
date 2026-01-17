@@ -391,3 +391,5 @@ export type CustomTheme = z.infer<typeof CustomThemeSchema>
 export type ThemeData = z.infer<typeof ThemeDataSchema>
 export type MergeMethod = z.infer<typeof MergeMethodSchema>
 export type ResetMode = z.infer<typeof ResetModeSchema>
+export type CreatePROptions = z.infer<typeof CreatePROptionsSchema>
+export type CreatePRResult = z.infer<typeof CreatePRResultSchema>

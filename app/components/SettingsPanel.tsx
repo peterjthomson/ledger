@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { loadBuiltInTheme, loadVSCodeTheme, getSelectedThemeId, type ThemeMode } from '../theme'
 import { useCanvas } from './canvas/CanvasContext'
+import { AISettingsSection } from './AISettingsSection'
 import type { SlotType, PanelType, Column } from '../types/app-types'
 
 // Panel options grouped by slot type
@@ -604,6 +605,12 @@ export const SettingsPanel = ({ themeMode: _themeMode, onThemeChange, onBack }: 
             </button>
           </div>
         </div>
+
+        {/* Divider between sections */}
+        <div className="settings-divider" />
+
+        {/* AI Settings Section */}
+        <AISettingsSection />
 
         {/* Divider between sections */}
         <div className="settings-divider" />
