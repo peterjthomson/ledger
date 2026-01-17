@@ -25,6 +25,7 @@ import type {
 import './styles/app.css'
 import { useWindowContext } from './components/window'
 import { useCanvas, useCanvasNavigation, useCanvasPersistence, CanvasRenderer, type CanvasData, type CanvasSelection, type CanvasHandlers, type CanvasUIState } from './components/canvas'
+import { formatRelativeTime, formatShortDate } from '@/app/utils/time'
 import {
   DiffPanel,
   CommitCreatePanel,
@@ -770,6 +771,29 @@ export default function App() {
     }
   }
 
+  // Checkout a specific commit (optionally via its branch if at tip)
+  const handleCommitCheckout = async (commitHash: string, branchName?: string) => {
+    if (switching) return
+
+    setSwitching(true)
+    const target = branchName || commitHash.slice(0, 7)
+    setStatus({ type: 'info', message: `Checking out ${target}...` })
+
+    try {
+      const result: CheckoutResult = await window.electronAPI.checkoutCommit(commitHash, branchName)
+      if (result.success) {
+        setStatus({ type: 'success', message: result.message, stashed: result.stashed })
+        await refresh()
+      } else {
+        setStatus({ type: 'error', message: result.message })
+      }
+    } catch (err) {
+      setStatus({ type: 'error', message: (err as Error).message })
+    } finally {
+      setSwitching(false)
+    }
+  }
+
   // Push local branch to remote
   const handleLocalBranchPush = async (branch: Branch) => {
     closeContextMenu()
@@ -1294,27 +1318,7 @@ export default function App() {
   }, [canvasState.editorState.historyIndex])
 
   // Filter graph commits based on history panel filters
-  const formatDate = (dateStr?: string) => {
-    if (!dateStr) return ''
-    const date = new Date(dateStr)
-    return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: '2-digit' })
-  }
-
-  const formatRelativeTime = (dateStr: string) => {
-    if (!dateStr) return ''
-    const date = new Date(dateStr)
-    if (isNaN(date.getTime())) return ''
-
-    const now = new Date()
-    const diffMs = now.getTime() - date.getTime()
-    const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24))
-
-    if (diffDays === 0) return 'today'
-    if (diffDays === 1) return 'yesterday'
-    if (diffDays < 7) return `${diffDays}d ago`
-    if (diffDays < 30) return `${Math.floor(diffDays / 7)}w ago`
-    return `${Math.floor(diffDays / 30)}mo ago`
-  }
+  const formatDate = formatShortDate
 
   const menuItems = getMenuItems()
 
@@ -1431,6 +1435,12 @@ export default function App() {
           onOpenMailmap={() => {
             setSidebarFocus({ type: 'mailmap', data: null })
           }}
+          onBranchClick={(branchName) => {
+            const branch = branches.find((b) => b.name === branchName)
+            if (branch) {
+              handleSidebarFocus(branch.isRemote ? 'remote' : 'branch', branch)
+            }
+          }}
         />
       )
     }
@@ -1447,12 +1457,14 @@ export default function App() {
             selectedCommit={selectedCommit}
             formatRelativeTime={formatRelativeTime}
             branches={branches}
+            switching={switching}
             onBranchClick={(branchName) => {
               const branch = branches.find((b) => b.name === branchName)
               if (branch) {
                 handleSidebarFocus(branch.isRemote ? 'remote' : 'branch', branch)
               }
             }}
+            onCheckoutCommit={handleCommitCheckout}
           />
         )
       }
@@ -1467,7 +1479,7 @@ export default function App() {
     formatRelativeTime, formatDate, handlePRCheckout, handleBranchDoubleClick,
     handleRemoteBranchDoubleClick, handleWorktreeDoubleClick, handleDeleteBranch, handleRenameBranch,
     handleDeleteRemoteBranch, branches, repoPath, worktrees, pullRequests, handleSidebarFocus,
-    selectedCommit, loadingDiff, commitDiff
+    selectedCommit, loadingDiff, commitDiff, handleCommitCheckout
   ])
 
   const canvasHandlers: CanvasHandlers = useMemo(() => ({

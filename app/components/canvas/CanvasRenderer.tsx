@@ -11,7 +11,7 @@
  * - Canvas config determines layout
  */
 
-import React, { useCallback, useState, type ReactNode } from 'react'
+import React, { useCallback, useState, useEffect, useRef, type ReactNode } from 'react'
 import type { Column } from '../../types/app-types'
 import type {
   PullRequest,
@@ -326,6 +326,59 @@ export function CanvasRenderer({
     [data, selection, handlers, uiState]
   )
 
+  // Git graph column widths state
+  // Default widths: graph = 68px (3 branches), refs = null (auto), message = null (flex), meta = null (auto)
+  type GitGraphColumn = 'graph' | 'refs' | 'message' | 'meta'
+  const DEFAULT_COLUMN_WIDTHS = {
+    graph: 68,      // 3 lanes * 16px + 20px padding
+    refs: null,     // auto-size based on content
+    message: null,  // flex to fill available space
+    meta: null,     // auto-size based on content
+  }
+  const [columnWidths, setColumnWidths] = useState<Record<GitGraphColumn, number | null>>(DEFAULT_COLUMN_WIDTHS)
+  const [resizingColumn, setResizingColumn] = useState<GitGraphColumn | null>(null)
+  const resizeStartRef = useRef<{ startX: number; startWidth: number; column: GitGraphColumn } | null>(null)
+
+  // Handle column resize
+  useEffect(() => {
+    if (!resizingColumn) return
+
+    const handleMouseMove = (e: MouseEvent) => {
+      if (!resizeStartRef.current) return
+      const delta = e.clientX - resizeStartRef.current.startX
+      const minWidths: Record<GitGraphColumn, number> = {
+        graph: 36,
+        refs: 60,
+        message: 100,
+        meta: 80,
+      }
+      const newWidth = Math.max(minWidths[resizeStartRef.current.column], resizeStartRef.current.startWidth + delta)
+      setColumnWidths(prev => ({ ...prev, [resizeStartRef.current!.column]: newWidth }))
+    }
+
+    const handleMouseUp = () => {
+      setResizingColumn(null)
+      resizeStartRef.current = null
+    }
+
+    window.addEventListener('mousemove', handleMouseMove)
+    window.addEventListener('mouseup', handleMouseUp)
+
+    return () => {
+      window.removeEventListener('mousemove', handleMouseMove)
+      window.removeEventListener('mouseup', handleMouseUp)
+    }
+  }, [resizingColumn])
+
+  const handleStartColumnResize = useCallback((column: GitGraphColumn, startX: number, currentWidth: number) => {
+    resizeStartRef.current = { startX, startWidth: currentWidth, column }
+    setResizingColumn(column)
+  }, [])
+
+  const handleResetColumnWidth = useCallback((column: GitGraphColumn) => {
+    setColumnWidths(prev => ({ ...prev, [column]: DEFAULT_COLUMN_WIDTHS[column] }))
+  }, [])
+
   // Render a viz panel based on column config
   const renderVizSlot = useCallback(
     (column: Column): ReactNode => {
@@ -405,6 +458,10 @@ export function CanvasRenderer({
                   onSelectCommit={handlers.onSelectCommit}
                   onDoubleClickCommit={handlers.onDoubleClickCommit}
                   formatRelativeTime={handlers.formatRelativeTime}
+                  columnWidths={columnWidths}
+                  onStartColumnResize={handleStartColumnResize}
+                  onResetColumnWidth={handleResetColumnWidth}
+                  resizingColumn={resizingColumn}
                 />
               </div>
             </div>
@@ -458,7 +515,7 @@ export function CanvasRenderer({
           )
       }
     },
-    [data.commits, selection.selectedCommit, handlers, activeCanvas, setColumnPanel]
+    [data.commits, selection.selectedCommit, handlers, activeCanvas, setColumnPanel, columnWidths, handleStartColumnResize, handleResetColumnWidth, resizingColumn]
   )
 
   // Render an editor panel based on column config

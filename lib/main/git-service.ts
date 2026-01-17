@@ -830,6 +830,82 @@ export async function checkoutBranch(
   }
 }
 
+// Checkout a specific commit (creates detached HEAD state unless on a branch tip)
+export async function checkoutCommit(
+  commitHash: string,
+  branchName?: string
+): Promise<{ success: boolean; message: string; stashed?: string }> {
+  if (!git) throw new Error('No repository selected')
+
+  try {
+    // Stash any uncommitted changes first
+    const stashResult = await stashChanges()
+
+    // If a branch name is provided and the commit is the tip of that branch, checkout the branch instead
+    if (branchName) {
+      const branches = await git.branchLocal()
+      if (branches.all.includes(branchName)) {
+        // Check if the branch tip matches the commit
+        const branchCommit = await git.revparse([branchName])
+        if (branchCommit.trim() === commitHash || branchCommit.trim().startsWith(commitHash)) {
+          // Checkout the branch (avoids detached HEAD)
+          await git.checkout(['--ignore-other-worktrees', branchName])
+          
+          if (stashResult.stashed) {
+            try {
+              await git.raw(['stash', 'pop'])
+              return {
+                success: true,
+                message: `Switched to branch '${branchName}' with uncommitted changes`,
+              }
+            } catch (_popError) {
+              return {
+                success: true,
+                message: `Switched to '${branchName}'. Uncommitted changes moved to stash (conflicts detected).`,
+                stashed: stashResult.message,
+              }
+            }
+          }
+          
+          return {
+            success: true,
+            message: `Switched to branch '${branchName}'`,
+          }
+        }
+      }
+    }
+
+    // Checkout the commit directly (detached HEAD)
+    await git.checkout(commitHash)
+
+    if (stashResult.stashed) {
+      try {
+        await git.raw(['stash', 'pop'])
+        return {
+          success: true,
+          message: `Checked out commit ${commitHash.slice(0, 7)} (detached HEAD) with uncommitted changes`,
+        }
+      } catch (_popError) {
+        return {
+          success: true,
+          message: `Checked out commit ${commitHash.slice(0, 7)} (detached HEAD). Uncommitted changes moved to stash.`,
+          stashed: stashResult.message,
+        }
+      }
+    }
+
+    return {
+      success: true,
+      message: `Checked out commit ${commitHash.slice(0, 7)} (detached HEAD)`,
+    }
+  } catch (error) {
+    return {
+      success: false,
+      message: (error as Error).message,
+    }
+  }
+}
+
 // Push a branch to origin
 export async function pushBranch(
   branchName?: string,

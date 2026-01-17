@@ -36,7 +36,7 @@ const IPC_CHANNELS = [
   'select-repo', 'get-repo-path', 'get-saved-repo-path', 'load-saved-repo', 'get-sibling-repos',
   // Branches
   'get-branches', 'get-branches-basic', 'get-branches-with-metadata',
-  'checkout-branch', 'create-branch', 'delete-branch', 'delete-remote-branch',
+  'checkout-branch', 'checkout-commit', 'create-branch', 'delete-branch', 'delete-remote-branch',
   'push-branch', 'checkout-remote-branch', 'open-branch-in-github', 'pull-branch', 'pull-current-branch',
   // Worktrees
   'get-worktrees', 'open-worktree', 'convert-worktree-to-branch', 'apply-worktree-changes',
@@ -77,6 +77,7 @@ import {
   getBranchesWithMetadata,
   getEnhancedWorktrees,
   checkoutBranch,
+  checkoutCommit,
   createBranch,
   deleteBranch,
   renameBranch,
@@ -305,6 +306,14 @@ app.whenReady().then(() => {
   ipcMain.handle('checkout-branch', async (_, branchName: string) => {
     try {
       return await checkoutBranch(branchName)
+    } catch (error) {
+      return { success: false, message: (error as Error).message }
+    }
+  })
+
+  ipcMain.handle('checkout-commit', async (_, commitHash: string, branchName?: string) => {
+    try {
+      return await checkoutCommit(commitHash, branchName)
     } catch (error) {
       return { success: false, message: (error as Error).message }
     }

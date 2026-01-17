@@ -2167,6 +2167,43 @@ body,
   cursor: text;
 }
 
+/* Clickable branch link in meta grid */
+.meta-value-link {
+  all: unset;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-family: 'JetBrains Mono', 'SF Mono', Monaco, monospace;
+  font-size: 11px;
+  color: var(--accent);
+  transition: color 0.15s ease;
+}
+
+.meta-value-link:hover {
+  color: var(--accent-dim);
+  text-decoration: underline;
+}
+
+.meta-value-link .branch-icon {
+  font-size: 10px;
+  opacity: 0.7;
+}
+
+.detail-meta-item .meta-link {
+  color: var(--accent);
+  text-decoration: none;
+  cursor: pointer;
+  font-size: 11px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.detail-meta-item .meta-link:hover {
+  text-decoration: underline;
+}
+
 /* PR link badge in branch detail */
 .pr-link-badge {
   all: unset;
@@ -2185,6 +2222,11 @@ body,
 
 .pr-link-badge:hover {
   background: var(--bg-hover);
+}
+
+.pr-link-badge:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
 }
 
 .pr-link-badge .pr-draft-indicator {
@@ -2597,6 +2639,17 @@ body,
   list-style: none;
   margin: 0;
   padding: 0;
+  outline: none;
+}
+
+.staging-file-list:focus {
+  outline: none;
+}
+
+.staging-file-list:focus-visible {
+  outline: none;
+  box-shadow: inset 0 0 0 1px var(--accent-dim);
+  border-radius: var(--radius-sm);
 }
 
 .staging-file-item {
@@ -2669,14 +2722,82 @@ body,
   color: white;
 }
 
+/* Unstage button - green tick, always visible, filled by default, outline on hover to imply "reverse" */
 .file-action-btn.unstage {
-  color: var(--error);
-  border-color: var(--error);
+  opacity: 1;
+  color: white;
+  background: var(--success);
+  border-color: var(--success);
 }
 
 .file-action-btn.unstage:hover {
+  background: transparent;
+  color: var(--success);
+  border-color: var(--success);
+}
+
+/* Discard file button */
+/* Discard file button - grey outline style */
+.file-action-btn.discard {
+  color: var(--text-muted);
+  border: 1px solid var(--border);
+  background: transparent;
+  opacity: 0;
+}
+
+.staging-file-item:hover .file-action-btn.discard {
+  opacity: 1;
+}
+
+.file-action-btn.discard:hover {
+  color: var(--text-secondary);
+  border-color: var(--text-muted);
+}
+
+.file-action-btn.discard.confirm {
+  opacity: 1;
+  border-color: var(--error);
   background: var(--error);
   color: white;
+  animation: pulse-danger 0.5s ease-in-out infinite alternate;
+}
+
+@keyframes pulse-danger {
+  from { opacity: 0.8; }
+  to { opacity: 1; }
+}
+
+/* File action buttons container */
+.file-action-btns {
+  display: flex;
+  gap: 4px;
+  align-items: center;
+}
+
+/* Staging section actions container */
+.staging-section-actions {
+  display: flex;
+  gap: 6px;
+  margin-left: auto;
+}
+
+/* Discard All button - grey outline style */
+.staging-action-btn.discard-all {
+  color: var(--text-muted);
+  border: 1px solid var(--border);
+  background: transparent;
+}
+
+.staging-action-btn.discard-all:hover {
+  color: var(--text-secondary);
+  border-color: var(--text-muted);
+}
+
+.staging-action-btn.discard-all.confirm {
+  color: white;
+  background: var(--error);
+  border-color: var(--error);
+  animation: pulse-danger 0.5s ease-in-out infinite alternate;
 }
 
 .staging-empty {
@@ -3563,6 +3684,68 @@ body,
   font-size: 10px;
   color: var(--text-muted);
   white-space: nowrap;
+}
+
+/* Git Graph Column Headers and Resize Handles */
+.git-graph-header {
+  display: flex;
+  height: 1px;
+  position: sticky;
+  top: 0;
+  z-index: 5;
+  overflow: visible;
+  pointer-events: none;
+}
+
+.graph-col {
+  position: relative;
+  flex-shrink: 0;
+  pointer-events: auto;
+}
+
+.graph-col-refs {
+  min-width: 60px;
+}
+
+.graph-col-message {
+  flex: 1;
+  min-width: 100px;
+}
+
+.graph-col-meta {
+  min-width: 80px;
+}
+
+/* Column resize handle - appears at right edge of each column */
+.graph-col-resize-handle {
+  position: absolute;
+  top: 0;
+  right: -4px;
+  width: 8px;
+  height: 2000px;
+  background: transparent;
+  cursor: col-resize;
+  z-index: 10;
+}
+
+.graph-col-resize-handle::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 1px;
+  height: 100%;
+  background: var(--border-subtle);
+  opacity: 0;
+  transition: opacity 0.15s ease;
+}
+
+.graph-col-resize-handle:hover::before,
+.graph-col-resize-handle.active::before {
+  opacity: 1;
+  background: var(--accent);
+  width: 2px;
 }
 
 /* ========================================
@@ -4527,12 +4710,36 @@ body,
   min-height: min-content;
 }
 
+/* Generic editor loading spinner */
+.editor-loading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  flex: 1;
+  min-height: 200px;
+  gap: 12px;
+  color: var(--text-muted);
+}
+
+.editor-loading-spinner {
+  width: 24px;
+  height: 24px;
+  border: 2px solid var(--border-subtle);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
 .pr-review-loading,
 .pr-review-error {
   display: flex;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
-  height: 100%;
+  flex: 1;
+  min-height: 200px;
+  gap: 12px;
   color: var(--text-muted);
   font-size: 13px;
 }
@@ -4623,6 +4830,12 @@ body,
   all: unset;
   cursor: pointer;
   display: inline-flex;
+}
+
+.pr-review-branch .branch-link:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  border-radius: 6px;
 }
 
 .pr-review-branch .branch-link code {
@@ -5093,6 +5306,109 @@ body,
   flex-direction: column;
   flex: 1;
   overflow: hidden;
+  padding: 16px;
+  gap: 16px;
+}
+
+/* Stash Header */
+.stash-header {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.stash-title {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin: 0;
+}
+
+.stash-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.stash-branch {
+  font-size: 11px;
+  padding: 2px 6px;
+  border-radius: 4px;
+  background: var(--bg-tertiary);
+  color: var(--text-secondary);
+}
+
+.stash-date {
+  color: var(--text-muted);
+}
+
+/* Stash Files Section */
+.stash-files {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+}
+
+/* Stash Diff Section */
+.stash-diff {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 150px;
+  overflow: hidden;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+}
+
+.stash-diff-header {
+  display: flex;
+  align-items: center;
+  padding: 8px 12px;
+  background: var(--bg-tertiary);
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.stash-diff-title {
+  font-size: 12px;
+  font-family: var(--font-mono);
+  color: var(--text-secondary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.stash-diff-content {
+  flex: 1;
+  overflow: auto;
+}
+
+.stash-diff-code {
+  margin: 0;
+  padding: 12px;
+  font-size: 11px;
+  font-family: var(--font-mono);
+  line-height: 1.5;
+  white-space: pre;
+  color: var(--text-primary);
+}
+
+/* Stash Action Buttons */
+.stash-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: auto;
+  padding-top: 16px;
+  border-top: 1px solid var(--border-subtle);
+}
+
+.stash-actions .btn {
+  width: 100%;
+  justify-content: center;
 }
 
 /* Stash status indicators */
@@ -5322,11 +5638,6 @@ body,
   flex: 1;
   white-space: pre;
   padding-right: 8px;
-}
-
-/* Stash Actions */
-.stash-actions {
-  flex-direction: column;
 }
 
 /* Leapfrog button - Ledger's parallel git feature */

@@ -429,6 +429,7 @@ export interface ElectronAPI {
   getWorktrees: () => Promise<Worktree[] | { error: string }>
   // Checkout operations
   checkoutBranch: (branchName: string) => Promise<CheckoutResult>
+  checkoutCommit: (commitHash: string, branchName?: string) => Promise<CheckoutResult>
   createBranch: (branchName: string, checkout?: boolean) => Promise<{ success: boolean; message: string }>
   deleteBranch: (branchName: string, force?: boolean) => Promise<{ success: boolean; message: string }>
   renameBranch: (oldName: string, newName: string) => Promise<{ success: boolean; message: string }>

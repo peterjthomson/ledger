@@ -90,6 +90,7 @@ const electronAPI = {
   getWorktrees: () => ipcRenderer.invoke('get-worktrees'),
   // Checkout operations
   checkoutBranch: (branchName: string) => ipcRenderer.invoke('checkout-branch', branchName),
+  checkoutCommit: (commitHash: string, branchName?: string) => ipcRenderer.invoke('checkout-commit', commitHash, branchName),
   createBranch: (branchName: string, checkout?: boolean) => ipcRenderer.invoke('create-branch', branchName, checkout),
   deleteBranch: (branchName: string, force?: boolean) => ipcRenderer.invoke('delete-branch', branchName, force),
   renameBranch: (oldName: string, newName: string) => ipcRenderer.invoke('rename-branch', oldName, newName),

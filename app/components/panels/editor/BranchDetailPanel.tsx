@@ -4,7 +4,7 @@
  * Displays branch metadata, allows PR creation, and shows diff against base branch.
  */
 
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect, useMemo, useRef } from 'react'
 import type { Branch, BranchDiff, BranchDiffType, PullRequest } from '../../../types/electron'
 import type { StatusMessage } from '../../../types/app-types'
 import { DiffViewer } from '../../ui/DiffViewer'
@@ -44,6 +44,8 @@ export function BranchDetailPanel({
   const [loadingDiff, setLoadingDiff] = useState(false)
   const [expandedFiles, setExpandedFiles] = useState<Set<string>>(new Set())
   const [diffType, setDiffType] = useState<BranchDiffType>('preview')
+  const [fileContextMenu, setFileContextMenu] = useState<{ x: number; y: number } | null>(null)
+  const fileMenuRef = useRef<HTMLDivElement>(null)
 
   // PR creation form state
   const [showPRForm, setShowPRForm] = useState(false)
@@ -193,6 +195,48 @@ export function BranchDetailPanel({
       return next
     })
   }
+
+  const expandAll = () => {
+    if (branchDiff) {
+      setExpandedFiles(new Set(branchDiff.files.map((f) => f.file.path)))
+    }
+    setFileContextMenu(null)
+  }
+
+  const collapseAll = () => {
+    setExpandedFiles(new Set())
+    setFileContextMenu(null)
+  }
+
+  const handleFileContextMenu = (e: React.MouseEvent) => {
+    e.preventDefault()
+    setFileContextMenu({ x: e.clientX, y: e.clientY })
+  }
+
+  // Close file context menu when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (fileMenuRef.current && !fileMenuRef.current.contains(e.target as Node)) {
+        setFileContextMenu(null)
+      }
+    }
+
+    const handleEscape = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        setFileContextMenu(null)
+      }
+    }
+
+    if (fileContextMenu) {
+      document.addEventListener('mousedown', handleClickOutside)
+      document.addEventListener('keydown', handleEscape)
+    }
+
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside)
+      document.removeEventListener('keydown', handleEscape)
+    }
+  }, [fileContextMenu])
 
   return (
     <div className="sidebar-detail-panel">
@@ -461,7 +505,7 @@ export function BranchDetailPanel({
                 const hasConflict = branchDiff.conflictFiles?.includes(fileDiff.file.path)
                 return (
                 <div key={fileDiff.file.path} className={`branch-diff-file ${hasConflict ? 'has-conflict' : ''}`}>
-                  <div className="branch-diff-file-header" onClick={() => toggleFile(fileDiff.file.path)}>
+                  <div className="branch-diff-file-header" onClick={() => toggleFile(fileDiff.file.path)} onContextMenu={handleFileContextMenu}>
                     <span className={`diff-file-chevron ${expandedFiles.has(fileDiff.file.path) ? 'open' : ''}`}>
                       ▸
                     </span>
@@ -507,6 +551,18 @@ export function BranchDetailPanel({
               )})}
             </div>
           )}
+        </div>
+      )}
+
+      {/* File Context Menu */}
+      {fileContextMenu && (
+        <div ref={fileMenuRef} className="context-menu" style={{ left: fileContextMenu.x, top: fileContextMenu.y }}>
+          <button className="context-menu-item" onClick={expandAll}>
+            Expand All
+          </button>
+          <button className="context-menu-item" onClick={collapseAll}>
+            Collapse All
+          </button>
         </div>
       )}
     </div>

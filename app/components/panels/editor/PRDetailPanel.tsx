@@ -232,7 +232,9 @@ export function PRReviewPanel({ pr, formatRelativeTime, onCheckout, onPRMerged, 
   if (loading) {
     return (
       <div className="pr-review-panel">
-        <div className="pr-review-loading">Loading PR details...</div>
+        <div className="pr-review-loading">
+          <div className="editor-loading-spinner" />
+        </div>
       </div>
     )
   }
