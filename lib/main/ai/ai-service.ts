@@ -238,8 +238,9 @@ class AIService {
     history.push(record)
 
     // Keep only last 1000 records to prevent unbounded growth
+    // Using splice for robustness in case history is already over limit
     if (history.length > 1000) {
-      history.shift()
+      history.splice(0, history.length - 1000)
     }
 
     this.settings.usage = {

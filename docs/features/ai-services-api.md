@@ -114,7 +114,7 @@ Under the `ai` key, stored alongside repository, theme, and canvas settings.
 ### Settings Structure
 
 **Provider Configuration:**
-- API key (encrypted in memory, plain in settings file)
+- API key (encrypted at rest via platform-specific secure storage)
 - Enabled/disabled state
 - Optional organization ID (OpenAI only)
 
@@ -421,9 +421,12 @@ Settings panel shows specific error states:
 
 ### API Key Storage
 
-**Storage Location:** Plain text in settings file  
-**Justification:** User's local machine, encrypted at OS level (FileVault on macOS)  
-**Future:** Consider OS keychain or other secure storage integration for additional security
+**Storage:** Encrypted using Electron's `safeStorage` API with platform-specific backends:
+- **macOS:** Keychain (hardware-backed on Apple Silicon)
+- **Windows:** DPAPI (user-account bound)
+- **Linux:** gnome-keyring or kwallet (falls back to basic encryption if unavailable)
+
+The UI displays encryption status so users know their keys are protected. On Linux without a keyring, a warning is shown that encryption is weaker.
 
 **Never Sent to Renderer:**
 - API keys stay in main process

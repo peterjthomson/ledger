@@ -220,9 +220,6 @@ export class AnthropicProvider implements AIProviderInterface {
     const convertedMessages = this.convertMessages(messages)
 
     let fullText = ''
-    // Track tokens for potential future usage reporting
-    let _inputTokens = 0
-    let _outputTokens = 0
 
     try {
       const stream = await this.client.messages.stream({
@@ -240,16 +237,6 @@ export class AnthropicProvider implements AIProviderInterface {
           if ('text' in delta) {
             fullText += delta.text
             callbacks.onChunk(delta.text)
-          }
-        }
-        if (event.type === 'message_delta') {
-          if (event.usage) {
-            _outputTokens = event.usage.output_tokens
-          }
-        }
-        if (event.type === 'message_start') {
-          if (event.message.usage) {
-            _inputTokens = event.message.usage.input_tokens
           }
         }
       }
