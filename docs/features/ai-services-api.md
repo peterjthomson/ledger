@@ -10,7 +10,7 @@ The AI Services API provides first-class integration with multiple AI providers 
 
 **Tier-Based Model Selection:** Rather than forcing users to understand model names, the API offers three tiers: `quick` (fast, cheap), `balanced` (general purpose), and `powerful` (complex reasoning). The service automatically routes to the appropriate model based on the configured provider.
 
-**Zero Friction by Default:** OpenRouter's free tier (via OpenCode Zen) provides immediate AI capability without requiring API keys. Users can start using AI features instantly and upgrade to premium providers as needed.
+**Opt-In with Free Tier:** No AI provider is configured by default. Users must explicitly enable a provider in settings. OpenRouter can be enabled without an API key, providing free access via OpenCode Zen for testing and demos.
 
 ---
 
@@ -145,11 +145,11 @@ Features:
 - "Set as Default" action
 - Usage statistics toggle with summary view
 
-**OpenRouter Special Treatment:**
-- Always shown as "configured" (free tier)
+**OpenRouter:**
 - Marked with "Free" badge
-- Explanatory text about no-API-key access
+- When enabled without API key, automatically uses free tier (OpenCode Zen)
 - Optional API key input for premium models (300+ additional models)
+- Same enable flow as other providers (no special treatment in UI)
 
 ---
 
@@ -223,25 +223,38 @@ Plugins access AI via the global `window.conveyor.ai` object exposed in the rend
 
 **No Provider Lock-In:** Plugins specify tiers (quick/balanced/powerful) rather than providers. The service routes based on user configuration.
 
-### Three-Tier Strategy
+### Three-Tier Model Selection System
 
-**Quick Tier:**
-- Use for: Simple questions, lightweight analysis, commit message generation
-- Models: Haiku, 4o-mini, Flash, Big Pickle (free)
-- Cost: $0.15-$1.00 per million input tokens
-- Speed: Fastest responses
+The AI service uses a tier-based abstraction so code doesn't need to know specific model names. When you call `ai.quick()`, `ai.balanced()`, or `ai.powerful()`, the service automatically selects the appropriate model based on the user's configured provider.
 
-**Balanced Tier:**
-- Use for: Code review, PR summarization, diff explanation, general assistance
-- Models: Sonnet 4, 4o, Pro 2.0, Big Pickle (free)
-- Cost: $1.25-$3.00 per million input tokens
-- Speed: Moderate
+**Quick Tier** - Fast, cheap models for simple tasks:
+| Provider | Model | Input Cost/1M | Use For |
+|----------|-------|---------------|---------|
+| Anthropic | Claude 3.5 Haiku | $1.00 | Simple questions, commit messages |
+| OpenAI | GPT-4o-mini | $0.15 | Lightweight analysis |
+| Gemini | Gemini 2.0 Flash | $0.075 | Fast responses |
+| OpenRouter | Big Pickle (free) | $0.00 | Testing, demos |
 
-**Powerful Tier:**
-- Use for: Complex refactoring, architecture decisions, deep reasoning
-- Models: Opus 4, o1, Pro 2.5, Grok Code (free)
-- Cost: $1.25-$15.00 per million input tokens
-- Speed: Slower but more capable
+**Balanced Tier** - General purpose models for most tasks:
+| Provider | Model | Input Cost/1M | Use For |
+|----------|-------|---------------|---------|
+| Anthropic | Claude Sonnet 4 | $3.00 | Code review, PR summaries |
+| OpenAI | GPT-4o | $2.50 | Diff explanation |
+| Gemini | Gemini 2.0 Pro | $1.25 | General assistance |
+| OpenRouter | Big Pickle (free) | $0.00 | Testing, demos |
+
+**Powerful Tier** - Complex reasoning for demanding tasks:
+| Provider | Model | Input Cost/1M | Use For |
+|----------|-------|---------------|---------|
+| Anthropic | Claude Opus 4 | $15.00 | Architecture decisions |
+| OpenAI | o1 | $15.00 | Complex refactoring |
+| Gemini | Gemini 2.5 Pro | $1.25 | Deep analysis |
+| OpenRouter | Grok Code (free) | $0.00 | Testing, demos |
+
+**Model Selection Priority:**
+1. User's configured default provider (if available)
+2. First configured provider in list
+3. OpenRouter free tier (if enabled)
 
 ### Plugin Examples
 
@@ -318,19 +331,20 @@ Internal features follow the same pattern as plugins:
 - Quality comparable to GPT-3.5 level
 
 **User Experience:**
-1. New Ledger install
+1. New Ledger install - no AI providers enabled by default
 2. Open AI settings
-3. OpenRouter already shows "configured" with green dot
-4. Click Test button → instant success
-5. Try AI feature → works immediately
-6. Optional: Add premium provider later for better quality/speed
+3. Expand OpenRouter card
+4. Click "Enable" button (no API key needed for free tier)
+5. OpenRouter now shows as configured, Test button appears
+6. Click Test → success (uses free tier models)
+7. Optional: Add OpenRouter API key for premium models, or add other providers
 
 **Fallback Hierarchy:**
 1. User's configured default provider (if available)
 2. First configured provider in list (if default unavailable)
-3. OpenRouter free tier (always available)
+3. OpenRouter free tier (if enabled)
 
-This ensures AI functionality never fails due to configuration issues.
+AI requires explicit opt-in. Users must enable at least one provider for AI features to work.
 
 ---
 
@@ -347,7 +361,7 @@ Each provider catches and normalizes errors:
 ### Service-Level Errors
 
 AIService adds additional safety:
-- Missing provider → Falls back to OpenRouter
+- Missing provider → Falls back to next configured provider, or error if none enabled
 - Invalid model ID → Error with suggested valid models
 - Malformed request → Zod validation error with clear message
 
@@ -604,7 +618,7 @@ Existing plugins continue to work. AI common layer is opt-in.
 
 **Recommended Adoption:**
 1. Add AI-enhanced features as progressive enhancement
-2. Gracefully degrade if AI unavailable (shouldn't happen due to free tier)
+2. Gracefully degrade if AI unavailable (user may not have enabled any provider)
 3. Use tiers appropriately (don't waste powerful tier on simple tasks)
 4. Respect user's provider choice (don't require specific provider)
 

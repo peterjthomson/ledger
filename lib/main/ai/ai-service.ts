@@ -102,11 +102,9 @@ class AIService {
       geminiProvider.configure(providers.gemini.apiKey)
     }
 
-    if (providers.openrouter?.apiKey && providers.openrouter.enabled) {
-      openrouterProvider.configure(providers.openrouter.apiKey)
-    } else {
-      // Always configure OpenRouter for free tier (OpenCode Zen)
-      openrouterProvider.configure() // No API key = free tier
+    if (providers.openrouter?.enabled) {
+      // Configure with API key if provided, otherwise use free tier
+      openrouterProvider.configure(providers.openrouter.apiKey || undefined)
     }
   }
 
@@ -128,8 +126,7 @@ class AIService {
 
   /**
    * Check if a provider is available and ready to handle requests.
-   * Note: OpenRouter is always available via free tier (OpenCode Zen).
-   * For checking user-configured providers only, use getConfiguredProviders().
+   * A provider is available if it's enabled and configured (has API key or uses free tier).
    */
   isProviderAvailable(provider: AIProvider): boolean {
     switch (provider) {
@@ -140,22 +137,23 @@ class AIService {
       case 'gemini':
         return geminiProvider.isConfigured()
       case 'openrouter':
-        return openrouterProvider.isConfigured()
+        // OpenRouter is available if enabled (works with or without API key via free tier)
+        return this.settings.providers.openrouter?.enabled === true
       default:
         return false
     }
   }
 
   /**
-   * Get all configured providers (excludes OpenRouter free tier from this list)
+   * Get all configured providers (enabled and ready to use)
    */
   getConfiguredProviders(): AIProvider[] {
     const providers: AIProvider[] = []
     if (anthropicProvider.isConfigured()) providers.push('anthropic')
     if (openaiProvider.isConfigured()) providers.push('openai')
     if (geminiProvider.isConfigured()) providers.push('gemini')
-    // Only include OpenRouter if user has added their own API key
-    if (this.settings.providers.openrouter?.apiKey) providers.push('openrouter')
+    // Include OpenRouter if enabled (works with or without API key)
+    if (this.settings.providers.openrouter?.enabled) providers.push('openrouter')
     return providers
   }
 
@@ -163,7 +161,7 @@ class AIService {
    * Check if any provider is available
    */
   hasAnyProvider(): boolean {
-    return this.getConfiguredProviders().length > 0 || openrouterProvider.isConfigured()
+    return this.getConfiguredProviders().length > 0
   }
 
   /**
@@ -248,10 +246,9 @@ class AIService {
   ): Promise<AIResponse> {
     const { modelId, provider } = this.resolveModelAndProvider(options)
 
-    // OpenRouter is always available (free tier via OpenCode Zen)
-    if (provider !== 'openrouter' && !this.isProviderAvailable(provider)) {
+    if (!this.isProviderAvailable(provider)) {
       throw new Error(
-        `Provider ${provider} is not configured. Please add an API key in settings.`
+        `Provider ${provider} is not configured. Please enable it in Settings > AI Providers.`
       )
     }
 
@@ -275,10 +272,9 @@ class AIService {
   ): Promise<void> {
     const { modelId, provider } = this.resolveModelAndProvider(options)
 
-    // OpenRouter is always available (free tier via OpenCode Zen)
-    if (provider !== 'openrouter' && !this.isProviderAvailable(provider)) {
+    if (!this.isProviderAvailable(provider)) {
       throw new Error(
-        `Provider ${provider} is not configured. Please add an API key in settings.`
+        `Provider ${provider} is not configured. Please enable it in Settings > AI Providers.`
       )
     }
 
@@ -295,14 +291,14 @@ class AIService {
   private getModelForTier(tier: 'quick' | 'balanced' | 'powerful', provider?: AIProvider): { modelId: string; provider: AIProvider } {
     // If provider is explicitly specified, require it to be configured
     if (provider) {
-      if (provider === 'openrouter' || this.isProviderAvailable(provider)) {
+      if (this.isProviderAvailable(provider)) {
         return {
           modelId: DEFAULT_MODELS[provider][tier],
           provider,
         }
       }
       throw new Error(
-        `Provider '${provider}' is not configured. Please add an API key for ${provider}.`
+        `Provider '${provider}' is not configured. Please enable it in Settings > AI Providers.`
       )
     }
 
@@ -316,7 +312,7 @@ class AIService {
       }
     }
 
-    // 2. Any configured provider
+    // 2. Any configured provider (including OpenRouter if enabled)
     const configuredProviders = this.getConfiguredProviders()
     if (configuredProviders.length > 0) {
       const availableProvider = configuredProviders[0]
@@ -326,11 +322,18 @@ class AIService {
       }
     }
 
-    // 3. OpenRouter free tier (always available)
-    return {
-      modelId: DEFAULT_MODELS.openrouter[tier],
-      provider: 'openrouter',
+    // 3. OpenRouter free tier (if enabled without API key)
+    if (this.settings.providers.openrouter?.enabled) {
+      return {
+        modelId: DEFAULT_MODELS.openrouter[tier],
+        provider: 'openrouter',
+      }
     }
+
+    // No provider configured - error
+    throw new Error(
+      'No AI provider is configured. Please enable a provider in Settings > AI Providers.'
+    )
   }
 
   /**

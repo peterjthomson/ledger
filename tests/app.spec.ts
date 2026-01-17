@@ -265,7 +265,7 @@ test.describe('Ledger App - AI Settings', () => {
     await expect(page.getByTestId('ai-provider-card-openrouter')).toBeVisible()
   })
 
-  test('OpenRouter free tier works without API key', async () => {
+  test('OpenRouter free tier works after enabling without API key', async () => {
     test.skip(!repoLoaded, 'Repo did not auto-load')
     
     // Ensure settings are open
@@ -280,15 +280,23 @@ test.describe('Ledger App - AI Settings', () => {
     const openrouterCard = page.getByTestId('ai-provider-card-openrouter')
     await expect(openrouterCard).toBeVisible()
     
-    // Check if already expanded, if not expand it
+    // Expand it if not already expanded
     const isExpanded = await openrouterCard.evaluate((el) => el.classList.contains('expanded'))
     if (!isExpanded) {
       await page.getByTestId('ai-provider-header-openrouter').click()
-      // Wait for expansion animation
       await page.waitForTimeout(300)
     }
     
-    // Test button should be visible (OpenRouter is always configured via free tier)
+    // Enable OpenRouter without API key by clicking Enable button
+    // This enables the provider for free tier access
+    const enableButton = openrouterCard.locator('.ai-key-btn-save')
+    if (await enableButton.isVisible()) {
+      // Button should say "Enable" when no API key is entered
+      await enableButton.click()
+      await page.waitForTimeout(500)
+    }
+    
+    // Test button should now be visible (OpenRouter enabled via free tier)
     const testButton = page.getByTestId('ai-test-btn-openrouter')
     await expect(testButton).toBeVisible({ timeout: 2000 })
     
@@ -296,7 +304,6 @@ test.describe('Ledger App - AI Settings', () => {
     await testButton.click()
     
     // Wait for test to complete - should see "Testing..." then "Connected" or "Failed"
-    // First wait for "Testing..." to appear
     const testStatus = page.getByTestId('ai-test-status-openrouter')
     await expect(testStatus).toBeVisible({ timeout: 2000 })
     await expect(testStatus).toHaveText('Testing...', { timeout: 2000 })

@@ -97,7 +97,9 @@ export function AISettingsSection() {
   const handleSaveKey = useCallback(
     async (provider: AIProvider) => {
       const apiKey = editingKeys[provider]
-      if (!apiKey.trim()) return
+      // For OpenRouter, allow empty key (enables free tier)
+      // For other providers, require an API key
+      if (provider !== 'openrouter' && !apiKey.trim()) return
 
       try {
         setSaving(true)
@@ -191,8 +193,10 @@ export function AISettingsSection() {
   )
 
   const isProviderConfigured = (provider: AIProvider): boolean => {
-    // OpenRouter is always "configured" via OpenCode Zen free tier
-    if (provider === 'openrouter') return true
+    // OpenRouter is configured when enabled (works without API key via free tier)
+    if (provider === 'openrouter') {
+      return settings?.providers?.openrouter?.enabled === true
+    }
     return !!settings?.providers?.[provider]?.apiKey
   }
 
@@ -308,9 +312,9 @@ export function AISettingsSection() {
                         <button
                           className="ai-key-btn ai-key-btn-save"
                           onClick={() => handleSaveKey(provider)}
-                          disabled={saving || !editingKeys[provider].trim()}
+                          disabled={saving || (provider !== 'openrouter' && !editingKeys[provider].trim())}
                         >
-                          Save
+                          {provider === 'openrouter' && !editingKeys[provider].trim() ? 'Enable' : 'Save'}
                         </button>
                       )}
                     </div>

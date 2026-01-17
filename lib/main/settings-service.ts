@@ -373,16 +373,28 @@ export function removeAIProviderKey(provider: 'anthropic' | 'openai' | 'gemini' 
 
 export function setDefaultAIProvider(provider: 'anthropic' | 'openai' | 'gemini' | 'openrouter'): void {
   const settings = loadSettings();
-  if (settings.ai) {
-    settings.ai.defaults.provider = provider;
-    // Keep defaults.models consistent with the selected provider.
-    // (UI currently allows changing default provider without selecting models.)
-    settings.ai.defaults.models = {
-      quick: DEFAULT_MODELS[provider].quick,
-      balanced: DEFAULT_MODELS[provider].balanced,
-      powerful: DEFAULT_MODELS[provider].powerful,
-    };
-    saveSettings(settings);
-  }
+  // Initialize AI settings if missing (same pattern as setAIProviderKey)
+  const currentAI = settings.ai || {
+    providers: {},
+    defaults: {
+      provider: 'anthropic',
+      models: {
+        quick: 'claude-3-5-haiku-20241022',
+        balanced: 'claude-sonnet-4-20250514',
+        powerful: 'claude-opus-4-20250514',
+      },
+    },
+  };
+
+  currentAI.defaults.provider = provider;
+  // Keep defaults.models consistent with the selected provider.
+  currentAI.defaults.models = {
+    quick: DEFAULT_MODELS[provider].quick,
+    balanced: DEFAULT_MODELS[provider].balanced,
+    powerful: DEFAULT_MODELS[provider].powerful,
+  };
+
+  settings.ai = currentAI;
+  saveSettings(settings);
 }
 
