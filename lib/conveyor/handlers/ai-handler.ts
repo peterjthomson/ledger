@@ -13,6 +13,7 @@ import {
   setAIProviderKey,
   removeAIProviderKey,
   setDefaultAIProvider,
+  getEncryptionStatus,
 } from '@/lib/main/settings-service'
 import type { AIProvider, AIMessage, CompletionOptions, AISettings } from '@/lib/main/ai/types'
 
@@ -220,6 +221,20 @@ export const registerAIHandlers = () => {
     } catch (error) {
       logHandlerError('ai:clear-usage-history', error)
       return { success: false, message: serializeError(error) }
+    }
+  })
+
+  // Security handlers
+  handle('ai:get-encryption-status', async () => {
+    try {
+      return getEncryptionStatus()
+    } catch (error) {
+      logHandlerError('ai:get-encryption-status', error)
+      return {
+        available: false,
+        backend: 'unknown',
+        isStrong: false,
+      }
     }
   })
 }

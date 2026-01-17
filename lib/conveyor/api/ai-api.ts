@@ -48,4 +48,7 @@ export class AIApi extends ConveyorApi {
   // Usage
   getUsageStats = () => this.invoke('ai:get-usage-stats')
   clearUsageHistory = () => this.invoke('ai:clear-usage-history')
+
+  // Security
+  getEncryptionStatus = () => this.invoke('ai:get-encryption-status')
 }

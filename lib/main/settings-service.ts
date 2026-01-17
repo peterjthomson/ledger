@@ -1,8 +1,12 @@
 import { app, dialog } from 'electron';
 import * as fs from 'fs';
 import * as path from 'path';
-import type { AISettings } from './ai/types';
+import type { AISettings, AIProvider } from './ai/types';
 import { DEFAULT_MODELS } from './ai/models';
+import { encryptApiKey, decryptApiKey } from './secure-storage';
+
+// Re-export encryption status for use by handlers
+export { getEncryptionStatus } from './secure-storage';
 
 type ViewMode = 'columns' | 'work';
 type ThemeMode = 'light' | 'dark' | 'system' | 'custom';
@@ -303,14 +307,59 @@ export function removeRecentRepo(repoPath: string): void {
 }
 
 // AI Settings functions
+
+/**
+ * Helper to decrypt all API keys in AI settings
+ */
+function decryptAISettings(ai: AISettings): AISettings {
+  const decrypted = { ...ai, providers: { ...ai.providers } };
+  const providers: AIProvider[] = ['anthropic', 'openai', 'gemini', 'openrouter'];
+
+  for (const provider of providers) {
+    const settings = decrypted.providers[provider];
+    if (settings?.apiKey) {
+      decrypted.providers[provider] = {
+        ...settings,
+        apiKey: decryptApiKey(settings.apiKey),
+      };
+    }
+  }
+
+  return decrypted;
+}
+
+/**
+ * Helper to encrypt all API keys in AI settings
+ */
+function encryptAISettings(ai: AISettings): AISettings {
+  const encrypted = { ...ai, providers: { ...ai.providers } };
+  const providers: AIProvider[] = ['anthropic', 'openai', 'gemini', 'openrouter'];
+
+  for (const provider of providers) {
+    const settings = encrypted.providers[provider];
+    if (settings?.apiKey) {
+      encrypted.providers[provider] = {
+        ...settings,
+        apiKey: encryptApiKey(settings.apiKey),
+      };
+    }
+  }
+
+  return encrypted;
+}
+
 export function getAISettings(): AISettings | null {
   const settings = loadSettings();
-  return settings.ai || null;
+  if (!settings.ai) return null;
+
+  // Decrypt API keys when loading
+  return decryptAISettings(settings.ai);
 }
 
 export function saveAISettings(aiSettings: AISettings): void {
   const settings = loadSettings();
-  settings.ai = aiSettings;
+  // Encrypt API keys when saving
+  settings.ai = encryptAISettings(aiSettings);
   saveSettings(settings);
 }
 
@@ -354,7 +403,8 @@ export function setAIProviderKey(
 
   currentAI.providers = currentAI.providers || {};
   currentAI.providers[provider] = {
-    apiKey,
+    // Encrypt the API key before storing
+    apiKey: encryptApiKey(apiKey),
     enabled,
     ...(organization && { organization }),
   };

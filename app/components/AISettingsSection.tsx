@@ -12,12 +12,24 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { useConveyor } from '../hooks/use-conveyor'
-import type { AIProvider, AISettings } from '@/lib/conveyor/schemas/ai-schema'
+import type { AIProvider, AISettings, EncryptionStatus } from '@/lib/conveyor/schemas/ai-schema'
 
 interface TestResult {
   provider: AIProvider
   status: 'idle' | 'testing' | 'success' | 'error'
   message?: string
+}
+
+// Human-readable backend names
+const BACKEND_NAMES: Record<string, string> = {
+  keychain: 'macOS Keychain',
+  dpapi: 'Windows DPAPI',
+  gnome_libsecret: 'GNOME Keyring',
+  kwallet: 'KWallet',
+  kwallet5: 'KWallet 5',
+  kwallet6: 'KWallet 6',
+  basic_text: 'Basic (weak)',
+  unknown: 'Unknown',
 }
 
 const PROVIDER_INFO: Record<AIProvider, { name: string; placeholder: string; link: string; isFree?: boolean }> = {
@@ -49,6 +61,7 @@ export function AISettingsSection() {
   const [settings, setSettings] = useState<AISettings | null>(null)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
+  const [encryptionStatus, setEncryptionStatus] = useState<EncryptionStatus | null>(null)
 
   // Local state for editing
   const [editingKeys, setEditingKeys] = useState<Record<AIProvider, string>>({
@@ -66,10 +79,20 @@ export function AISettingsSection() {
   })
   const [expandedProvider, setExpandedProvider] = useState<AIProvider | null>(null)
 
-  // Load settings on mount
+  // Load settings and encryption status on mount
   useEffect(() => {
     loadSettings()
+    loadEncryptionStatus()
   }, [])
+
+  const loadEncryptionStatus = async () => {
+    try {
+      const status = await ai.getEncryptionStatus()
+      setEncryptionStatus(status)
+    } catch (error) {
+      console.error('Failed to load encryption status:', error)
+    }
+  }
 
   const loadSettings = async () => {
     try {
@@ -244,6 +267,29 @@ export function AISettingsSection() {
     <div className="settings-section settings-section-ai" data-testid="ai-settings-section">
       <h4 className="settings-section-title">AI Providers</h4>
       <p className="settings-hint">Configure API keys for AI-powered features. OpenRouter provides free models with no API key required.</p>
+
+      {/* Encryption Status Warning */}
+      {encryptionStatus && !encryptionStatus.isStrong && (
+        <div className="ai-encryption-warning" data-testid="ai-encryption-warning">
+          <span className="ai-encryption-icon">⚠️</span>
+          <div className="ai-encryption-message">
+            <strong>Weak credential encryption</strong>
+            <span>
+              {!encryptionStatus.available
+                ? 'No system keyring available. API keys are stored with minimal protection.'
+                : `Using ${BACKEND_NAMES[encryptionStatus.backend] || encryptionStatus.backend}. For better security, install gnome-keyring or kwallet.`}
+            </span>
+          </div>
+        </div>
+      )}
+
+      {/* Encryption Status Info (when strong) */}
+      {encryptionStatus && encryptionStatus.isStrong && (
+        <div className="ai-encryption-info" data-testid="ai-encryption-info">
+          <span className="ai-encryption-icon">🔒</span>
+          <span>API keys encrypted via {BACKEND_NAMES[encryptionStatus.backend] || encryptionStatus.backend}</span>
+        </div>
+      )}
 
       {/* Provider Cards */}
       <div className="ai-provider-list" data-testid="ai-provider-list">
