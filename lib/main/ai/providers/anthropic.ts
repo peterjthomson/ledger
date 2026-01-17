@@ -37,6 +37,14 @@ export class AnthropicProvider implements AIProviderInterface {
   }
 
   /**
+   * Reset the provider, clearing credentials and client state
+   */
+  reset(): void {
+    this.client = null
+    this.apiKey = null
+  }
+
+  /**
    * Convert our message format to Anthropic's format
    */
   private convertMessages(

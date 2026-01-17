@@ -85,26 +85,39 @@ class AIService {
   }
 
   /**
-   * Configure all providers with their API keys from settings
+   * Configure all providers with their API keys from settings.
+   * Providers that are not enabled are reset to clear any stale credentials.
    */
   private configureProviders(): void {
     const { providers } = this.settings
 
+    // Anthropic: configure if enabled with key, otherwise reset
     if (providers.anthropic?.apiKey && providers.anthropic.enabled) {
       anthropicProvider.configure(providers.anthropic.apiKey)
+    } else {
+      anthropicProvider.reset()
     }
 
+    // OpenAI: configure if enabled with key, otherwise reset
     if (providers.openai?.apiKey && providers.openai.enabled) {
       openaiProvider.configure(providers.openai.apiKey, providers.openai.organization)
+    } else {
+      openaiProvider.reset()
     }
 
+    // Gemini: configure if enabled with key, otherwise reset
     if (providers.gemini?.apiKey && providers.gemini.enabled) {
       geminiProvider.configure(providers.gemini.apiKey)
+    } else {
+      geminiProvider.reset()
     }
 
+    // OpenRouter: configure if enabled (supports free tier), otherwise reset
     if (providers.openrouter?.enabled) {
       // Configure with API key if provided, otherwise use free tier
       openrouterProvider.configure(providers.openrouter.apiKey || undefined)
+    } else {
+      openrouterProvider.reset()
     }
   }
 

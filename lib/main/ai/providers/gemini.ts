@@ -37,6 +37,14 @@ export class GeminiProvider implements AIProviderInterface {
   }
 
   /**
+   * Reset the provider, clearing credentials and client state
+   */
+  reset(): void {
+    this.client = null
+    this.apiKey = null
+  }
+
+  /**
    * Get a generative model instance
    */
   private getGenerativeModel(modelId: string, options: CompletionOptions): GenerativeModel {

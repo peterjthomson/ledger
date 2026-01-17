@@ -86,6 +86,15 @@ export class OpenRouterProvider implements AIProviderInterface {
   }
 
   /**
+   * Reset the provider, clearing credentials and client state
+   */
+  reset(): void {
+    this.client = null
+    this.apiKey = ''
+    this.isUsingFreeTier = false
+  }
+
+  /**
    * Check if using free tier
    */
   isFreeTier(): boolean {

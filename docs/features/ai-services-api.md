@@ -165,8 +165,8 @@ Features:
 - `ai:set-default-provider` - Change default provider
 
 **Provider Status:**
-- `ai:get-configured-providers` - List providers with valid credentials
-- `ai:is-provider-available` - Check specific provider availability
+- `ai:get-configured-providers` - List providers that are enabled and ready to use (includes OpenRouter when enabled, even without API key)
+- `ai:is-provider-available` - Check if a specific provider is available (enabled and configured)
 
 **Model Information:**
 - `ai:get-models` - Retrieve full model registry

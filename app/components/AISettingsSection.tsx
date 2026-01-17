@@ -260,7 +260,7 @@ export function AISettingsSection() {
   }
 
   const configuredProviders = (['anthropic', 'openai', 'gemini', 'openrouter'] as AIProvider[]).filter(
-    hasCustomKey
+    isProviderConfigured
   )
 
   return (

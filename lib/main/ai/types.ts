@@ -75,6 +75,9 @@ export interface AIProviderInterface {
   /** Check if the provider is configured with valid credentials */
   isConfigured(): boolean
 
+  /** Reset the provider, clearing credentials and client state */
+  reset(): void
+
   /** Send a completion request */
   complete(messages: AIMessage[], options: CompletionOptions): Promise<AIResponse>
 
