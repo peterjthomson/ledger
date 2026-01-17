@@ -67,7 +67,11 @@ test.describe('Ledger App - Main View', () => {
         path.join(__dirname, '../out/main/main.js'),
         `--repo=${TEST_REPO}`
       ],
-      env: { ...process.env, LEDGER_SETTINGS_PATH: settingsPath },
+      env: {
+        ...process.env,
+        LEDGER_SETTINGS_PATH: settingsPath,
+        LEDGER_MOCK_OPENROUTER: '1',
+      },
     })
     
     page = await app.firstWindow()

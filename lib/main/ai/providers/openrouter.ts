@@ -41,6 +41,10 @@ const OPENCODE_ZEN_PUBLIC_KEY = 'public'
 // OpenRouter API endpoint (requires API key)
 const OPENROUTER_API = 'https://openrouter.ai/api/v1'
 
+const SHOULD_MOCK_OPENROUTER =
+  process.env.LEDGER_MOCK_OPENROUTER === '1' ||
+  process.env.LEDGER_MOCK_OPENROUTER === 'true'
+
 export class OpenRouterProvider implements AIProviderInterface {
   readonly provider = 'openrouter' as const
   private client: OpenAI | null = null
@@ -188,12 +192,21 @@ export class OpenRouterProvider implements AIProviderInterface {
     messages: AIMessage[],
     options: CompletionOptions = {}
   ): Promise<AIResponse> {
+    const modelId = options.model || OPENROUTER_DEFAULTS.balanced
+    if (SHOULD_MOCK_OPENROUTER) {
+      return {
+        content: 'Hello',
+        model: modelId,
+        provider: 'openrouter' as const,
+        usage: { inputTokens: 3, outputTokens: 1, estimatedCost: 0 },
+        finishReason: 'complete',
+      }
+    }
+
     if (!this.client) {
       // Auto-configure for free tier if not configured
       this.configure()
     }
-
-    const modelId = options.model || OPENROUTER_DEFAULTS.balanced
     const convertedMessages = this.convertMessages(messages, options)
 
     try {
@@ -249,11 +262,16 @@ export class OpenRouterProvider implements AIProviderInterface {
     callbacks: StreamCallbacks,
     options: CompletionOptions = {}
   ): Promise<void> {
+    const modelId = options.model || OPENROUTER_DEFAULTS.balanced
+    if (SHOULD_MOCK_OPENROUTER) {
+      callbacks.onChunk('Hello')
+      callbacks.onComplete?.('Hello')
+      return
+    }
+
     if (!this.client) {
       this.configure()
     }
-
-    const modelId = options.model || OPENROUTER_DEFAULTS.balanced
     const convertedMessages = this.convertMessages(messages, options)
 
     let fullText = ''

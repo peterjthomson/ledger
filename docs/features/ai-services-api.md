@@ -25,7 +25,7 @@ Four provider implementations, each conforming to `AIProviderInterface`:
 - **AnthropicProvider** - Claude models
 - **OpenAIProvider** - GPT models
 - **GeminiProvider** - Google models
-- **OpenRouterProvider** - Aggregator with free tier access (Big Pickle, Grok Code)
+- **OpenRouterProvider** - Aggregator with optional free tier access
 
 Each provider handles:
 - API authentication and configuration
@@ -37,11 +37,11 @@ Each provider handles:
 #### 2. Orchestration Layer (`lib/main/ai/ai-service.ts`)
 
 The `AIService` singleton coordinates:
-- **Provider selection** - Chooses configured provider or falls back to OpenRouter
+- **Provider selection** - Chooses a configured provider and can fall back to OpenRouter if enabled
 - **Model resolution** - Maps tier requests to specific models based on provider
 - **Usage tracking** - Records token counts and estimated costs
 - **Settings persistence** - Saves API keys and preferences via settings service
-- **Fallback strategy** - Ensures AI is always available (via free tier)
+- **Fallback strategy** - Optional free tier fallback when OpenRouter is enabled
 
 #### 3. Internal API Layer (`lib/conveyor/api/ai-api.ts`)
 
@@ -121,7 +121,7 @@ Under the `ai` key, stored alongside repository, theme, and canvas settings.
 **Default Provider:**
 - Which provider to use when no explicit provider specified
 - Falls back to first configured provider if default unavailable
-- Always falls back to OpenRouter free tier as ultimate fallback
+- Can fall back to OpenRouter free tier if enabled
 
 **Model Preferences:**
 - Per-tier model selection (quick, balanced, powerful)
@@ -147,8 +147,8 @@ Features:
 
 **OpenRouter:**
 - Marked with "Free" badge
-- When enabled without API key, automatically uses free tier (OpenCode Zen)
-- Optional API key input for premium models (300+ additional models)
+- When enabled without an API key, uses the free tier (OpenCode Zen)
+- Optional API key input for broader model access
 - Same enable flow as other providers (no special treatment in UI)
 
 ---
@@ -225,31 +225,7 @@ Plugins access AI via the global `window.conveyor.ai` object exposed in the rend
 
 ### Three-Tier Model Selection System
 
-The AI service uses a tier-based abstraction so code doesn't need to know specific model names. When you call `ai.quick()`, `ai.balanced()`, or `ai.powerful()`, the service automatically selects the appropriate model based on the user's configured provider.
-
-**Quick Tier** - Fast, cheap models for simple tasks:
-| Provider | Model | Input Cost/1M | Use For |
-|----------|-------|---------------|---------|
-| Anthropic | Claude 3.5 Haiku | $1.00 | Simple questions, commit messages |
-| OpenAI | GPT-4o-mini | $0.15 | Lightweight analysis |
-| Gemini | Gemini 2.0 Flash | $0.075 | Fast responses |
-| OpenRouter | Big Pickle (free) | $0.00 | Testing, demos |
-
-**Balanced Tier** - General purpose models for most tasks:
-| Provider | Model | Input Cost/1M | Use For |
-|----------|-------|---------------|---------|
-| Anthropic | Claude Sonnet 4 | $3.00 | Code review, PR summaries |
-| OpenAI | GPT-4o | $2.50 | Diff explanation |
-| Gemini | Gemini 2.0 Pro | $1.25 | General assistance |
-| OpenRouter | Big Pickle (free) | $0.00 | Testing, demos |
-
-**Powerful Tier** - Complex reasoning for demanding tasks:
-| Provider | Model | Input Cost/1M | Use For |
-|----------|-------|---------------|---------|
-| Anthropic | Claude Opus 4 | $15.00 | Architecture decisions |
-| OpenAI | o1 | $15.00 | Complex refactoring |
-| Gemini | Gemini 2.5 Pro | $1.25 | Deep analysis |
-| OpenRouter | Grok Code (free) | $0.00 | Testing, demos |
+The AI service uses a tier-based abstraction so code doesn't need to know specific model names. When you call `ai.quick()`, `ai.balanced()`, or `ai.powerful()`, the service selects the appropriate model based on the user's configured provider and per-tier defaults. This document intentionally avoids listing model names and pricing to prevent drift; the model registry is the canonical source.
 
 **Model Selection Priority:**
 1. User's configured default provider (if available)
@@ -320,15 +296,14 @@ Internal features follow the same pattern as plugins:
 **Why This Matters:**
 - Removes friction for new users
 - Enables dogfooding without API keys
-- Provides fallback when user's API quota exhausted
+- Can provide a fallback when user's API quota is exhausted (if enabled)
 - Demonstrates AI capability before purchase decision
 
 **How It Works:**
 - OpenRouter offers free tier via "OpenCode Zen" initiative
 - No API key required (or use `"public"` as key)
-- Two models available: Big Pickle (balanced) and Grok Code (powerful)
-- Rate limited but sufficient for testing and light usage
-- Quality comparable to GPT-3.5 level
+- Limited set of free models suitable for testing and light usage
+- Rate limited but sufficient for onboarding and demos
 
 **User Experience:**
 1. New Ledger install - no AI providers enabled by default
@@ -468,13 +443,12 @@ Location: `tests/app.spec.ts` - "AI Settings" test suite
 **Coverage:**
 - Settings panel opens and displays correctly
 - All provider cards render
-- OpenRouter free tier connection test (real API call)
+- OpenRouter connection test (mocked response)
 - Provider list completeness
 
 **Test Philosophy:**
-- Real API calls where possible (OpenRouter free tier)
-- No mocking of external APIs (tests actual integration)
-- Mock at provider boundary for unit tests (not implemented yet)
+- External API calls are mocked in E2E to avoid network flakiness
+- Provider-boundary mocks can be enabled for unit tests (future)
 - E2E tests verify the full stack including IPC, service, provider, and UI
 
 ### Validation Tests
@@ -582,9 +556,9 @@ New AI-powered features can be added as:
 
 - ✅ Core AI infrastructure (providers, service, IPC)
 - ✅ Settings UI and persistence
-- ✅ Model registry with 11 models
+- ✅ Model registry with tiered defaults
 - ✅ Usage tracking
-- ✅ Free tier fallback
+- ✅ Optional free tier fallback
 - ✅ E2E tests
 - ✅ Example plugins
 

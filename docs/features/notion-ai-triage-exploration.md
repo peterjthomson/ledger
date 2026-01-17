@@ -4,7 +4,7 @@
 
 This document explores two interconnected features:
 
-1. **Core AI Infrastructure** - First-class support for Anthropic, OpenAI, and Gemini as foundational services available throughout Ledger
+1. **Core AI Infrastructure** - First-class support for Anthropic, OpenAI, Gemini, and OpenRouter (free tier option) as foundational services available throughout Ledger
 2. **Notion Triage Plugin** - A gamified card triage experience (Pokémon-style encounters) that uses AI to help build complete product specs
 
 ---
@@ -99,7 +99,7 @@ Once completeness reaches threshold (e.g., 80%), AI declares the card "ready for
 
 AI should be a **first-class citizen** in Ledger, not an afterthought:
 
-1. **Multiple providers** - Users should be able to use Anthropic, OpenAI, or Gemini based on preference/cost
+1. **Multiple providers** - Users should be able to use Anthropic, OpenAI, Gemini, or OpenRouter based on preference/cost
 2. **Model preferences** - Different tasks need different models (Haiku for quick summaries, Opus for complex analysis)
 3. **Ubiquitous access** - Commit messages, PR reviews, diff explanations, branch summaries, merge conflict help
 4. **Plugin ecosystem** - All plugins should have easy access to AI capabilities
@@ -114,7 +114,7 @@ AI should be a **first-class citizen** in Ledger, not an afterthought:
 
 ## Part 1: Core AI Infrastructure ✅ (Implemented)
 
-The AI system is designed as **first-class infrastructure** with all major providers treated equally.
+The AI system is designed as **first-class infrastructure** with all major providers treated equally. OpenRouter provides an optional free tier for onboarding, and provider keys are encrypted via `safeStorage` with UI warnings when strong encryption is unavailable.
 
 ### File Structure
 
@@ -200,17 +200,19 @@ lib/plugins/notion-triage/
 
 ### API Key Storage
 
-**Current approach**: Plain JSON in settings file at `~/Library/Application Support/ledger/ledger-settings.json`
+**Current approach**: API keys are stored in the settings file at `~/Library/Application Support/ledger/ledger-settings.json`, encrypted via Electron `safeStorage`.
 
-**Recommended improvement**: Use macOS Keychain for secure storage (future enhancement)
+**Storage backends**:
+- macOS: Keychain
+- Windows: DPAPI
+- Linux: gnome-keyring/kwallet (falls back to `basic_text` if unavailable)
+
+The settings UI surfaces encryption status so users know when the fallback is in use.
 
 ### Rate Limiting
 
-| Service | Limit | Mitigation |
-|---------|-------|------------|
-| Notion | 3 req/sec | Request queue with exponential backoff |
-| Claude | 4000 req/min (tier 1) | Unlikely to hit in normal use |
-| Gemini | 60 req/min (free) | Queue for free tier |
+- Notion: strict request limits; use a queue with exponential backoff.
+- AI providers: limits vary by provider and plan; retry with backoff and surface rate-limit errors in the UI.
 
 ---
 
@@ -222,12 +224,12 @@ lib/plugins/notion-triage/
 2. **OAuth vs API key for Notion?**
    - Recommendation: Start with API key (simpler), add OAuth later for teams
 
-3. **Encrypt API keys in settings?**
-   - Recommendation: Use Keychain for additional security
+3. **How should we handle Linux fallback encryption?**
+   - When `basic_text` is used, should we gate AI features or just warn?
 
-4. **Model cost visibility?**
-   - Could show estimated cost before AI operations
-   - Track usage per session
+4. **Cost visibility and budgets?**
+   - Show preflight cost estimates for large requests
+   - Add monthly budget alerts in the UI
 
 5. **Offline mode for Notion triage?**
    - Could cache cards locally for offline review

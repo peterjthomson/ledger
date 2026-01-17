@@ -16,6 +16,8 @@ import {
   CheckoutResult,
   PushResult,
   CreateBranchResult,
+  PullCurrentBranchResult,
+  RenameBranchResult,
 } from './branch-types'
 
 /**
@@ -405,6 +407,290 @@ export async function deleteBranch(
         message: `Branch '${branchName}' is not fully merged. Use force delete if you're sure.`,
       }
     }
+    return { success: false, message: errorMessage }
+  }
+}
+
+/**
+ * Checkout a specific commit (creates detached HEAD state unless on a branch tip)
+ */
+export async function checkoutCommit(
+  ctx: RepositoryContext,
+  commitHash: string,
+  branchName?: string
+): Promise<CheckoutResult> {
+  const git = ctx.git
+  if (!git) throw new Error('No repository selected')
+
+  try {
+    // Stash any uncommitted changes first
+    const stashResult = await stashChanges(ctx)
+
+    // If a branch name is provided and the commit is the tip of that branch, checkout the branch instead
+    if (branchName) {
+      const branches = await git.branchLocal()
+      if (branches.all.includes(branchName)) {
+        // Check if the branch tip matches the commit
+        const branchCommit = await git.revparse([branchName])
+        if (branchCommit.trim() === commitHash || branchCommit.trim().startsWith(commitHash)) {
+          // Checkout the branch (avoids detached HEAD)
+          await git.checkout(['--ignore-other-worktrees', branchName])
+
+          if (stashResult.stashed) {
+            try {
+              await git.raw(['stash', 'pop'])
+              return {
+                success: true,
+                message: `Switched to branch '${branchName}' with uncommitted changes`,
+              }
+            } catch {
+              return {
+                success: true,
+                message: `Switched to '${branchName}'. Uncommitted changes moved to stash (conflicts detected).`,
+                stashed: stashResult.message,
+              }
+            }
+          }
+
+          return {
+            success: true,
+            message: `Switched to branch '${branchName}'`,
+          }
+        }
+      }
+    }
+
+    // Checkout the commit directly (detached HEAD)
+    await git.checkout(commitHash)
+
+    if (stashResult.stashed) {
+      try {
+        await git.raw(['stash', 'pop'])
+        return {
+          success: true,
+          message: `Checked out commit ${commitHash.slice(0, 7)} (detached HEAD) with uncommitted changes`,
+        }
+      } catch {
+        return {
+          success: true,
+          message: `Checked out commit ${commitHash.slice(0, 7)} (detached HEAD). Uncommitted changes moved to stash.`,
+          stashed: stashResult.message,
+        }
+      }
+    }
+
+    return {
+      success: true,
+      message: `Checked out commit ${commitHash.slice(0, 7)} (detached HEAD)`,
+    }
+  } catch (error) {
+    return {
+      success: false,
+      message: (error as Error).message,
+    }
+  }
+}
+
+/**
+ * Rename a branch
+ */
+export async function renameBranch(
+  ctx: RepositoryContext,
+  oldName: string,
+  newName: string
+): Promise<RenameBranchResult> {
+  const git = ctx.git
+  if (!git) throw new Error('No repository selected')
+
+  try {
+    const trimmedOldName = oldName.trim()
+    const trimmedNewName = newName.trim()
+
+    if (!trimmedOldName || !trimmedNewName) {
+      return { success: false, message: 'Branch names cannot be empty' }
+    }
+
+    // Don't allow renaming main/master
+    if (trimmedOldName === 'main' || trimmedOldName === 'master') {
+      return { success: false, message: 'Cannot rename main or master branch' }
+    }
+
+    // Don't allow renaming to main/master
+    if (trimmedNewName === 'main' || trimmedNewName === 'master') {
+      return { success: false, message: 'Cannot rename to main or master' }
+    }
+
+    // Validate new branch name format (no spaces, special chars at start)
+    if (!/^[a-zA-Z0-9]/.test(trimmedNewName)) {
+      return { success: false, message: 'Branch name must start with a letter or number' }
+    }
+
+    if (/\s/.test(trimmedNewName)) {
+      return { success: false, message: 'Branch name cannot contain spaces' }
+    }
+
+    // Check if new name already exists
+    const branches = await git.branchLocal()
+    if (branches.all.includes(trimmedNewName)) {
+      return { success: false, message: `Branch '${trimmedNewName}' already exists` }
+    }
+
+    // Rename the branch using -m flag
+    await git.branch(['-m', trimmedOldName, trimmedNewName])
+    return { success: true, message: `Renamed branch '${trimmedOldName}' to '${trimmedNewName}'` }
+  } catch (error) {
+    return { success: false, message: (error as Error).message }
+  }
+}
+
+/**
+ * Delete a remote branch (git push origin --delete branchname)
+ */
+export async function deleteRemoteBranch(
+  ctx: RepositoryContext,
+  branchName: string
+): Promise<{ success: boolean; message: string }> {
+  const git = ctx.git
+  if (!git) throw new Error('No repository selected')
+
+  try {
+    // Clean up the branch name (remove remotes/origin/ prefix if present)
+    let cleanName = branchName.trim()
+    cleanName = cleanName.replace(/^remotes\//, '').replace(/^origin\//, '')
+
+    if (!cleanName) {
+      return { success: false, message: 'Branch name cannot be empty' }
+    }
+
+    // Don't allow deleting main/master
+    if (cleanName === 'main' || cleanName === 'master') {
+      return { success: false, message: 'Cannot delete main or master branch' }
+    }
+
+    // Delete the remote branch
+    await git.raw(['push', 'origin', '--delete', cleanName])
+    return { success: true, message: `Deleted remote branch 'origin/${cleanName}'` }
+  } catch (error) {
+    const errorMessage = (error as Error).message
+    if (errorMessage.includes('remote ref does not exist')) {
+      return { success: false, message: `Remote branch '${branchName}' does not exist` }
+    }
+    return { success: false, message: errorMessage }
+  }
+}
+
+/**
+ * Pull current branch from origin (with rebase to avoid merge commits)
+ * Ledger Opinion: Auto-stashes uncommitted changes, pulls, then restores them.
+ */
+export async function pullCurrentBranch(ctx: RepositoryContext): Promise<PullCurrentBranchResult> {
+  const git = ctx.git
+  if (!git) throw new Error('No repository selected')
+
+  let didStash = false
+
+  try {
+    const currentBranch = (await git.branchLocal()).current
+    if (!currentBranch) {
+      return { success: false, message: 'Not on a branch (detached HEAD state)' }
+    }
+
+    // Fetch first to get the latest refs
+    await git.fetch('origin', currentBranch)
+
+    // Check if there are remote changes to pull
+    const statusBefore = await git.status()
+    if (statusBefore.behind === 0) {
+      return { success: true, message: 'Already up to date' }
+    }
+
+    // Check if we have uncommitted changes
+    const hasUncommittedChangesNow =
+      statusBefore.modified.length > 0 ||
+      statusBefore.not_added.length > 0 ||
+      statusBefore.created.length > 0 ||
+      statusBefore.deleted.length > 0 ||
+      statusBefore.staged.length > 0
+
+    // Auto-stash if we have uncommitted changes
+    if (hasUncommittedChangesNow) {
+      await git.raw(['stash', 'push', '--include-untracked', '-m', 'ledger-auto-stash-for-pull'])
+      didStash = true
+    }
+
+    // Pull with rebase
+    await git.pull('origin', currentBranch, ['--rebase'])
+
+    // Restore stashed changes
+    if (didStash) {
+      try {
+        await git.raw(['stash', 'pop'])
+        return {
+          success: true,
+          message: `Pulled ${statusBefore.behind} commit${statusBefore.behind > 1 ? 's' : ''} and restored your uncommitted changes`,
+          autoStashed: true,
+        }
+      } catch (stashError) {
+        const stashMsg = (stashError as Error).message
+        if (stashMsg.includes('conflict') || stashMsg.includes('CONFLICT')) {
+          return {
+            success: true,
+            message:
+              'Pulled successfully, but restoring your changes caused conflicts. Please resolve them.',
+            hadConflicts: true,
+            autoStashed: true,
+          }
+        }
+        // Stash pop failed for other reason - leave it in stash list
+        return {
+          success: true,
+          message:
+            'Pulled successfully. Your changes are in the stash (run git stash pop to restore).',
+          autoStashed: true,
+        }
+      }
+    }
+
+    return {
+      success: true,
+      message: `Pulled ${statusBefore.behind} commit${statusBefore.behind > 1 ? 's' : ''} from origin`,
+    }
+  } catch (error) {
+    const errorMessage = (error as Error).message
+
+    // If we stashed but pull failed, try to restore
+    if (didStash) {
+      try {
+        await git.raw(['stash', 'pop'])
+      } catch {
+        // Stash restore failed - it's still in stash list, user can recover
+      }
+    }
+
+    // Check for merge/rebase conflicts
+    if (
+      errorMessage.includes('conflict') ||
+      errorMessage.includes('CONFLICT') ||
+      errorMessage.includes('Merge conflict') ||
+      errorMessage.includes('could not apply')
+    ) {
+      try {
+        await git.rebase(['--abort'])
+      } catch {
+        /* ignore */
+      }
+      return {
+        success: false,
+        message: 'Pull failed due to conflicts with incoming changes. Please resolve manually.',
+        hadConflicts: true,
+      }
+    }
+
+    // No tracking branch - this is fine for new branches
+    if (errorMessage.includes('no tracking') || errorMessage.includes("doesn't track")) {
+      return { success: true, message: 'No remote tracking branch (will be created on push)' }
+    }
+
     return { success: false, message: errorMessage }
   }
 }

@@ -11,6 +11,9 @@ import { stagingIpcSchema } from './staging-schema'
 import { themeIpcSchema } from './theme-schema'
 import { pluginIpcSchema } from './plugin-schema'
 import { aiIpcSchema } from './ai-schema'
+import { mailmapIpcSchema } from './mailmap-schema'
+import { analyticsIpcSchema } from './analytics-schema'
+import { canvasIpcSchema } from './canvas-schema'
 
 // Define all IPC channel schemas in one place
 export const ipcSchemas = {
@@ -26,6 +29,9 @@ export const ipcSchemas = {
   ...themeIpcSchema,
   ...pluginIpcSchema,
   ...aiIpcSchema,
+  ...mailmapIpcSchema,
+  ...analyticsIpcSchema,
+  ...canvasIpcSchema,
 } as const
 
 // Extract types from Zod schemas

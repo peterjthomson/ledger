@@ -28,16 +28,20 @@ import { registerStagingHandlers } from '@/lib/conveyor/handlers/staging-handler
 import { registerThemeHandlers } from '@/lib/conveyor/handlers/theme-handler'
 import { registerPluginHandlers } from '@/lib/conveyor/handlers/plugin-handler'
 import { registerAIHandlers } from '@/lib/conveyor/handlers/ai-handler'
+import { registerMailmapHandlers } from '@/lib/conveyor/handlers/mailmap-handler'
+import { registerAnalyticsHandlers } from '@/lib/conveyor/handlers/analytics-handler'
+import { registerCanvasHandlers } from '@/lib/conveyor/handlers/canvas-handler'
 import { markChannelRegistered } from '@/lib/main/shared'
 
-// IPC channels registered below via ipcMain.handle
+// IPC channels registered in this file (for documentation/debugging)
 const IPC_CHANNELS = [
   // Repo
-  'select-repo', 'get-repo-path', 'get-saved-repo-path', 'load-saved-repo', 'get-sibling-repos',
+  'select-repo', 'get-repo-path', 'get-saved-repo-path', 'load-saved-repo',
   // Branches
   'get-branches', 'get-branches-basic', 'get-branches-with-metadata',
   'checkout-branch', 'checkout-commit', 'create-branch', 'delete-branch', 'delete-remote-branch',
   'push-branch', 'checkout-remote-branch', 'open-branch-in-github', 'pull-branch', 'pull-current-branch',
+  'rename-branch',
   // Worktrees
   'get-worktrees', 'open-worktree', 'convert-worktree-to-branch', 'apply-worktree-changes',
   'remove-worktree', 'create-worktree', 'select-worktree-folder', 'push-worktree-branch',
@@ -45,8 +49,7 @@ const IPC_CHANNELS = [
   'get-pull-requests', 'open-pull-request', 'create-pull-request', 'checkout-pr-branch',
   'get-pr-detail', 'get-pr-review-comments', 'get-pr-file-diff', 'comment-on-pr', 'merge-pr', 'get-github-url',
   // Commits
-  'get-commit-history', 'get-commit-diff', 'get-branch-diff', 'get-commit-graph-history', 'get-contributor-stats',
-  'get-merged-branch-tree', 'reset-to-commit',
+  'get-commit-history', 'get-commit-diff', 'get-branch-diff', 'get-commit-graph-history', 'reset-to-commit',
   // Stashes
   'get-stashes', 'get-stash-files', 'get-stash-file-diff', 'get-stash-file-diff-parsed',
   'get-stash-diff', 'apply-stash', 'pop-stash', 'drop-stash', 'stash-to-branch', 'apply-stash-to-branch',
@@ -59,11 +62,6 @@ const IPC_CHANNELS = [
   // Theme
   'get-theme-mode', 'set-theme-mode', 'get-system-theme', 'get-selected-theme-id',
   'get-custom-theme', 'load-vscode-theme', 'load-built-in-theme', 'clear-custom-theme',
-  // Canvas
-  'get-canvases', 'save-canvases', 'get-active-canvas-id', 'save-active-canvas-id',
-  'add-canvas', 'remove-canvas', 'update-canvas',
-  // Mailmap
-  'get-mailmap', 'add-mailmap-entries', 'remove-mailmap-entry', 'suggest-mailmap-entries', 'get-author-identities',
 ]
 
 // Fix PATH for macOS when launched from Finder/Dock (not terminal)
@@ -137,10 +135,7 @@ import {
   getPRFileDiff,
   commentOnPR,
   mergePR,
-  // Repo operations
-  getSiblingRepos,
-  // Tech Tree
-  getMergedBranchTree,
+  // Note: getSiblingRepos, getMergedBranchTree now handled by conveyor analytics handlers
 } from './git-service'
 import {
   getLastRepoPath,
@@ -153,14 +148,7 @@ import {
   loadBuiltInTheme,
   clearCustomTheme,
   mapVSCodeThemeToCSS,
-  // Canvas functions
-  getCanvases,
-  saveCanvases,
-  getActiveCanvasId,
-  saveActiveCanvasId,
-  addCanvas,
-  removeCanvas,
-  updateCanvas,
+  // Note: Canvas functions (getCanvases, saveCanvases, etc.) now handled by conveyor canvas handlers
 } from './settings-service'
 
 // Check for --repo command line argument (for testing)
@@ -202,6 +190,9 @@ app.whenReady().then(() => {
   registerThemeHandlers()
   registerPluginHandlers()
   registerAIHandlers()
+  registerMailmapHandlers()
+  registerAnalyticsHandlers()
+  registerCanvasHandlers()
 
   // Register git IPC handlers
   ipcMain.handle('select-repo', async () => {
@@ -457,64 +448,6 @@ app.whenReady().then(() => {
       }
     }
   )
-
-  ipcMain.handle(
-    'get-contributor-stats',
-    async (_, topN?: number, bucketSize?: 'day' | 'week' | 'month') => {
-      try {
-        const { getContributorStats } = await import('./git-service')
-        return await getContributorStats(topN, bucketSize)
-      } catch (_error) {
-        return { contributors: [], startDate: '', endDate: '', bucketSize: bucketSize || 'week' }
-      }
-    }
-  )
-
-  // Mailmap management
-  ipcMain.handle('get-mailmap', async () => {
-    try {
-      const { getMailmap } = await import('./git-service')
-      return await getMailmap()
-    } catch (_error) {
-      return []
-    }
-  })
-
-  ipcMain.handle('get-author-identities', async () => {
-    try {
-      const { getAuthorIdentities } = await import('./git-service')
-      return await getAuthorIdentities()
-    } catch (_error) {
-      return []
-    }
-  })
-
-  ipcMain.handle('suggest-mailmap-entries', async () => {
-    try {
-      const { suggestMailmapEntries } = await import('./git-service')
-      return await suggestMailmapEntries()
-    } catch (_error) {
-      return []
-    }
-  })
-
-  ipcMain.handle('add-mailmap-entries', async (_, entries) => {
-    try {
-      const { addMailmapEntries } = await import('./git-service')
-      return await addMailmapEntries(entries)
-    } catch (_error) {
-      return { success: false, message: 'Failed to add mailmap entries' }
-    }
-  })
-
-  ipcMain.handle('remove-mailmap-entry', async (_, entry) => {
-    try {
-      const { removeMailmapEntry } = await import('./git-service')
-      return await removeMailmapEntry(entry)
-    } catch (_error) {
-      return { success: false, message: 'Failed to remove mailmap entry' }
-    }
-  })
 
   ipcMain.handle('get-commit-diff', async (_, commitHash: string) => {
     try {
@@ -838,15 +771,6 @@ app.whenReady().then(() => {
     }
   })
 
-  // Tech Tree handlers
-  ipcMain.handle('get-merged-branch-tree', async (_, limit?: number) => {
-    try {
-      return await getMergedBranchTree(limit)
-    } catch (_error) {
-      return { masterBranch: 'main', nodes: [], stats: { minLoc: 0, maxLoc: 1, minFiles: 0, maxFiles: 1, minAge: 0, maxAge: 1 } }
-    }
-  })
-
   // Theme handlers
   ipcMain.handle('get-theme-mode', () => {
     return getThemeMode()
@@ -901,50 +825,6 @@ app.whenReady().then(() => {
       }
     }
     return null
-  })
-
-  // Canvas handlers
-  ipcMain.handle('get-canvases', () => {
-    return getCanvases()
-  })
-
-  ipcMain.handle('save-canvases', (_event, canvases: unknown[]) => {
-    saveCanvases(canvases as any)
-    return { success: true }
-  })
-
-  ipcMain.handle('get-active-canvas-id', () => {
-    return getActiveCanvasId()
-  })
-
-  ipcMain.handle('save-active-canvas-id', (_event, canvasId: string) => {
-    saveActiveCanvasId(canvasId)
-    return { success: true }
-  })
-
-  ipcMain.handle('add-canvas', (_event, canvas: unknown) => {
-    addCanvas(canvas as any)
-    return { success: true }
-  })
-
-  ipcMain.handle('remove-canvas', (_event, canvasId: string) => {
-    removeCanvas(canvasId)
-    return { success: true }
-  })
-
-  ipcMain.handle('update-canvas', (_event, canvasId: string, updates: unknown) => {
-    updateCanvas(canvasId, updates as any)
-    return { success: true }
-  })
-
-  // Repo operations
-  ipcMain.handle('get-sibling-repos', async () => {
-    try {
-      return await getSiblingRepos()
-    } catch (error) {
-      console.error('Error getting sibling repos:', error)
-      return []
-    }
   })
 
   // Set app user model id for windows

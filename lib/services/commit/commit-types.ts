@@ -137,3 +137,31 @@ export interface ResetResult {
   message: string
   stashed?: string // Message if changes were auto-stashed
 }
+
+/**
+ * Working directory status
+ */
+export interface WorkingStatus {
+  hasChanges: boolean
+  files: UncommittedFile[]
+  stagedCount: number
+  unstagedCount: number
+  additions: number
+  deletions: number
+}
+
+/**
+ * Branch diff result
+ */
+export interface BranchDiff {
+  branchName: string
+  baseBranch: string
+  files: FileDiff[]
+  totalAdditions: number
+  totalDeletions: number
+  commitCount: number
+  hasConflicts?: boolean
+  conflictFiles?: string[]
+}
+
+export type BranchDiffType = 'diff' | 'changes' | 'preview'

@@ -54,6 +54,9 @@
  * Pure function - no side effects.
  */
 export function serializeError(error: unknown): string {
+  if (error === null || error === undefined) {
+    return 'Unknown error'
+  }
   if (error instanceof Error) {
     return error.message
   }

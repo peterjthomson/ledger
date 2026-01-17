@@ -39,6 +39,7 @@ interface CanvasColumn {
 interface CanvasConfig {
   id: string;
   name: string;
+  icon?: string;
   columns: CanvasColumn[];
   isPreset?: boolean;
 }

@@ -55,7 +55,7 @@ export const aiChatPanelPlugin: PanelPlugin = {
   closable: true,
   shortcut: 'Cmd+Shift+C',
 
-  // Settings - model selection now uses tiers instead of specific models
+  // Settings - model selection uses tiers (speed/quality trade-off)
   settings: [
     {
       key: 'responseSpeed',

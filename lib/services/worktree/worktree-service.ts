@@ -65,8 +65,12 @@ function detectAgent(worktreePath: string): WorktreeAgent {
     return 'cursor'
   }
 
-  // Claude Code might use ~/.claude/worktrees/ or similar
-  if (worktreePath.includes('/.claude/worktrees/') || worktreePath.includes('/claude-worktrees/')) {
+  // Claude Code might use ~/.claude/worktrees/ or ~/.claude-worktrees/ or similar
+  if (
+    worktreePath.includes('/.claude-worktrees/') ||
+    worktreePath.includes('/.claude/worktrees/') ||
+    worktreePath.includes('/claude-worktrees/')
+  ) {
     return 'claude'
   }
 

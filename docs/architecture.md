@@ -8,20 +8,19 @@ Ledger is an Electron application built with React. It follows the standard Elec
 ┌─────────────────────────────────────────────────────────────┐
 │                     Main Process                             │
 │  ┌─────────────────┐  ┌─────────────────┐                   │
-│  │  main.ts        │  │  git-service.ts │                   │
-│  │  (app lifecycle)│  │  (git commands) │                   │
+│  │  main.ts        │  │  lib/services/  │                   │
+│  │  (app lifecycle)│  │  (git ops)      │                   │
 │  └────────┬────────┘  └────────┬────────┘                   │
 │           │                    │                             │
 │  ┌────────┴────────────────────┴────────┐                   │
-│  │         settings-service.ts          │                   │
-│  │         (persistent storage)         │                   │
+│  │   lib/conveyor/handlers/ (IPC+Zod)   │                   │
 │  └──────────────────────────────────────┘                   │
 └─────────────────────┬───────────────────────────────────────┘
-                      │ IPC (ipcMain/ipcRenderer)
+                      │ IPC (conveyor: typed + validated)
 ┌─────────────────────┴───────────────────────────────────────┐
 │                   Preload Script                             │
 │  ┌──────────────────────────────────────────────────────┐   │
-│  │  preload.ts - exposes electronAPI to renderer        │   │
+│  │  preload.ts - exposes electronAPI + conveyor         │   │
 │  └──────────────────────────────────────────────────────┘   │
 └─────────────────────┬───────────────────────────────────────┘
                       │ contextBridge
@@ -43,23 +42,24 @@ Ledger is an Electron application built with React. It follows the standard Elec
 ledger/
 ├── app/                    # Renderer process (React)
 │   ├── app.tsx            # Main React component
+│   ├── components/        # UI components
 │   ├── styles/            # CSS styles
-│   │   └── app.css        # Main stylesheet
 │   └── types/             # TypeScript declarations
-│       └── electron.d.ts  # ElectronAPI types
 │
 ├── lib/                    # Main process code
-│   ├── main/
-│   │   ├── main.ts        # App entry, IPC handlers
-│   │   ├── app.ts         # Window creation
-│   │   ├── git-service.ts # Git operations
-│   │   └── settings-service.ts # Persistent settings
-│   └── preload/
-│       └── preload.ts     # Context bridge
+│   ├── main/              # App entry, lifecycle
+│   ├── services/          # Git operations (pure functions)
+│   │   ├── branch/        # Branch operations
+│   │   ├── commit/        # Commit operations
+│   │   ├── stash/         # Stash operations
+│   │   └── ...            # Other domains
+│   ├── conveyor/          # Typed IPC system
+│   │   ├── schemas/       # Zod validation schemas
+│   │   ├── handlers/      # IPC handlers
+│   │   └── api/           # Renderer-side API
+│   └── preload/           # Context bridge
 │
 ├── tests/                  # Playwright E2E tests
-│   └── app.spec.ts
-│
 ├── out/                    # Build output (generated)
 ├── dist/                   # Distribution files (generated)
 └── resources/              # Build resources (icons, etc.)
@@ -71,10 +71,10 @@ ledger/
 
 | File | Purpose |
 |------|---------|
-| `lib/main/main.ts` | App lifecycle, IPC handler registration |
-| `lib/main/git-service.ts` | All git operations via `simple-git` |
+| `lib/main/main.ts` | App lifecycle, handler registration |
+| `lib/services/*` | Git operations as pure functions |
+| `lib/conveyor/handlers/*` | IPC handlers with Zod validation |
 | `lib/main/settings-service.ts` | Read/write settings to disk |
-| `lib/main/app.ts` | BrowserWindow creation and config |
 
 ### Renderer Process
 
@@ -88,7 +88,7 @@ ledger/
 
 | File | Purpose |
 |------|---------|
-| `lib/preload/preload.ts` | Exposes `window.electronAPI` safely |
+| `lib/preload/preload.ts` | Exposes `window.electronAPI` + `window.conveyor` |
 
 ## Data Flow
 
@@ -102,16 +102,20 @@ ledger/
 
 ## IPC API
 
-All IPC is via `ipcMain.handle` / `ipcRenderer.invoke` (async request/response).
+IPC uses the **conveyor** system: typed channels with Zod validation.
 
-**Canonical source of truth:** `app/types/electron.d.ts` defines the renderer-facing `window.electronAPI` contract (method names + return types). `lib/preload/preload.ts` maps those methods to IPC channels, and `lib/main/main.ts` implements the handlers.
+**Canonical sources:**
+- `lib/conveyor/schemas/` - Channel definitions with Zod schemas
+- `lib/conveyor/handlers/` - Handler implementations
+- `lib/conveyor/api/` - Renderer-side typed API
 
-Because the IPC surface evolves frequently (staging, stashes, PR review, themes, canvases, etc.), this doc intentionally does **not** attempt to keep an exhaustive channel list in sync. If you need to add/verify an API:
+To add a new IPC channel:
 
-1. Update `app/types/electron.d.ts`
-2. Update `lib/preload/preload.ts`
-3. Update `lib/main/main.ts`
-4. Implement logic in `lib/main/git-service.ts` / `lib/main/settings-service.ts`
+1. Add pure function to `lib/services/` (e.g., `branch-service.ts`)
+2. Add Zod schema in `lib/conveyor/schemas/`
+3. Add handler in `lib/conveyor/handlers/`
+4. Add API method in `lib/conveyor/api/`
+5. Call via `window.conveyor.*` from renderer
 
 ## State Management
 

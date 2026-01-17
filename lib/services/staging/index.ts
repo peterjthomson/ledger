@@ -22,6 +22,7 @@ export {
   stageAll,
   unstageAll,
   discardFileChanges,
+  discardAllChanges,
   getFileDiff,
   // Hunk-level operations
   stageHunk,

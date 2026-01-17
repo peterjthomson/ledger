@@ -13,6 +13,7 @@
 import type { Plugin, PluginManifest, PluginPermission } from './plugin-types'
 import { pluginManager } from './plugin-manager'
 import { grantPermissions, revokePermissions } from './plugin-permissions'
+import { examplePlugins } from './examples'
 
 // ============================================================================
 // Types
@@ -445,10 +446,8 @@ class PluginLoader {
   }
 
   private async loadBuiltinPlugin(id: string): Promise<Plugin | null> {
-    // Import built-in plugins dynamically
-    const builtins = await import('./examples')
-    const plugin = builtins.examplePlugins.find((p) => p.id === id)
-    return plugin ?? null
+    // Built-in plugins are bundled with the app
+    return examplePlugins.find((p) => p.id === id) ?? null
   }
 
   private async loadExternalPlugin(pluginId: string): Promise<Plugin | null> {
