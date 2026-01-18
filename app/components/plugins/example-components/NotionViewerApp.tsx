@@ -171,6 +171,10 @@ export function NotionViewerApp({ context, activeNavItem, onNavigate }: PluginAp
     loadCardDetails(card.id)
   }
 
+  const handleCardClose = () => {
+    setSelectedCard(null)
+  }
+
   const handleLoadMore = () => {
     if (selectedDatabase && hasMore && nextCursor) {
       loadCards(selectedDatabase.id, nextCursor)
@@ -516,7 +520,7 @@ function CardsView({
           <CardDetailView
             card={selectedCard}
             database={database}
-            onClose={() => onSelectCard(null as unknown as NotionCard)}
+            onClose={handleCardClose}
           />
         )}
       </div>

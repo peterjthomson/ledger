@@ -79,7 +79,7 @@ class NotionServiceImpl {
    * Set the API key
    */
   setApiKey(apiKey: string): void {
-    this.settings = { ...this.settings, apiKey }
+    this.settings = { ...(this.settings ?? {}), apiKey }
     this.client = new Client({ auth: apiKey })
     this.onSettingsChange?.(this.settings)
   }
@@ -88,7 +88,7 @@ class NotionServiceImpl {
    * Clear the API key
    */
   clearApiKey(): void {
-    this.settings = { ...this.settings, apiKey: undefined }
+    this.settings = { ...(this.settings ?? {}), apiKey: undefined }
     this.client = null
     this.onSettingsChange?.(this.settings)
   }
@@ -654,24 +654,62 @@ class NotionServiceImpl {
           return { property, [type]: { is_not_empty: true } }
         }
         break
+      case 'multi_select':
+        if (condition === 'contains') {
+          return { property, multi_select: { contains: value as string } }
+        }
+        if (condition === 'does_not_contain') {
+          return { property, multi_select: { does_not_contain: value as string } }
+        }
+        if (condition === 'is_empty') {
+          return { property, multi_select: { is_empty: true } }
+        }
+        if (condition === 'is_not_empty') {
+          return { property, multi_select: { is_not_empty: true } }
+        }
+        break
 
       case 'checkbox':
-        return { property, checkbox: { equals: value as boolean } }
+        if (condition === 'equals') {
+          return { property, checkbox: { equals: value as boolean } }
+        }
+        if (condition === 'does_not_equal') {
+          return { property, checkbox: { does_not_equal: value as boolean } }
+        }
+        break
 
       case 'title':
       case 'rich_text': {
+        if (condition === 'is_empty') {
+          return { property, [type]: { is_empty: true } }
+        }
+        if (condition === 'is_not_empty') {
+          return { property, [type]: { is_not_empty: true } }
+        }
         const textFilter: Record<string, unknown> = {}
         textFilter[condition] = value
         return { property, [type]: textFilter }
       }
 
       case 'number': {
+        if (condition === 'is_empty') {
+          return { property, number: { is_empty: true } }
+        }
+        if (condition === 'is_not_empty') {
+          return { property, number: { is_not_empty: true } }
+        }
         const numFilter: Record<string, unknown> = {}
         numFilter[condition] = value
         return { property, number: numFilter }
       }
 
       case 'date': {
+        if (condition === 'is_empty') {
+          return { property, date: { is_empty: true } }
+        }
+        if (condition === 'is_not_empty') {
+          return { property, date: { is_not_empty: true } }
+        }
         const dateFilter: Record<string, unknown> = {}
         dateFilter[condition] = value
         return { property, date: dateFilter }
