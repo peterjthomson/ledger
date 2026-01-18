@@ -46,10 +46,16 @@ export interface EnhancedWorktree {
   additions: number
   /** Lines deleted in working directory */
   deletions: number
-  /** Last modification time of any file in worktree */
+  /** Directory modification time (used for sorting worktrees by creation order) */
   lastModified: string
-  /** Activity status based on lastModified */
+  /** Activity status based on both file and git activity */
   activityStatus: WorktreeActivityStatus
+  /** Most recent file modification time in worktree (filesystem level) */
+  lastFileModified: string
+  /** Last git activity: commit time or working directory change time */
+  lastGitActivity: string
+  /** Source of activity status: 'file' | 'git' | 'both' */
+  activitySource: 'file' | 'git' | 'both'
   /** Optional hint about what the agent is working on */
   agentTaskHint: string | null
 }

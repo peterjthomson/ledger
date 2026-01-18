@@ -25,6 +25,7 @@ import {
 } from 'lucide-react'
 import type { PluginAppProps } from '@/lib/plugins/plugin-types'
 import type { Commit, PullRequest, Branch } from '@/lib/types'
+import { formatRelativeTime } from '@/app/utils/time'
 import './example-plugin-styles.css'
 
 interface ContributorStats {
@@ -123,7 +124,7 @@ export function TeamDashboardApp({ context, activeNavItem }: PluginAppProps) {
       const commitDate = new Date(commit.date)
       if (commitDate > existing.lastActiveDate) {
         existing.lastActiveDate = commitDate
-        existing.lastActive = formatTimeAgo(commitDate)
+        existing.lastActive = formatRelativeTime(commitDate)
       }
 
       authorMap.set(commit.author, existing)
@@ -751,7 +752,7 @@ function BranchesView({ branches }: { branches: Branch[] }) {
               {branch.lastCommitDate && (
                 <span className="branch-last-commit">
                   <Clock size={12} />
-                  {formatTimeAgo(new Date(branch.lastCommitDate))}
+                  {formatRelativeTime(branch.lastCommitDate)}
                 </span>
               )}
             </div>
@@ -766,22 +767,6 @@ function BranchesView({ branches }: { branches: Branch[] }) {
       </div>
     </div>
   )
-}
-
-// Helper functions
-function formatTimeAgo(date: Date): string {
-  const now = new Date()
-  const diff = now.getTime() - date.getTime()
-  const minutes = Math.floor(diff / 60000)
-  const hours = Math.floor(diff / 3600000)
-  const days = Math.floor(diff / 86400000)
-  const weeks = Math.floor(days / 7)
-
-  if (minutes < 60) return `${minutes}m ago`
-  if (hours < 24) return `${hours}h ago`
-  if (days < 7) return `${days}d ago`
-  if (weeks < 4) return `${weeks}w ago`
-  return `${Math.floor(weeks / 4)}mo ago`
 }
 
 function getWaitTime(createdAt: string): string {

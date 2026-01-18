@@ -32,7 +32,7 @@ export function StashDetailPanel({
   const [showBranchModal, setShowBranchModal] = useState(false)
   const [branchName, setBranchName] = useState('')
 
-  // Handle Apply stash
+  // Handle Apply stash (keeps stash in list)
   const handleApply = async () => {
     setActionInProgress(true)
     onStatusChange?.({ type: 'info', message: `Applying stash@{${stash.index}}...` })
@@ -41,6 +41,27 @@ export function StashDetailPanel({
       const result = await window.conveyor.stash.applyStash(stash.index)
       if (result.success) {
         onStatusChange?.({ type: 'success', message: result.message })
+        await onRefresh?.()
+      } else {
+        onStatusChange?.({ type: 'error', message: result.message })
+      }
+    } catch (error) {
+      onStatusChange?.({ type: 'error', message: (error as Error).message })
+    } finally {
+      setActionInProgress(false)
+    }
+  }
+
+  // Handle Pop stash (applies and removes from list)
+  const handlePop = async () => {
+    setActionInProgress(true)
+    onStatusChange?.({ type: 'info', message: `Popping stash@{${stash.index}}...` })
+
+    try {
+      const result = await window.conveyor.stash.popStash(stash.index)
+      if (result.success) {
+        onStatusChange?.({ type: 'success', message: result.message })
+        onClearFocus?.()
         await onRefresh?.()
       } else {
         onStatusChange?.({ type: 'error', message: result.message })
@@ -260,13 +281,16 @@ export function StashDetailPanel({
 
       {/* Action Buttons */}
       <div className="stash-actions">
-        <button className="btn btn-primary" onClick={handleApply} disabled={actionInProgress}>
+        <button className="btn btn-primary" onClick={handlePop} disabled={actionInProgress} title="Apply and remove stash">
+          Pop
+        </button>
+        <button className="btn btn-secondary" onClick={handleApply} disabled={actionInProgress} title="Apply but keep stash">
           Apply
         </button>
         <button className="btn btn-secondary" onClick={() => setShowBranchModal(true)} disabled={actionInProgress}>
           Create Branch
         </button>
-        <button className="btn btn-danger" onClick={handleDrop} disabled={actionInProgress}>
+        <button className="btn btn-danger" onClick={handleDrop} disabled={actionInProgress} title="Remove without applying">
           Drop
         </button>
       </div>

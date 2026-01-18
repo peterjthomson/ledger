@@ -8,4 +8,8 @@ export class StagingApi extends ConveyorApi {
   unstageAll = () => this.invoke('unstage-all')
   discardFileChanges = (filePath: string) => this.invoke('discard-file-changes', filePath)
   getFileDiff = (filePath: string, staged: boolean) => this.invoke('get-file-diff', filePath, staged)
+  getBehindMainCount = () => this.invoke('get-behind-main-count')
+  // File content operations (for inline editing)
+  getFileContent = (filePath: string) => this.invoke('get-file-content', filePath)
+  saveFileContent = (filePath: string, content: string) => this.invoke('save-file-content', filePath, content)
 }

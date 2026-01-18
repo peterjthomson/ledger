@@ -11,6 +11,7 @@ export class PRApi extends ConveyorApi {
   getPRDetail = (prNumber: number) => this.invoke('get-pr-detail', prNumber)
   getPRReviewComments = (prNumber: number) => this.invoke('get-pr-review-comments', prNumber)
   getPRFileDiff = (prNumber: number, filePath: string) => this.invoke('get-pr-file-diff', prNumber, filePath)
+  getPRFileDiffParsed = (prNumber: number, filePath: string) => this.invoke('get-pr-file-diff-parsed', prNumber, filePath)
   commentOnPR = (prNumber: number, body: string) => this.invoke('comment-on-pr', prNumber, body)
   mergePR = (prNumber: number, mergeMethod?: MergeMethod) => this.invoke('merge-pr', prNumber, mergeMethod)
 }

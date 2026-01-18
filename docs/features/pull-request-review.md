@@ -72,77 +72,13 @@ gh pr view <number> --json \
 gh api /repos/{owner}/{repo}/pulls/{number}/comments
 ```
 
-### Key Data Structures
+### Data Types
 
-```typescript
-// PR Overview
-interface PRDetail {
-  number: number;
-  title: string;
-  body: string;
-  author: { login: string; };
-  state: 'OPEN' | 'CLOSED' | 'MERGED';
-  reviewDecision: 'APPROVED' | 'CHANGES_REQUESTED' | 'REVIEW_REQUIRED' | null;
-  
-  // Metadata
-  baseRefName: string;
-  headRefName: string;
-  additions: number;
-  deletions: number;
-  createdAt: string;
-  updatedAt: string;
-  url: string;
-  
-  // Related data
-  comments: PRComment[];
-  reviews: PRReview[];
-  files: PRFile[];
-  commits: PRCommit[];
-}
+Canonical types live in `app/types/electron.d.ts`:
 
-// General conversation comment
-interface PRComment {
-  id: string;
-  author: { login: string; };
-  authorAssociation: 'OWNER' | 'MEMBER' | 'CONTRIBUTOR' | 'NONE';
-  body: string;
-  createdAt: string;
-  url: string;
-  isMinimized: boolean;
-}
-
-// Review submission
-interface PRReview {
-  id: string;
-  author: { login: string; };
-  authorAssociation: string;
-  state: 'APPROVED' | 'CHANGES_REQUESTED' | 'COMMENTED' | 'PENDING';
-  body: string;
-  submittedAt: string;
-}
-
-// Line-specific review comment
-interface PRReviewComment {
-  id: number;
-  author: { login: string; };
-  body: string;
-  path: string;
-  line: number;
-  startLine?: number;
-  side: 'LEFT' | 'RIGHT';
-  diffHunk: string;
-  createdAt: string;
-  inReplyToId?: number;
-}
-
-// Changed file
-interface PRFile {
-  path: string;
-  additions: number;
-  deletions: number;
-  status: 'added' | 'modified' | 'removed' | 'renamed';
-}
-```
+- `PRDetail` - Full PR data including reviews, comments, files, commits
+- `PRReviewComment` - Line-specific review comment
+- `PRFile` - Changed file with stats
 
 ## MVP Implementation Plan
 
@@ -202,42 +138,23 @@ interface PRFile {
 - Inline comment threads
 - "View on GitHub" link
 
-## API Functions Needed
+## API
 
-```typescript
-// Get full PR details
-getPRDetail(prNumber: number): Promise<PRDetail>
+Canonical API surface is in `app/types/electron.d.ts` (renderer-facing `ElectronAPI`).
 
-// Get review comments (line-specific)
-getPRReviewComments(prNumber: number): Promise<PRReviewComment[]>
+Implemented:
+- `getPRDetail(prNumber)` - Full PR data
+- `getPRReviewComments(prNumber)` - Line-specific comments
+- `getPRFileDiff(prNumber, filePath)` - Raw diff
+- `getPRFileDiffParsed(prNumber, filePath)` - Parsed diff with hunks
+- `commentOnPR(prNumber, body)` - Add general comment
+- `mergePR(prNumber, mergeMethod)` - Merge PR
 
-// Get file diff
-getPRFileDiff(prNumber: number, filePath: string): Promise<FileDiff>
-
-// Future: Add comment
-addPRComment(prNumber: number, body: string): Promise<void>
-
-// Future: Add review comment on line
-addPRReviewComment(prNumber: number, path: string, line: number, body: string): Promise<void>
-
-// Future: Submit review
-submitPRReview(prNumber: number, state: 'APPROVE' | 'REQUEST_CHANGES' | 'COMMENT', body: string): Promise<void>
-```
+Future:
+- Add line-specific review comments
+- Submit review (Approve/Request Changes)
 
 ## Future: AI-Age Features
-
-### Human vs AI Filtering
-
-```typescript
-// Detect AI authors
-const AI_AUTHORS = ['copilot', 'github-actions', 'dependabot', 'renovate', 'coderabbit'];
-
-function isAIComment(comment: PRComment): boolean {
-  return AI_AUTHORS.some(ai => 
-    comment.author.login.toLowerCase().includes(ai)
-  );
-}
-```
 
 ### Comment Consolidation
 

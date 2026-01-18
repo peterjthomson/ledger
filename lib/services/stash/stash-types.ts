@@ -32,3 +32,13 @@ export interface StashResult {
   success: boolean
   message: string
 }
+
+/**
+ * Result of applying stash to a branch
+ */
+export interface ApplyStashToBranchResult {
+  success: boolean
+  message: string
+  usedExistingWorktree: boolean
+  worktreePath?: string
+}

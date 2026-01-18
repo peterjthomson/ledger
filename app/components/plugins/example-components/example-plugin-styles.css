@@ -833,7 +833,8 @@
   margin-top: 20px;
 }
 
-.branch-item {
+/* Scoped to team-dashboard plugin to avoid conflicts with main app */
+.team-dashboard .branch-item {
   padding: 14px 16px;
   background: var(--bg-primary);
   border: 1px solid var(--border);
@@ -841,30 +842,30 @@
   transition: all 0.15s ease;
 }
 
-.branch-item:hover {
+.team-dashboard .branch-item:hover {
   border-color: var(--border-hover);
 }
 
-.branch-item.branch-active {
+.team-dashboard .branch-item.branch-active {
   border-left: 3px solid var(--color-green);
 }
 
-.branch-item.branch-recent {
+.team-dashboard .branch-item.branch-recent {
   border-left: 3px solid var(--color-yellow);
 }
 
-.branch-item.branch-stale {
+.team-dashboard .branch-item.branch-stale {
   border-left: 3px solid var(--color-red);
 }
 
-.branch-item-header {
+.team-dashboard .branch-item-header {
   display: flex;
   align-items: center;
   gap: 10px;
   margin-bottom: 8px;
 }
 
-.branch-item-header svg {
+.team-dashboard .branch-item-header svg {
   color: var(--text-tertiary);
 }
 
@@ -906,7 +907,7 @@
   color: var(--color-red);
 }
 
-.branch-item-meta {
+.team-dashboard .branch-item-meta {
   display: flex;
   align-items: center;
   gap: 16px;

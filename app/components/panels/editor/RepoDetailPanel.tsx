@@ -74,6 +74,22 @@ export function RepoDetailPanel({
           <span className="meta-label">Status</span>
           <span className="meta-value">{repo.isCurrent ? 'Currently open in Ledger' : 'Not open'}</span>
         </div>
+        {githubUrl && (
+          <div className="detail-meta-item">
+            <span className="meta-label">GitHub</span>
+            <a 
+              className="meta-value meta-link" 
+              href={githubUrl} 
+              onClick={(e) => {
+                e.preventDefault()
+                handleOpenGitHub()
+              }}
+              title={githubUrl}
+            >
+              {githubUrl.replace('https://github.com/', '')}
+            </a>
+          </div>
+        )}
       </div>
 
       {/* Actions */}

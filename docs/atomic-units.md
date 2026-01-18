@@ -134,6 +134,3 @@ Ledger optimizes for:
 ---
 
 *Built for the agentic era.*
-
-
-

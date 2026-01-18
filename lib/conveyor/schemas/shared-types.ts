@@ -3,7 +3,7 @@ import { z } from 'zod'
 // Common result schema used by many handlers
 export const SuccessResultSchema = z.object({
   success: z.boolean(),
-  message: z.string(),
+  message: z.string().optional(),
 })
 
 export const CheckoutResultSchema = z.object({
@@ -51,6 +51,8 @@ export const StashFileSchema = z.object({
 export const WorktreeAgentSchema = z.enum(['cursor', 'claude', 'conductor', 'gemini', 'junie', 'unknown', 'working-folder'])
 export const WorktreeActivityStatusSchema = z.enum(['active', 'recent', 'stale', 'unknown'])
 
+export const ActivitySourceSchema = z.enum(['file', 'git', 'both'])
+
 export const WorktreeSchema = z.object({
   path: z.string(),
   head: z.string(),
@@ -63,8 +65,14 @@ export const WorktreeSchema = z.object({
   changedFileCount: z.number(),
   additions: z.number(),
   deletions: z.number(),
-  lastModified: z.string(),
+  lastModified: z.string(), // Directory mtime (used for sorting worktrees by creation order)
   activityStatus: WorktreeActivityStatusSchema,
+  /** Most recent file modification time in worktree (filesystem level) */
+  lastFileModified: z.string(),
+  /** Last git activity: commit time or working directory change time */
+  lastGitActivity: z.string(),
+  /** Source of activity status: 'file' | 'git' | 'both' */
+  activitySource: ActivitySourceSchema,
   agentTaskHint: z.string().nullable(),
 })
 
@@ -212,6 +220,7 @@ export const StagingDiffLineSchema = z.object({
   content: z.string(),
   oldLineNumber: z.number().optional(),
   newLineNumber: z.number().optional(),
+  lineIndex: z.number(),
 })
 
 export const StagingDiffHunkSchema = z.object({
@@ -221,6 +230,7 @@ export const StagingDiffHunkSchema = z.object({
   newStart: z.number(),
   newLines: z.number(),
   lines: z.array(StagingDiffLineSchema),
+  rawPatch: z.string(),
 })
 
 export const StagingFileDiffSchema = z.object({
@@ -307,6 +317,7 @@ export const CommitResultSchema = z.object({
   success: z.boolean(),
   message: z.string(),
   behindCount: z.number().optional(),
+  hash: z.string().optional(),
 })
 
 export const PullResultSchema = z.object({
@@ -380,3 +391,5 @@ export type CustomTheme = z.infer<typeof CustomThemeSchema>
 export type ThemeData = z.infer<typeof ThemeDataSchema>
 export type MergeMethod = z.infer<typeof MergeMethodSchema>
 export type ResetMode = z.infer<typeof ResetModeSchema>
+export type CreatePROptions = z.infer<typeof CreatePROptionsSchema>
+export type CreatePRResult = z.infer<typeof CreatePRResultSchema>

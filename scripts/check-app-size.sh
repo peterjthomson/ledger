@@ -29,4 +29,3 @@ if [ "$SIZE_MB" -gt "$MAX_SIZE_MB" ]; then
 fi
 
 echo "✅ App size OK (under ${MAX_SIZE_MB}MB)"
-

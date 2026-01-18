@@ -10,6 +10,10 @@ import { StashApi } from './stash-api'
 import { StagingApi } from './staging-api'
 import { ThemeApi } from './theme-api'
 import { PluginApi } from './plugin-api'
+import { AIApi } from './ai-api'
+import { MailmapApi } from './mailmap-api'
+import { AnalyticsApi } from './analytics-api'
+import { CanvasApi } from './canvas-api'
 
 export const conveyor = {
   app: new AppApi(electronAPI),
@@ -23,6 +27,10 @@ export const conveyor = {
   staging: new StagingApi(electronAPI),
   theme: new ThemeApi(electronAPI),
   plugin: new PluginApi(electronAPI),
+  ai: new AIApi(electronAPI),
+  mailmap: new MailmapApi(electronAPI),
+  analytics: new AnalyticsApi(electronAPI),
+  canvas: new CanvasApi(electronAPI),
 }
 
 export type ConveyorApi = typeof conveyor

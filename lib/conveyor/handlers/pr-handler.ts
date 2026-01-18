@@ -9,6 +9,7 @@ import {
   getPRDetail,
   getPRReviewComments,
   getPRFileDiff,
+  getPRFileDiffParsed,
   commentOnPR,
   mergePR,
 } from '@/lib/main/git-service'
@@ -103,6 +104,15 @@ export const registerPRHandlers = () => {
     } catch (error) {
       logHandlerError('get-pr-file-diff', error)
       return { error: serializeError(error), diff: null }
+    }
+  })
+
+  handle('get-pr-file-diff-parsed', async (prNumber: number, filePath: string) => {
+    try {
+      return await getPRFileDiffParsed(prNumber, filePath)
+    } catch (error) {
+      logHandlerError('get-pr-file-diff-parsed', error)
+      return null
     }
   })
 

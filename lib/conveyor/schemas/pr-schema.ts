@@ -8,6 +8,7 @@ import {
   PRDetailSchema,
   PRReviewCommentSchema,
   MergeMethodSchema,
+  StagingFileDiffSchema,
 } from './shared-types'
 
 export const prIpcSchema = {
@@ -46,6 +47,10 @@ export const prIpcSchema = {
   'get-pr-file-diff': {
     args: z.tuple([z.number(), z.string()]),
     return: z.string().nullable(),
+  },
+  'get-pr-file-diff-parsed': {
+    args: z.tuple([z.number(), z.string()]),
+    return: StagingFileDiffSchema.nullable(),
   },
   'comment-on-pr': {
     args: z.tuple([z.number(), z.string()]),

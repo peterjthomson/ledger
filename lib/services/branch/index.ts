@@ -21,6 +21,8 @@ export type {
   PushResult,
   CreateBranchResult,
   PullResult,
+  PullCurrentBranchResult,
+  RenameBranchResult,
 } from './branch-types'
 
 // Service functions
@@ -33,9 +35,13 @@ export {
   hasUncommittedChanges,
   stashChanges,
   checkoutBranch,
+  checkoutCommit,
   pushBranch,
   createBranch,
   checkoutRemoteBranch,
   pullBranch,
+  pullCurrentBranch,
   deleteBranch,
+  renameBranch,
+  deleteRemoteBranch,
 } from './branch-service'

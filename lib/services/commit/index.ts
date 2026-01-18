@@ -26,6 +26,9 @@ export type {
   CommitDiff,
   CommitResult,
   ResetResult,
+  WorkingStatus,
+  BranchDiff,
+  BranchDiffType,
 } from './commit-types'
 
 // Service functions
@@ -38,4 +41,6 @@ export {
   getCommitDiff,
   resetToCommit,
   commitChanges,
+  getWorkingStatus,
+  getBranchDiff,
 } from './commit-service'

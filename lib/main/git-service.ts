@@ -260,10 +260,16 @@ export interface EnhancedWorktree {
   changedFileCount: number
   additions: number
   deletions: number
-  // For ordering
+  // Directory modification time (used for sorting worktrees by creation order)
   lastModified: string
-  // Activity tracking
+  // Activity tracking - dual signals for more reliable detection
   activityStatus: WorktreeActivityStatus
+  /** Most recent file modification time in worktree (filesystem level) */
+  lastFileModified: string
+  /** Last git activity: commit time or working directory change time */
+  lastGitActivity: string
+  /** Source of activity status: 'file' | 'git' | 'both' */
+  activitySource: 'file' | 'git' | 'both'
   agentTaskHint: string | null // The agent's current task/prompt if available
 }
 
@@ -279,8 +285,9 @@ function detectAgent(worktreePath: string): WorktreeAgent {
     return 'claude'
   }
 
-  // Gemini might use ~/.gemini/worktrees/
-  if (worktreePath.includes('/.gemini/worktrees/')) {
+  // Gemini CLI (gemini-wt) uses ~/.gemini/worktrees/{project}/
+  // Branches are typically named gemini-{timestamp} or custom names
+  if (worktreePath.includes('/.gemini/worktrees/') || worktreePath.includes('/gemini-worktrees/')) {
     return 'gemini'
   }
 
@@ -375,7 +382,7 @@ async function getWorktreeCommitMessage(worktreePath: string): Promise<string> {
   }
 }
 
-// Get directory modification time
+// Get directory modification time (used for sorting worktrees by creation order)
 async function getDirectoryMtime(dirPath: string): Promise<string> {
   try {
     const stat = await statAsync(dirPath)
@@ -385,16 +392,161 @@ async function getDirectoryMtime(dirPath: string): Promise<string> {
   }
 }
 
-// Calculate activity status based on last modified time
-function calculateActivityStatus(lastModified: string): WorktreeActivityStatus {
-  const now = Date.now()
-  const modified = new Date(lastModified).getTime()
-  const diffMinutes = (now - modified) / (1000 * 60)
+/**
+ * Get the most recent file modification time in a worktree
+ * Scans files recursively, respecting .gitignore patterns
+ * This detects activity even when agents make changes not yet tracked by git
+ */
+async function getLastFileModifiedTime(worktreePath: string): Promise<string> {
+  try {
+    // Use git ls-files to get tracked files, then check their mtimes
+    // Also check untracked files that aren't ignored
+    const { stdout: trackedOutput } = await execAsync('git ls-files', { cwd: worktreePath })
+    const trackedFiles = trackedOutput.split('\n').filter(Boolean)
 
-  if (diffMinutes < 5) return 'active' // Modified in last 5 minutes
-  if (diffMinutes < 60) return 'recent' // Modified in last hour
-  if (diffMinutes < 24 * 60) return 'stale' // Modified in last 24 hours
-  return 'unknown' // Older than 24 hours
+    // Get untracked files (respects .gitignore)
+    const { stdout: untrackedOutput } = await execAsync(
+      'git ls-files --others --exclude-standard',
+      { cwd: worktreePath }
+    )
+    const untrackedFiles = untrackedOutput.split('\n').filter(Boolean)
+
+    const allFiles = [...trackedFiles, ...untrackedFiles]
+
+    let latestMtime = 0
+
+    // Check file mtimes in batches for efficiency
+    const batchSize = 50
+    for (let i = 0; i < allFiles.length; i += batchSize) {
+      const batch = allFiles.slice(i, i + batchSize)
+      const mtimePromises = batch.map(async (file) => {
+        try {
+          const fullPath = path.join(worktreePath, file)
+          const stat = await statAsync(fullPath)
+          return stat.mtime.getTime()
+        } catch {
+          return 0
+        }
+      })
+      const mtimes = await Promise.all(mtimePromises)
+      const maxInBatch = Math.max(...mtimes, 0)
+      if (maxInBatch > latestMtime) {
+        latestMtime = maxInBatch
+      }
+    }
+
+    return latestMtime > 0 ? new Date(latestMtime).toISOString() : new Date().toISOString()
+  } catch {
+    // Fallback to directory mtime
+    return getDirectoryMtime(worktreePath)
+  }
+}
+
+/**
+ * Get the last git activity time for a worktree
+ * Returns the more recent of: last commit time, or last change to working directory
+ */
+async function getLastGitActivity(worktreePath: string): Promise<string> {
+  try {
+    // Get last commit time
+    let lastCommitTime = 0
+    try {
+      const { stdout: commitTimeOutput } = await execAsync(
+        'git log -1 --format=%ct',
+        { cwd: worktreePath }
+      )
+      const timestamp = parseInt(commitTimeOutput.trim(), 10)
+      if (!isNaN(timestamp)) {
+        lastCommitTime = timestamp * 1000 // Convert to milliseconds
+      }
+    } catch {
+      // No commits yet
+    }
+
+    // Check for uncommitted changes and their modification times
+    let lastChangeTime = 0
+    try {
+      // Get modified files in working directory
+      const { stdout: diffFiles } = await execAsync(
+        'git diff --name-only',
+        { cwd: worktreePath }
+      )
+      const { stdout: stagedFiles } = await execAsync(
+        'git diff --staged --name-only',
+        { cwd: worktreePath }
+      )
+      const { stdout: untrackedFiles } = await execAsync(
+        'git ls-files --others --exclude-standard',
+        { cwd: worktreePath }
+      )
+
+      const changedFiles = [
+        ...diffFiles.split('\n').filter(Boolean),
+        ...stagedFiles.split('\n').filter(Boolean),
+        ...untrackedFiles.split('\n').filter(Boolean),
+      ]
+
+      // Get the most recent mtime of changed files
+      for (const file of changedFiles.slice(0, 20)) { // Limit to 20 files for perf
+        try {
+          const fullPath = path.join(worktreePath, file)
+          const stat = await statAsync(fullPath)
+          if (stat.mtime.getTime() > lastChangeTime) {
+            lastChangeTime = stat.mtime.getTime()
+          }
+        } catch {
+          // File might have been deleted
+        }
+      }
+    } catch {
+      // No changes
+    }
+
+    // Return the more recent of commit time or change time
+    const latestActivity = Math.max(lastCommitTime, lastChangeTime)
+    return latestActivity > 0 ? new Date(latestActivity).toISOString() : new Date().toISOString()
+  } catch {
+    return new Date().toISOString()
+  }
+}
+
+/**
+ * Calculate activity status based on both file and git activity
+ * Uses the more recent of the two signals
+ */
+function calculateActivityStatus(
+  lastFileModified: string,
+  lastGitActivity: string
+): { status: WorktreeActivityStatus; source: 'file' | 'git' | 'both' } {
+  const now = Date.now()
+  const fileModified = new Date(lastFileModified).getTime()
+  const gitActivity = new Date(lastGitActivity).getTime()
+
+  // Use the more recent activity
+  const moreRecent = Math.max(fileModified, gitActivity)
+  const diffMinutes = (now - moreRecent) / (1000 * 60)
+
+  // Determine which source is more recent
+  let source: 'file' | 'git' | 'both' = 'both'
+  const timeDiff = Math.abs(fileModified - gitActivity)
+  const significantDiff = 60 * 1000 // 1 minute threshold
+  
+  if (timeDiff > significantDiff) {
+    source = fileModified > gitActivity ? 'file' : 'git'
+  }
+
+  let status: WorktreeActivityStatus
+  if (diffMinutes < 5) {
+    status = 'active' // Modified in last 5 minutes
+  } else if (diffMinutes < 60) {
+    status = 'recent' // Modified in last hour
+  } else if (diffMinutes < 24 * 60) {
+    status = 'stale' // Modified in last 24 hours
+  } else {
+    status = 'unknown' // Older than 24 hours
+  }
+
+  return { status, source }
 }
 
 // Get agent task hint from Cursor transcript files
@@ -463,6 +615,79 @@ async function getCursorAgentTaskHint(worktreePath: string): Promise<string | nu
   }
 }
 
+// Get agent task hint from Claude Code session files
+// Claude Code stores sessions in ~/.claude/projects/{encoded-path}/*.jsonl
+async function getClaudeCodeAgentTaskHint(worktreePath: string): Promise<string | null> {
+  try {
+    const homeDir = process.env.HOME || ''
+    const projectsDir = path.join(homeDir, '.claude', 'projects')
+
+    // Check if the projects directory exists
+    if (!fs.existsSync(projectsDir)) return null
+
+    // Claude Code encodes paths by replacing / with - (e.g., /Users/foo/bar -> -Users-foo-bar)
+    const encodedPath = worktreePath.replace(/\//g, '-')
+    const projectFolder = path.join(projectsDir, encodedPath)
+
+    // Check if this worktree has a Claude Code project folder
+    if (!fs.existsSync(projectFolder)) return null
+
+    // Get session files sorted by modification time (newest first)
+    // Session files are UUIDs.jsonl, skip agent-*.jsonl files
+    const files = fs.readdirSync(projectFolder)
+      .filter(f => f.endsWith('.jsonl') && !f.startsWith('agent-'))
+      .map(f => ({
+        name: f,
+        path: path.join(projectFolder, f),
+        mtime: fs.statSync(path.join(projectFolder, f)).mtime.getTime()
+      }))
+      .sort((a, b) => b.mtime - a.mtime)
+
+    // Check the most recent session file
+    for (const file of files.slice(0, 3)) { // Only check 3 most recent sessions
+      try {
+        const content = fs.readFileSync(file.path, 'utf-8')
+        const lines = content.split('\n').filter(Boolean)
+
+        // Find the first user message in the session
+        for (const line of lines) {
+          try {
+            const entry = JSON.parse(line)
+            
+            // Look for user messages
+            if (entry.type === 'user' && entry.message?.content) {
+              let userContent = entry.message.content
+              
+              // Strip system instruction tags if present
+              userContent = userContent.replace(/<system[_-]?instruction>[\s\S]*?<\/system[_-]?instruction>/gi, '')
+              
+              // Get the actual user query, trimming whitespace
+              const trimmed = userContent.trim()
+              if (!trimmed) continue
+              
+              // Get first meaningful line
+              const firstLine = trimmed.split('\n')[0].trim()
+              if (!firstLine) continue
+              
+              return firstLine.slice(0, 60) + (firstLine.length > 60 ? '…' : '')
+            }
+          } catch {
+            // Skip malformed lines
+            continue
+          }
+        }
+      } catch {
+        // Skip unreadable files
+        continue
+      }
+    }
+
+    return null
+  } catch {
+    return null
+  }
+}
+
 // Get enhanced worktrees with agent detection and metadata
 export async function getEnhancedWorktrees(): Promise<EnhancedWorktree[]> {
   if (!git) throw new Error('No repository selected')
@@ -475,15 +700,19 @@ export async function getEnhancedWorktrees(): Promise<EnhancedWorktree[]> {
     const agent = detectAgent(wt.path)
 
     // Gather all metadata in parallel
-    const [diffStats, commitMessage, lastModified, agentTaskHint] = await Promise.all([
+    const [diffStats, commitMessage, lastModified, lastFileModified, lastGitActivity, agentTaskHint] = await Promise.all([
       getWorktreeDiffStats(wt.path),
       getWorktreeCommitMessage(wt.path),
       getDirectoryMtime(wt.path),
-      agent === 'cursor' ? getCursorAgentTaskHint(wt.path) : Promise.resolve(null),
+      getLastFileModifiedTime(wt.path),
+      getLastGitActivity(wt.path),
+      agent === 'cursor' ? getCursorAgentTaskHint(wt.path) :
+      agent === 'claude' ? getClaudeCodeAgentTaskHint(wt.path) :
+      Promise.resolve(null),
     ])
 
     const contextHint = getContextHint(wt.branch, diffStats.changedFiles, commitMessage)
-    const activityStatus = calculateActivityStatus(lastModified)
+    const { status: activityStatus, source: activitySource } = calculateActivityStatus(lastFileModified, lastGitActivity)
 
     return {
       ...wt,
@@ -496,6 +725,9 @@ export async function getEnhancedWorktrees(): Promise<EnhancedWorktree[]> {
       deletions: diffStats.deletions,
       lastModified,
       activityStatus,
+      lastFileModified,
+      lastGitActivity,
+      activitySource,
       agentTaskHint,
     }
   })
@@ -589,6 +821,82 @@ export async function checkoutBranch(
     return {
       success: true,
       message: `Switched to branch '${branchName}'`,
+    }
+  } catch (error) {
+    return {
+      success: false,
+      message: (error as Error).message,
+    }
+  }
+}
+
+// Checkout a specific commit (creates detached HEAD state unless on a branch tip)
+export async function checkoutCommit(
+  commitHash: string,
+  branchName?: string
+): Promise<{ success: boolean; message: string; stashed?: string }> {
+  if (!git) throw new Error('No repository selected')
+
+  try {
+    // Stash any uncommitted changes first
+    const stashResult = await stashChanges()
+
+    // If a branch name is provided and the commit is the tip of that branch, checkout the branch instead
+    if (branchName) {
+      const branches = await git.branchLocal()
+      if (branches.all.includes(branchName)) {
+        // Check if the branch tip matches the commit
+        const branchCommit = await git.revparse([branchName])
+        if (branchCommit.trim() === commitHash || branchCommit.trim().startsWith(commitHash)) {
+          // Checkout the branch (avoids detached HEAD)
+          await git.checkout(['--ignore-other-worktrees', branchName])
+          
+          if (stashResult.stashed) {
+            try {
+              await git.raw(['stash', 'pop'])
+              return {
+                success: true,
+                message: `Switched to branch '${branchName}' with uncommitted changes`,
+              }
+            } catch (_popError) {
+              return {
+                success: true,
+                message: `Switched to '${branchName}'. Uncommitted changes moved to stash (conflicts detected).`,
+                stashed: stashResult.message,
+              }
+            }
+          }
+          
+          return {
+            success: true,
+            message: `Switched to branch '${branchName}'`,
+          }
+        }
+      }
+    }
+
+    // Checkout the commit directly (detached HEAD)
+    await git.checkout(commitHash)
+
+    if (stashResult.stashed) {
+      try {
+        await git.raw(['stash', 'pop'])
+        return {
+          success: true,
+          message: `Checked out commit ${commitHash.slice(0, 7)} (detached HEAD) with uncommitted changes`,
+        }
+      } catch (_popError) {
+        return {
+          success: true,
+          message: `Checked out commit ${commitHash.slice(0, 7)} (detached HEAD). Uncommitted changes moved to stash.`,
+          stashed: stashResult.message,
+        }
+      }
+    }
+
+    return {
+      success: true,
+      message: `Checked out commit ${commitHash.slice(0, 7)} (detached HEAD)`,
     }
   } catch (error) {
     return {
@@ -717,6 +1025,54 @@ export async function deleteBranch(
       }
     }
     return { success: false, message: errorMessage }
+  }
+}
+
+// Rename a branch
+export async function renameBranch(
+  oldName: string,
+  newName: string
+): Promise<{ success: boolean; message: string }> {
+  if (!git) throw new Error('No repository selected')
+
+  try {
+    const trimmedOldName = oldName.trim()
+    const trimmedNewName = newName.trim()
+
+    if (!trimmedOldName || !trimmedNewName) {
+      return { success: false, message: 'Branch names cannot be empty' }
+    }
+
+    // Don't allow renaming main/master
+    if (trimmedOldName === 'main' || trimmedOldName === 'master') {
+      return { success: false, message: 'Cannot rename main or master branch' }
+    }
+
+    // Don't allow renaming to main/master
+    if (trimmedNewName === 'main' || trimmedNewName === 'master') {
+      return { success: false, message: 'Cannot rename to main or master' }
+    }
+
+    // Validate new branch name format (no spaces, special chars at start)
+    if (!/^[a-zA-Z0-9]/.test(trimmedNewName)) {
+      return { success: false, message: 'Branch name must start with a letter or number' }
+    }
+
+    if (/\s/.test(trimmedNewName)) {
+      return { success: false, message: 'Branch name cannot contain spaces' }
+    }
+
+    // Check if new name already exists
+    const branches = await git.branchLocal()
+    if (branches.all.includes(trimmedNewName)) {
+      return { success: false, message: `Branch '${trimmedNewName}' already exists` }
+    }
+
+    // Rename the branch using -m flag
+    await git.branch(['-m', trimmedOldName, trimmedNewName])
+    return { success: true, message: `Renamed branch '${trimmedOldName}' to '${trimmedNewName}'` }
+  } catch (error) {
+    return { success: false, message: (error as Error).message }
   }
 }
 
@@ -1246,7 +1602,7 @@ export async function getPRReviewComments(prNumber: number): Promise<PRReviewCom
   }
 }
 
-// Get the diff for a specific file in a PR
+// Get the diff for a specific file in a PR (raw text)
 export async function getPRFileDiff(prNumber: number, filePath: string): Promise<string | null> {
   if (!repoPath) return null
 
@@ -1282,6 +1638,23 @@ export async function getPRFileDiff(prNumber: number, filePath: string): Promise
     return result.length > 0 ? result.join('\n') : null
   } catch (error) {
     console.error('Error fetching PR file diff:', error)
+    return null
+  }
+}
+
+// Get parsed diff for a specific file in a PR (with hunks and line-by-line info)
+export async function getPRFileDiffParsed(prNumber: number, filePath: string): Promise<StagingFileDiff | null> {
+  if (!repoPath) return null
+
+  try {
+    // Get the raw diff first
+    const rawDiff = await getPRFileDiff(prNumber, filePath)
+    if (!rawDiff) return null
+
+    // Parse the diff using the same parser as staging
+    return parseDiff(rawDiff, filePath)
+  } catch (error) {
+    console.error('Error fetching parsed PR file diff:', error)
     return null
   }
 }
@@ -1563,6 +1936,55 @@ export async function getWorkingStatus(): Promise<WorkingStatus> {
     unstagedCount,
     additions,
     deletions,
+  }
+}
+
+/**
+ * Get how many commits the current branch is behind main/master
+ * Returns null if cannot be determined (e.g. no main branch, on main already)
+ */
+export async function getBehindMainCount(): Promise<{
+  behind: number
+  baseBranch: string
+} | null> {
+  if (!git) throw new Error('No repository selected')
+
+  try {
+    const status = await git.status()
+    const currentBranch = status.current
+
+    if (!currentBranch) return null
+
+    // Don't show indicator if we're on main/master
+    if (currentBranch === 'main' || currentBranch === 'master') {
+      return null
+    }
+
+    // Find the base branch (origin/main, origin/master, or local main/master)
+    let baseBranch: string | null = null
+    const candidates = ['origin/main', 'origin/master', 'main', 'master']
+
+    for (const candidate of candidates) {
+      try {
+        await git.raw(['rev-parse', '--verify', candidate])
+        baseBranch = candidate
+        break
+      } catch {
+        // Try next candidate
+      }
+    }
+
+    if (!baseBranch) return null
+
+    // Count commits the current branch is behind main
+    // baseBranch..HEAD = commits in HEAD not in baseBranch (ahead)
+    // HEAD..baseBranch = commits in baseBranch not in HEAD (behind)
+    const behindOutput = await git.raw(['rev-list', '--count', `HEAD..${baseBranch}`])
+    const behind = parseInt(behindOutput.trim()) || 0
+
+    return { behind, baseBranch }
+  } catch {
+    return null
   }
 }
 
@@ -2220,788 +2642,6 @@ export async function getCommitGraphHistory(
     return commits
   } catch {
     return []
-  }
-}
-
-// Contributor statistics for ridgeline chart
-export interface ContributorTimeSeries {
-  author: string
-  email: string
-  totalCommits: number
-  // Array of commit counts per time bucket
-  timeSeries: { date: string; count: number }[]
-}
-
-export interface ContributorStats {
-  contributors: ContributorTimeSeries[]
-  startDate: string
-  endDate: string
-  bucketSize: 'day' | 'week' | 'month'
-}
-
-// ========================================
-// Mailmap Management - Opinionated Git
-// ========================================
-
-export interface AuthorIdentity {
-  name: string
-  email: string
-  commitCount: number
-}
-
-export interface MailmapSuggestion {
-  canonicalName: string
-  canonicalEmail: string
-  aliases: AuthorIdentity[]
-  confidence: 'high' | 'medium' | 'low'
-}
-
-export interface MailmapEntry {
-  canonicalName: string
-  canonicalEmail: string
-  aliasName?: string
-  aliasEmail: string
-}
-
-// Read current .mailmap file
-export async function getMailmap(): Promise<MailmapEntry[]> {
-  if (!repoPath) return []
-  
-  const mailmapPath = path.join(repoPath, '.mailmap')
-  try {
-    const content = await fs.promises.readFile(mailmapPath, 'utf-8')
-    const entries: MailmapEntry[] = []
-    
-    for (const line of content.split('\n')) {
-      const trimmed = line.trim()
-      if (!trimmed || trimmed.startsWith('#')) continue
-      
-      // Parse .mailmap format:
-      // Canonical Name <canonical@email> Alias Name <alias@email>
-      // Canonical Name <canonical@email> <alias@email>
-      const match = trimmed.match(/^(.+?)\s*<([^>]+)>\s+(?:(.+?)\s+)?<([^>]+)>$/)
-      if (match) {
-        entries.push({
-          canonicalName: match[1].trim(),
-          canonicalEmail: match[2].trim(),
-          aliasName: match[3]?.trim(),
-          aliasEmail: match[4].trim(),
-        })
-      }
-    }
-    
-    return entries
-  } catch {
-    return [] // No .mailmap file
-  }
-}
-
-// Get all unique author identities from the repo
-export async function getAuthorIdentities(): Promise<AuthorIdentity[]> {
-  if (!git) throw new Error('No repository selected')
-  
-  try {
-    // Get raw identities (without mailmap) to see what needs mapping
-    const output = await git.raw([
-      'shortlog', '-sne', '--all'
-    ])
-    
-    const identities: AuthorIdentity[] = []
-    for (const line of output.trim().split('\n')) {
-      const match = line.match(/^\s*(\d+)\s+(.+?)\s+<([^>]+)>$/)
-      if (match) {
-        identities.push({
-          name: match[2].trim(),
-          email: match[3].trim(),
-          commitCount: parseInt(match[1], 10),
-        })
-      }
-    }
-    
-    return identities.sort((a, b) => b.commitCount - a.commitCount)
-  } catch {
-    return []
-  }
-}
-
-// Suggest mailmap entries by detecting potential duplicates
-export async function suggestMailmapEntries(): Promise<MailmapSuggestion[]> {
-  const identities = await getAuthorIdentities()
-  const suggestions: MailmapSuggestion[] = []
-  const used = new Set<string>()
-  
-  // Helper to normalize for comparison
-  const normalize = (s: string) => s.toLowerCase().replace(/[._-]/g, '').replace(/\s+/g, '')
-  
-  for (let i = 0; i < identities.length; i++) {
-    const primary = identities[i]
-    if (used.has(primary.email)) continue
-    
-    const aliases: AuthorIdentity[] = []
-    let confidence: 'high' | 'medium' | 'low' = 'low'
-    
-    for (let j = i + 1; j < identities.length; j++) {
-      const candidate = identities[j]
-      if (used.has(candidate.email)) continue
-      
-      const nameMatch = normalize(primary.name) === normalize(candidate.name)
-      const emailPrefixMatch = normalize(primary.email.split('@')[0]) === normalize(candidate.email.split('@')[0])
-      const partialNameMatch = normalize(primary.name).includes(normalize(candidate.name)) ||
-                               normalize(candidate.name).includes(normalize(primary.name))
-      
-      // Exact name match = high confidence
-      if (nameMatch) {
-        aliases.push(candidate)
-        used.add(candidate.email)
-        confidence = 'high'
-      }
-      // Email prefix matches = high confidence  
-      else if (emailPrefixMatch && primary.email.split('@')[0].length >= 3) {
-        aliases.push(candidate)
-        used.add(candidate.email)
-        confidence = confidence === 'low' ? 'medium' : confidence
-      }
-      // Partial name overlap = medium confidence
-      else if (partialNameMatch && normalize(candidate.name).length >= 3) {
-        aliases.push(candidate)
-        used.add(candidate.email)
-        confidence = confidence === 'low' ? 'medium' : confidence
-      }
-    }
-    
-    if (aliases.length > 0) {
-      suggestions.push({
-        canonicalName: primary.name,
-        canonicalEmail: primary.email,
-        aliases,
-        confidence,
-      })
-    }
-    
-    used.add(primary.email)
-  }
-  
-  return suggestions.sort((a, b) => {
-    // Sort by confidence, then by total commits
-    const confOrder = { high: 0, medium: 1, low: 2 }
-    if (confOrder[a.confidence] !== confOrder[b.confidence]) {
-      return confOrder[a.confidence] - confOrder[b.confidence]
-    }
-    const aTotal = a.aliases.reduce((sum, x) => sum + x.commitCount, 0)
-    const bTotal = b.aliases.reduce((sum, x) => sum + x.commitCount, 0)
-    return bTotal - aTotal
-  })
-}
-
-// Add entries to .mailmap file
-export async function addMailmapEntries(entries: MailmapEntry[]): Promise<{ success: boolean; message: string }> {
-  if (!repoPath) return { success: false, message: 'No repository selected' }
-  
-  const mailmapPath = path.join(repoPath, '.mailmap')
-  
-  try {
-    // Read existing content
-    let content = ''
-    try {
-      content = await fs.promises.readFile(mailmapPath, 'utf-8')
-      if (!content.endsWith('\n')) content += '\n'
-    } catch {
-      // File doesn't exist, start fresh with header
-      content = '# .mailmap - Author identity mapping\n# Format: Canonical Name <canonical@email> Alias Name <alias@email>\n\n'
-    }
-    
-    // Add new entries
-    for (const entry of entries) {
-      const line = entry.aliasName
-        ? `${entry.canonicalName} <${entry.canonicalEmail}> ${entry.aliasName} <${entry.aliasEmail}>`
-        : `${entry.canonicalName} <${entry.canonicalEmail}> <${entry.aliasEmail}>`
-      content += line + '\n'
-    }
-    
-    await fs.promises.writeFile(mailmapPath, content, 'utf-8')
-    return { success: true, message: `Added ${entries.length} entries to .mailmap` }
-  } catch (error) {
-    return { success: false, message: `Failed to update .mailmap: ${error}` }
-  }
-}
-
-// Remove a specific entry from .mailmap
-export async function removeMailmapEntry(entry: MailmapEntry): Promise<{ success: boolean; message: string }> {
-  if (!repoPath) return { success: false, message: 'No repository selected' }
-  
-  const mailmapPath = path.join(repoPath, '.mailmap')
-  
-  try {
-    const content = await fs.promises.readFile(mailmapPath, 'utf-8')
-    const lines = content.split('\n')
-    
-    // Build the line pattern to remove
-    const targetLine = entry.aliasName
-      ? `${entry.canonicalName} <${entry.canonicalEmail}> ${entry.aliasName} <${entry.aliasEmail}>`
-      : `${entry.canonicalName} <${entry.canonicalEmail}> <${entry.aliasEmail}>`
-    
-    // Filter out the matching line (case-sensitive match)
-    const newLines = lines.filter(line => line.trim() !== targetLine.trim())
-    
-    if (newLines.length === lines.length) {
-      return { success: false, message: 'Entry not found in .mailmap' }
-    }
-    
-    await fs.promises.writeFile(mailmapPath, newLines.join('\n'), 'utf-8')
-    return { success: true, message: 'Removed entry from .mailmap' }
-  } catch (error) {
-    return { success: false, message: `Failed to update .mailmap: ${error}` }
-  }
-}
-
-// Normalize and cluster author identities
-// Groups commits by the same person using email domain, name similarity, and common patterns
-function clusterAuthors(
-  commits: { author: string; email: string; date: Date }[]
-): Map<string, { canonicalName: string; canonicalEmail: string; dates: Date[] }> {
-  // First pass: group by normalized email (ignoring + suffixes and case)
-  const emailGroups = new Map<string, { names: Map<string, number>; emails: Set<string>; dates: Date[] }>()
-  
-  for (const { author, email, date } of commits) {
-    // Normalize email: lowercase, remove + suffix (user+tag@domain -> user@domain)
-    const normalizedEmail = email.toLowerCase().replace(/\+[^@]*@/, '@')
-    
-    // Extract email prefix for matching (before @)
-    const emailPrefix = normalizedEmail.split('@')[0].replace(/[._-]/g, '').toLowerCase()
-    
-    // Try to find existing group by email or email prefix
-    let groupKey: string | null = null
-    
-    // Check exact email match first
-    if (emailGroups.has(normalizedEmail)) {
-      groupKey = normalizedEmail
-    } else {
-      // Check if email prefix matches an existing group's prefix
-      for (const [key, _group] of emailGroups) {
-        const existingPrefix = key.split('@')[0].replace(/[._-]/g, '').toLowerCase()
-        if (emailPrefix === existingPrefix && emailPrefix.length >= 3) {
-          groupKey = key
-          break
-        }
-      }
-    }
-    
-    if (!groupKey) {
-      groupKey = normalizedEmail
-      emailGroups.set(groupKey, { names: new Map(), emails: new Set(), dates: [] })
-    }
-    
-    const group = emailGroups.get(groupKey)!
-    group.emails.add(email)
-    group.dates.push(date)
-    group.names.set(author, (group.names.get(author) || 0) + 1)
-  }
-  
-  // Second pass: merge groups with similar names (handles different emails, same person)
-  const mergedGroups = new Map<string, typeof emailGroups extends Map<string, infer V> ? V : never>()
-  
-  const normalizeNameForComparison = (name: string): string => {
-    return name
-      .toLowerCase()
-      .replace(/[._-]/g, ' ')  // jp-guiang -> jp guiang
-      .replace(/\s+/g, ' ')    // normalize spaces
-      .trim()
-  }
-  
-  for (const [key, group] of emailGroups) {
-    // Get most common name from this group
-    let mostCommonName = ''
-    let maxCount = 0
-    for (const [name, count] of group.names) {
-      if (count > maxCount) {
-        maxCount = count
-        mostCommonName = name
-      }
-    }
-    
-    const normalizedName = normalizeNameForComparison(mostCommonName)
-    
-    // Check if this name matches an existing merged group
-    let merged = false
-    for (const [_mergedKey, mergedGroup] of mergedGroups) {
-      let mergedMostCommonName = ''
-      let mergedMaxCount = 0
-      for (const [name, count] of mergedGroup.names) {
-        if (count > mergedMaxCount) {
-          mergedMaxCount = count
-          mergedMostCommonName = name
-        }
-      }
-      
-      const mergedNormalizedName = normalizeNameForComparison(mergedMostCommonName)
-      
-      // Check name similarity
-      if (normalizedName === mergedNormalizedName || 
-          normalizedName.includes(mergedNormalizedName) ||
-          mergedNormalizedName.includes(normalizedName)) {
-        // Merge into existing group
-        for (const [name, count] of group.names) {
-          mergedGroup.names.set(name, (mergedGroup.names.get(name) || 0) + count)
-        }
-        for (const email of group.emails) {
-          mergedGroup.emails.add(email)
-        }
-        mergedGroup.dates.push(...group.dates)
-        merged = true
-        break
-      }
-    }
-    
-    if (!merged) {
-      mergedGroups.set(key, group)
-    }
-  }
-  
-  // Final pass: create canonical result
-  const result = new Map<string, { canonicalName: string; canonicalEmail: string; dates: Date[] }>()
-  
-  for (const [key, group] of mergedGroups) {
-    // Pick canonical name: prefer title case, most common
-    let canonicalName = ''
-    let maxCount = 0
-    for (const [name, count] of group.names) {
-      // Prefer proper cased names over all-lowercase
-      const isProperCase = name !== name.toLowerCase()
-      const effectiveCount = isProperCase ? count * 1.5 : count
-      if (effectiveCount > maxCount) {
-        maxCount = effectiveCount
-        canonicalName = name
-      }
-    }
-    
-    // Pick canonical email: prefer non-noreply, most common domain
-    const emails = Array.from(group.emails)
-    const canonicalEmail = emails.find(e => !e.includes('noreply')) || emails[0]
-    
-    result.set(key, {
-      canonicalName,
-      canonicalEmail,
-      dates: group.dates,
-    })
-  }
-  
-  return result
-}
-
-// Get commit statistics by contributor over time for ridgeline chart
-export async function getContributorStats(
-  topN: number = 10,
-  bucketSize: 'day' | 'week' | 'month' = 'week'
-): Promise<ContributorStats> {
-  if (!git) throw new Error('No repository selected')
-
-  try {
-    // Get all commits with author and date info
-    // Use --use-mailmap to respect .mailmap file for identity normalization
-    const format = '%aN|%aE|%ci'  // %aN/%aE = mailmap-aware name/email
-    const output = await git.raw([
-      'log',
-      '--use-mailmap',
-      `--format=${format}`,
-      '--all',
-    ])
-
-    const lines = output.trim().split('\n').filter(Boolean)
-    
-    // Parse commits
-    const rawCommits: { author: string; email: string; date: Date }[] = []
-    let minDate = new Date()
-    let maxDate = new Date(0)
-
-    for (const line of lines) {
-      const [author, email, dateStr] = line.split('|')
-      const date = new Date(dateStr)
-      
-      if (date < minDate) minDate = date
-      if (date > maxDate) maxDate = date
-      
-      rawCommits.push({ author, email, date })
-    }
-    
-    // Cluster authors to deduplicate identities
-    const authorCommits = clusterAuthors(rawCommits)
-
-    // Sort authors by total commits and take top N
-    const sortedAuthors = Array.from(authorCommits.entries())
-      .map(([_key, data]) => ({
-        author: data.canonicalName,
-        email: data.canonicalEmail,
-        totalCommits: data.dates.length,
-        dates: data.dates,
-      }))
-      .sort((a, b) => b.totalCommits - a.totalCommits)
-      .slice(0, topN)
-
-    // Create time buckets
-    const buckets: Date[] = []
-    const current = new Date(minDate)
-    
-    // Align to bucket boundaries
-    if (bucketSize === 'week') {
-      current.setDate(current.getDate() - current.getDay()) // Start of week
-    } else if (bucketSize === 'month') {
-      current.setDate(1) // Start of month
-    }
-    current.setHours(0, 0, 0, 0)
-
-    while (current <= maxDate) {
-      buckets.push(new Date(current))
-      if (bucketSize === 'day') {
-        current.setDate(current.getDate() + 1)
-      } else if (bucketSize === 'week') {
-        current.setDate(current.getDate() + 7)
-      } else {
-        current.setMonth(current.getMonth() + 1)
-      }
-    }
-
-    // Helper to find bucket for a date
-    const getBucketIndex = (date: Date): number => {
-      for (let i = buckets.length - 1; i >= 0; i--) {
-        if (date >= buckets[i]) return i
-      }
-      return 0
-    }
-
-    // Build time series for each contributor
-    const contributors: ContributorTimeSeries[] = sortedAuthors.map(({ author, email, totalCommits, dates }) => {
-      // Count commits per bucket
-      const bucketCounts = new Array(buckets.length).fill(0)
-      for (const date of dates) {
-        const idx = getBucketIndex(date)
-        bucketCounts[idx]++
-      }
-
-      return {
-        author, // Already canonical from clustering
-        email,
-        totalCommits,
-        timeSeries: buckets.map((bucket, i) => ({
-          date: bucket.toISOString().split('T')[0],
-          count: bucketCounts[i],
-        })),
-      }
-    })
-
-    return {
-      contributors,
-      startDate: minDate.toISOString().split('T')[0],
-      endDate: maxDate.toISOString().split('T')[0],
-      bucketSize,
-    }
-  } catch (error) {
-    console.error('Error getting contributor stats:', error)
-    return {
-      contributors: [],
-      startDate: '',
-      endDate: '',
-      bucketSize,
-    }
-  }
-}
-
-// ========================================
-// Tech Tree - Merged Branch Visualization
-// ========================================
-
-export type TechTreeSizeTier = 'xs' | 'sm' | 'md' | 'lg' | 'xl'
-export type TechTreeBranchType = 'feature' | 'fix' | 'chore' | 'refactor' | 'docs' | 'test' | 'release' | 'unknown'
-
-export interface TechTreeNodeStats {
-  linesAdded: number
-  linesRemoved: number
-  filesChanged: number
-  filesAdded: number
-  filesRemoved: number
-  commitCount: number
-  daysSinceMerge: number
-}
-
-export interface TechTreeNode {
-  id: string
-  branchName: string
-  commitHash: string
-  mergeCommitHash: string
-  author: string
-  mergeDate: string
-  message: string
-  prNumber?: number
-  stats: TechTreeNodeStats
-  sizeTier: TechTreeSizeTier
-  branchType: TechTreeBranchType
-  badges: {
-    massive: boolean
-    destructive: boolean
-    additive: boolean
-    multiFile: boolean
-    surgical: boolean
-    ancient: boolean
-    fresh: boolean
-  }
-}
-
-export interface TechTreeData {
-  masterBranch: string
-  nodes: TechTreeNode[]
-  stats: {
-    minLoc: number
-    maxLoc: number
-    minFiles: number
-    maxFiles: number
-    minAge: number
-    maxAge: number
-  }
-}
-
-// Determine branch type from branch name prefix
-function getBranchType(branchName: string): TechTreeBranchType {
-  const lower = branchName.toLowerCase()
-  if (lower.startsWith('feature/') || lower.startsWith('feat/')) return 'feature'
-  if (lower.startsWith('fix/') || lower.startsWith('bugfix/') || lower.startsWith('hotfix/')) return 'fix'
-  if (lower.startsWith('chore/') || lower.startsWith('deps/') || lower.startsWith('build/')) return 'chore'
-  if (lower.startsWith('refactor/')) return 'refactor'
-  if (lower.startsWith('docs/') || lower.startsWith('doc/')) return 'docs'
-  if (lower.startsWith('test/') || lower.startsWith('tests/')) return 'test'
-  if (lower.startsWith('release/') || lower.startsWith('v')) return 'release'
-  return 'unknown'
-}
-
-// Extract branch name and PR number from merge commit message
-function parseMergeCommitMessage(message: string): { branchName: string; prNumber?: number } {
-  // GitHub PR merge: "Merge pull request #123 from owner/branch-name"
-  const prMatch = message.match(/Merge pull request #(\d+) from [^/]+\/(.+)/)
-  if (prMatch) {
-    return { branchName: prMatch[2], prNumber: parseInt(prMatch[1], 10) }
-  }
-
-  // Standard git merge: "Merge branch 'branch-name'"
-  const branchMatch = message.match(/Merge branch '([^']+)'/)
-  if (branchMatch) {
-    return { branchName: branchMatch[1] }
-  }
-
-  // Alternative format: "Merge branch-name into master"
-  const intoMatch = message.match(/Merge (\S+) into/)
-  if (intoMatch) {
-    return { branchName: intoMatch[1] }
-  }
-
-  // Fallback: use first line of message
-  return { branchName: message.split('\n')[0].slice(0, 50) }
-}
-
-// Assign size tiers based on percentiles
-function assignSizeTiers(nodes: TechTreeNode[]): void {
-  if (nodes.length === 0) return
-
-  // Sort by total LOC
-  const sorted = [...nodes].sort((a, b) => {
-    const aLoc = a.stats.linesAdded + a.stats.linesRemoved
-    const bLoc = b.stats.linesAdded + b.stats.linesRemoved
-    return aLoc - bLoc
-  })
-
-  const n = sorted.length
-  sorted.forEach((node, index) => {
-    const percentile = index / n
-    let tier: TechTreeSizeTier
-    if (percentile < 0.10) tier = 'xs'
-    else if (percentile < 0.30) tier = 'sm'
-    else if (percentile < 0.60) tier = 'md'
-    else if (percentile < 0.85) tier = 'lg'
-    else tier = 'xl'
-
-    // Find the original node and update its tier
-    const originalNode = nodes.find(n => n.id === node.id)
-    if (originalNode) {
-      originalNode.sizeTier = tier
-    }
-  })
-}
-
-// Assign badges based on percentiles
-function assignBadges(nodes: TechTreeNode[]): void {
-  if (nodes.length === 0) return
-
-  // Sort nodes by different metrics to find percentiles
-  const byLoc = [...nodes].sort((a, b) =>
-    (a.stats.linesAdded + a.stats.linesRemoved) - (b.stats.linesAdded + b.stats.linesRemoved)
-  )
-  const byAdded = [...nodes].sort((a, b) => a.stats.linesAdded - b.stats.linesAdded)
-  const byRemoved = [...nodes].sort((a, b) => a.stats.linesRemoved - b.stats.linesRemoved)
-  const byFiles = [...nodes].sort((a, b) => a.stats.filesChanged - b.stats.filesChanged)
-  const byAge = [...nodes].sort((a, b) => a.stats.daysSinceMerge - b.stats.daysSinceMerge)
-
-  const n = nodes.length
-
-  // Helper to check if node is in top X%
-  const isInTopPercentile = (sorted: TechTreeNode[], node: TechTreeNode, topPercent: number): boolean => {
-    const idx = sorted.findIndex(n => n.id === node.id)
-    return idx >= n * (1 - topPercent)
-  }
-
-  // Helper to check if node is in bottom X%
-  const isInBottomPercentile = (sorted: TechTreeNode[], node: TechTreeNode, bottomPercent: number): boolean => {
-    const idx = sorted.findIndex(n => n.id === node.id)
-    return idx < n * bottomPercent
-  }
-
-  for (const node of nodes) {
-    node.badges = {
-      massive: isInTopPercentile(byLoc, node, 0.10),        // Top 10% by total LOC
-      destructive: isInTopPercentile(byRemoved, node, 0.15), // Top 15% by lines removed
-      additive: isInTopPercentile(byAdded, node, 0.15),     // Top 15% by lines added
-      multiFile: isInTopPercentile(byFiles, node, 0.20),    // Top 20% by files changed
-      surgical: isInBottomPercentile(byLoc, node, 0.10),    // Bottom 10% by LOC
-      ancient: isInTopPercentile(byAge, node, 0.15),        // Top 15% oldest (highest daysSinceMerge)
-      fresh: isInBottomPercentile(byAge, node, 0.15),       // Bottom 15% newest (lowest daysSinceMerge)
-    }
-  }
-}
-
-// Get merged branch tree for tech tree visualization
-export async function getMergedBranchTree(limit: number = 50): Promise<TechTreeData> {
-  if (!git) throw new Error('No repository selected')
-
-  // Detect master branch name
-  let masterBranch = 'main'
-  try {
-    const branches = await git.branch()
-    if (branches.all.includes('master')) masterBranch = 'master'
-    else if (branches.all.includes('main')) masterBranch = 'main'
-  } catch {
-    // Default to main
-  }
-
-  try {
-    // Get merge commits on the main branch
-    // Format: hash|author_date|author_name|subject
-    const format = '%H|%ai|%an|%s'
-    const output = await git.raw([
-      'log',
-      masterBranch,
-      '--first-parent',
-      '--merges',
-      `--format=${format}`,
-      '-n',
-      limit.toString(),
-    ])
-
-    const lines = output.trim().split('\n').filter(Boolean)
-    const nodes: TechTreeNode[] = []
-    const now = Date.now()
-
-    for (const line of lines) {
-      const [mergeCommitHash, dateStr, author, message] = line.split('|')
-      if (!mergeCommitHash || !message) continue
-
-      const { branchName, prNumber } = parseMergeCommitMessage(message)
-
-      // Get diff stats for this merge commit
-      let linesAdded = 0
-      let linesRemoved = 0
-      let filesChanged = 0
-      let filesAdded = 0
-      let filesRemoved = 0
-      const commitCount = 1
-
-      try {
-        // Get stat info for the merge commit
-        const statOutput = await git.raw([
-          'show',
-          '--stat',
-          '--format=',
-          mergeCommitHash,
-        ])
-        const statLines = statOutput.trim().split('\n')
-        const summaryLine = statLines[statLines.length - 1]
-
-        // Parse: "3 files changed, 10 insertions(+), 5 deletions(-)"
-        const filesMatch = summaryLine.match(/(\d+) files? changed/)
-        const addMatch = summaryLine.match(/(\d+) insertions?\(\+\)/)
-        const delMatch = summaryLine.match(/(\d+) deletions?\(-\)/)
-
-        filesChanged = filesMatch ? parseInt(filesMatch[1]) : 0
-        linesAdded = addMatch ? parseInt(addMatch[1]) : 0
-        linesRemoved = delMatch ? parseInt(delMatch[1]) : 0
-
-        // Count new/deleted files from the stat output
-        for (const sl of statLines) {
-          if (sl.includes('(new)') || sl.includes('create mode')) filesAdded++
-          if (sl.includes('(gone)') || sl.includes('delete mode')) filesRemoved++
-        }
-      } catch {
-        // Ignore stat errors
-      }
-
-      // Calculate days since merge
-      const mergeDate = new Date(dateStr)
-      const daysSinceMerge = Math.floor((now - mergeDate.getTime()) / (1000 * 60 * 60 * 24))
-
-      nodes.push({
-        id: mergeCommitHash.slice(0, 8),
-        branchName,
-        commitHash: mergeCommitHash,
-        mergeCommitHash,
-        author,
-        mergeDate: dateStr,
-        message,
-        prNumber,
-        stats: {
-          linesAdded,
-          linesRemoved,
-          filesChanged,
-          filesAdded,
-          filesRemoved,
-          commitCount,
-          daysSinceMerge,
-        },
-        sizeTier: 'md', // Will be assigned by assignSizeTiers
-        branchType: getBranchType(branchName),
-        badges: {
-          massive: false,
-          destructive: false,
-          additive: false,
-          multiFile: false,
-          surgical: false,
-          ancient: false,
-          fresh: false,
-        },
-      })
-    }
-
-    // Compute percentile-based tiers and badges
-    assignSizeTiers(nodes)
-    assignBadges(nodes)
-
-    // Calculate global stats
-    const allLoc = nodes.map(n => n.stats.linesAdded + n.stats.linesRemoved)
-    const allFiles = nodes.map(n => n.stats.filesChanged)
-    const allAge = nodes.map(n => n.stats.daysSinceMerge)
-
-    return {
-      masterBranch,
-      nodes,
-      stats: {
-        minLoc: Math.min(...allLoc, 0),
-        maxLoc: Math.max(...allLoc, 1),
-        minFiles: Math.min(...allFiles, 0),
-        maxFiles: Math.max(...allFiles, 1),
-        minAge: Math.min(...allAge, 0),
-        maxAge: Math.max(...allAge, 1),
-      },
-    }
-  } catch {
-    return {
-      masterBranch,
-      nodes: [],
-      stats: { minLoc: 0, maxLoc: 1, minFiles: 0, maxFiles: 1, minAge: 0, maxAge: 1 },
-    }
   }
 }
 
@@ -4018,26 +3658,451 @@ export async function discardAllChanges(): Promise<{ success: boolean; message: 
   if (!git) throw new Error('No repository selected')
 
   try {
-    const status = await git.status()
-    
-    // First unstage everything
-    if (status.staged.length > 0) {
+    const statusBefore = await git.status()
+    const totalChanges = statusBefore.files.length
+
+    if (totalChanges === 0) {
+      return { success: true, message: 'No changes to discard' }
+    }
+
+    // 1) Unstage everything.
+    // Important: staged-only changes (including newly added files) become unstaged after this.
+    if (statusBefore.staged.length > 0) {
       await git.raw(['restore', '--staged', '.'])
     }
-    
-    // Restore tracked files to last commit
-    const trackedModified = [...status.modified, ...status.deleted]
-    if (trackedModified.length > 0) {
-      await git.raw(['restore', '.'])
-    }
-    
-    // Remove untracked files
-    if (status.not_added.length > 0) {
+
+    // 2) Restore tracked files to last commit (covers both previously-unstaged and previously-staged changes)
+    await git.raw(['restore', '.'])
+
+    // 3) Remove untracked files (covers initially-untracked and "unstaged new files" created by step 1)
+    const statusAfter = await git.status()
+    if (statusAfter.not_added.length > 0) {
       await git.raw(['clean', '-fd'])
     }
-    
-    const totalChanges = status.files.length
+
     return { success: true, message: `Discarded all ${totalChanges} changes` }
+  } catch (error) {
+    return { success: false, message: (error as Error).message }
+  }
+}
+
+/**
+ * Apply a patch using git apply with stdin via child_process
+ */
+async function applyPatch(
+  targetPath: string,
+  patch: string,
+  args: string[]
+): Promise<void> {
+  const { spawn } = await import('child_process')
+
+  return new Promise((resolve, reject) => {
+    const gitProcess = spawn('git', ['apply', ...args], {
+      cwd: targetPath,
+      stdio: ['pipe', 'pipe', 'pipe'],
+    })
+
+    let stderr = ''
+
+    gitProcess.stderr.on('data', (data) => {
+      stderr += data.toString()
+    })
+
+    gitProcess.on('close', (code) => {
+      if (code === 0) {
+        resolve()
+      } else {
+        reject(new Error(stderr || `git apply failed with code ${code}`))
+      }
+    })
+
+    gitProcess.on('error', (err) => {
+      reject(err)
+    })
+
+    // Write the patch to stdin
+    gitProcess.stdin.write(patch)
+    gitProcess.stdin.end()
+  })
+}
+
+// Stage a single hunk
+export async function stageHunk(
+  filePath: string,
+  hunkIndex: number
+): Promise<{ success: boolean; message: string }> {
+  if (!git || !repoPath) throw new Error('No repository selected')
+
+  try {
+    // Get the current diff to extract the hunk
+    const diff = await getFileDiff(filePath, false)
+    if (!diff) {
+      return { success: false, message: 'Could not get file diff' }
+    }
+
+    if (hunkIndex < 0 || hunkIndex >= diff.hunks.length) {
+      return { success: false, message: `Invalid hunk index: ${hunkIndex}` }
+    }
+
+    const hunk = diff.hunks[hunkIndex]
+    if (!hunk.rawPatch) {
+      return { success: false, message: 'Hunk has no raw patch data' }
+    }
+
+    // Apply the patch to the index
+    await applyPatch(repoPath, hunk.rawPatch, ['--cached'])
+    return { success: true, message: `Staged hunk ${hunkIndex + 1}` }
+  } catch (error) {
+    return { success: false, message: (error as Error).message }
+  }
+}
+
+// Unstage a single hunk
+export async function unstageHunk(
+  filePath: string,
+  hunkIndex: number
+): Promise<{ success: boolean; message: string }> {
+  if (!git || !repoPath) throw new Error('No repository selected')
+
+  try {
+    // Get the staged diff to extract the hunk
+    const diff = await getFileDiff(filePath, true)
+    if (!diff) {
+      return { success: false, message: 'Could not get staged file diff' }
+    }
+
+    if (hunkIndex < 0 || hunkIndex >= diff.hunks.length) {
+      return { success: false, message: `Invalid hunk index: ${hunkIndex}` }
+    }
+
+    const hunk = diff.hunks[hunkIndex]
+    if (!hunk.rawPatch) {
+      return { success: false, message: 'Hunk has no raw patch data' }
+    }
+
+    // Reverse apply the patch from the index
+    await applyPatch(repoPath, hunk.rawPatch, ['--cached', '-R'])
+    return { success: true, message: `Unstaged hunk ${hunkIndex + 1}` }
+  } catch (error) {
+    return { success: false, message: (error as Error).message }
+  }
+}
+
+// Discard a single hunk
+export async function discardHunk(
+  filePath: string,
+  hunkIndex: number
+): Promise<{ success: boolean; message: string }> {
+  if (!git || !repoPath) throw new Error('No repository selected')
+
+  try {
+    // Get the current diff to extract the hunk
+    const diff = await getFileDiff(filePath, false)
+    if (!diff) {
+      return { success: false, message: 'Could not get file diff' }
+    }
+
+    if (hunkIndex < 0 || hunkIndex >= diff.hunks.length) {
+      return { success: false, message: `Invalid hunk index: ${hunkIndex}` }
+    }
+
+    const hunk = diff.hunks[hunkIndex]
+    if (!hunk.rawPatch) {
+      return { success: false, message: 'Hunk has no raw patch data' }
+    }
+
+    // Reverse apply the patch to the working tree
+    await applyPatch(repoPath, hunk.rawPatch, ['-R'])
+    return { success: true, message: `Discarded hunk ${hunkIndex + 1}` }
+  } catch (error) {
+    return { success: false, message: (error as Error).message }
+  }
+}
+
+/**
+ * Build a partial patch from a hunk with only selected lines.
+ *
+ * For staging (applying to index from unstaged diff):
+ * - Selected add lines: include as '+' (add to index)
+ * - Non-selected add lines: OMIT entirely (they don't exist in index, can't be context)
+ * - Selected delete lines: include as '-' (remove from index)
+ * - Non-selected delete lines: include as context ' ' (keep in index)
+ * - Context lines: include as context ' '
+ */
+function buildPartialPatch(
+  filePath: string,
+  hunk: StagingDiffHunk,
+  selectedLineIndices: number[]
+): string {
+  const selectedSet = new Set(selectedLineIndices)
+
+  const patchLines: string[] = []
+  let oldCount = 0
+  let newCount = 0
+
+  for (const line of hunk.lines) {
+    const isSelected = selectedSet.has(line.lineIndex)
+
+    if (line.type === 'context') {
+      // Context lines are always included
+      patchLines.push(' ' + line.content)
+      oldCount++
+      newCount++
+    } else if (line.type === 'add') {
+      if (isSelected) {
+        // Selected add line - include as addition
+        patchLines.push('+' + line.content)
+        newCount++
+      }
+      // Non-selected add lines are OMITTED entirely.
+      // They exist in the working tree but NOT in the index,
+      // so they can't be used as context for git apply --cached.
+    } else if (line.type === 'delete') {
+      if (isSelected) {
+        // Selected delete line - include as deletion
+        patchLines.push('-' + line.content)
+        oldCount++
+      } else {
+        // Non-selected delete line - keep as context (line stays in index)
+        patchLines.push(' ' + line.content)
+        oldCount++
+        newCount++
+      }
+    }
+  }
+
+  const newHeader = `@@ -${hunk.oldStart},${oldCount} +${hunk.newStart},${newCount} @@`
+
+  return (
+    `diff --git a/${filePath} b/${filePath}\n` +
+    `--- a/${filePath}\n` +
+    `+++ b/${filePath}\n` +
+    newHeader +
+    '\n' +
+    patchLines.join('\n') +
+    '\n'
+  )
+}
+
+/**
+ * Build a partial patch for reversed application (unstage/discard).
+ *
+ * For unstaging (applying -R to index) or discarding (applying -R to working tree):
+ * - Selected add lines: include as '+' (will be removed by -R)
+ * - Non-selected add lines: include as context ' ' (they exist in the target and must match)
+ * - Selected delete lines: include as '-' (will be restored by -R)
+ * - Non-selected delete lines: include as context ' ' (keep in target)
+ * - Context lines: include as context ' '
+ *
+ * The key difference: when applying with -R, ALL lines (selected and non-selected)
+ * must exist in the target for proper context matching.
+ */
+function buildReversedPartialPatch(
+  filePath: string,
+  hunk: StagingDiffHunk,
+  selectedLineIndices: number[]
+): string {
+  const selectedSet = new Set(selectedLineIndices)
+
+  const patchLines: string[] = []
+  let oldCount = 0
+  let newCount = 0
+
+  for (const line of hunk.lines) {
+    const isSelected = selectedSet.has(line.lineIndex)
+
+    if (line.type === 'context') {
+      // Context lines are always included
+      patchLines.push(' ' + line.content)
+      oldCount++
+      newCount++
+    } else if (line.type === 'add') {
+      if (isSelected) {
+        // Selected add line - include as addition (will be removed by -R)
+        patchLines.push('+' + line.content)
+        newCount++
+      } else {
+        // Non-selected add line - include as context (exists in target, must match)
+        patchLines.push(' ' + line.content)
+        oldCount++
+        newCount++
+      }
+    } else if (line.type === 'delete') {
+      if (isSelected) {
+        // Selected delete line - include as deletion (will be restored by -R)
+        patchLines.push('-' + line.content)
+        oldCount++
+      } else {
+        // Non-selected delete line - keep as context
+        patchLines.push(' ' + line.content)
+        oldCount++
+        newCount++
+      }
+    }
+  }
+
+  const newHeader = `@@ -${hunk.oldStart},${oldCount} +${hunk.newStart},${newCount} @@`
+
+  return (
+    `diff --git a/${filePath} b/${filePath}\n` +
+    `--- a/${filePath}\n` +
+    `+++ b/${filePath}\n` +
+    newHeader +
+    '\n' +
+    patchLines.join('\n') +
+    '\n'
+  )
+}
+
+// Stage specific lines within a hunk
+export async function stageLines(
+  filePath: string,
+  hunkIndex: number,
+  lineIndices: number[]
+): Promise<{ success: boolean; message: string }> {
+  if (!git || !repoPath) throw new Error('No repository selected')
+
+  try {
+    if (lineIndices.length === 0) {
+      return { success: false, message: 'No lines selected' }
+    }
+
+    const diff = await getFileDiff(filePath, false)
+    if (!diff) {
+      return { success: false, message: 'Could not get file diff' }
+    }
+
+    if (hunkIndex < 0 || hunkIndex >= diff.hunks.length) {
+      return { success: false, message: `Invalid hunk index: ${hunkIndex}` }
+    }
+
+    const hunk = diff.hunks[hunkIndex]
+    const partialPatch = buildPartialPatch(filePath, hunk, lineIndices)
+
+    await applyPatch(repoPath, partialPatch, ['--cached'])
+    return { success: true, message: `Staged ${lineIndices.length} line(s)` }
+  } catch (error) {
+    return { success: false, message: (error as Error).message }
+  }
+}
+
+// Unstage specific lines within a hunk
+export async function unstageLines(
+  filePath: string,
+  hunkIndex: number,
+  lineIndices: number[]
+): Promise<{ success: boolean; message: string }> {
+  if (!git || !repoPath) throw new Error('No repository selected')
+
+  try {
+    if (lineIndices.length === 0) {
+      return { success: false, message: 'No lines selected' }
+    }
+
+    const diff = await getFileDiff(filePath, true)
+    if (!diff) {
+      return { success: false, message: 'Could not get staged file diff' }
+    }
+
+    if (hunkIndex < 0 || hunkIndex >= diff.hunks.length) {
+      return { success: false, message: `Invalid hunk index: ${hunkIndex}` }
+    }
+
+    const hunk = diff.hunks[hunkIndex]
+    const partialPatch = buildReversedPartialPatch(filePath, hunk, lineIndices)
+
+    await applyPatch(repoPath, partialPatch, ['--cached', '-R'])
+    return { success: true, message: `Unstaged ${lineIndices.length} line(s)` }
+  } catch (error) {
+    return { success: false, message: (error as Error).message }
+  }
+}
+
+// Discard specific lines within a hunk
+export async function discardLines(
+  filePath: string,
+  hunkIndex: number,
+  lineIndices: number[]
+): Promise<{ success: boolean; message: string }> {
+  if (!git || !repoPath) throw new Error('No repository selected')
+
+  try {
+    if (lineIndices.length === 0) {
+      return { success: false, message: 'No lines selected' }
+    }
+
+    const diff = await getFileDiff(filePath, false)
+    if (!diff) {
+      return { success: false, message: 'Could not get file diff' }
+    }
+
+    if (hunkIndex < 0 || hunkIndex >= diff.hunks.length) {
+      return { success: false, message: `Invalid hunk index: ${hunkIndex}` }
+    }
+
+    const hunk = diff.hunks[hunkIndex]
+    const partialPatch = buildReversedPartialPatch(filePath, hunk, lineIndices)
+
+    await applyPatch(repoPath, partialPatch, ['-R'])
+    return { success: true, message: `Discarded ${lineIndices.length} line(s)` }
+  } catch (error) {
+    return { success: false, message: (error as Error).message }
+  }
+}
+
+// Get the full content of a file for editing
+export async function getFileContent(filePath: string): Promise<string | null> {
+  if (!repoPath) return null
+
+  try {
+    const fullPath = path.join(repoPath, filePath)
+
+    // Security: ensure the file is within the repo
+    const resolvedPath = path.resolve(fullPath)
+    const resolvedRepo = path.resolve(repoPath)
+    if (!resolvedPath.startsWith(resolvedRepo + path.sep)) {
+      console.error('Security: attempted to read file outside repository')
+      return null
+    }
+
+    // Check if file exists
+    if (!fs.existsSync(fullPath)) {
+      return null
+    }
+
+    const content = await fs.promises.readFile(fullPath, 'utf-8')
+    return content
+  } catch (error) {
+    console.error('Error reading file content:', error)
+    return null
+  }
+}
+
+// Save content to a file (for inline editing)
+export async function saveFileContent(
+  filePath: string,
+  content: string
+): Promise<{ success: boolean; message: string }> {
+  if (!repoPath) return { success: false, message: 'No repository selected' }
+
+  try {
+    const fullPath = path.join(repoPath, filePath)
+
+    // Security: ensure the file is within the repo
+    const resolvedPath = path.resolve(fullPath)
+    const resolvedRepo = path.resolve(repoPath)
+    if (!resolvedPath.startsWith(resolvedRepo + path.sep)) {
+      return { success: false, message: 'Cannot write to files outside repository' }
+    }
+
+    // Ensure parent directory exists (for new files)
+    const dir = path.dirname(fullPath)
+    if (!fs.existsSync(dir)) {
+      await fs.promises.mkdir(dir, { recursive: true })
+    }
+
+    await fs.promises.writeFile(fullPath, content, 'utf-8')
+    return { success: true, message: `Saved ${filePath}` }
   } catch (error) {
     return { success: false, message: (error as Error).message }
   }
@@ -4051,6 +4116,8 @@ export interface StagingDiffHunk {
   newStart: number
   newLines: number
   lines: StagingDiffLine[]
+  /** Raw patch text for this hunk (used for git apply) */
+  rawPatch: string
 }
 
 export interface StagingDiffLine {
@@ -4058,6 +4125,8 @@ export interface StagingDiffLine {
   content: string
   oldLineNumber?: number
   newLineNumber?: number
+  /** Index of this line within the hunk (0-based, for selection) */
+  lineIndex: number
 }
 
 export interface StagingFileDiff {
@@ -4090,25 +4159,40 @@ export async function getFileDiff(filePath: string, staged: boolean): Promise<St
         const fullPath = path.join(repoPath!, filePath)
         try {
           const content = await fs.promises.readFile(fullPath, 'utf-8')
-          const lines = content.split('\n')
+          const fileLines = content.split('\n')
+
+          // Build raw patch for untracked file
+          const header = `@@ -0,0 +1,${fileLines.length} @@`
+          const patchLines = fileLines.map((l) => '+' + l)
+          const rawPatch =
+            `diff --git a/${filePath} b/${filePath}\n` +
+            `new file mode 100644\n` +
+            `--- /dev/null\n` +
+            `+++ b/${filePath}\n` +
+            header +
+            '\n' +
+            patchLines.join('\n') +
+            '\n'
 
           return {
             filePath,
             status: 'untracked',
             isBinary: false,
-            additions: lines.length,
+            additions: fileLines.length,
             deletions: 0,
             hunks: [
               {
-                header: `@@ -0,0 +1,${lines.length} @@`,
+                header,
                 oldStart: 0,
                 oldLines: 0,
                 newStart: 1,
-                newLines: lines.length,
-                lines: lines.map((line, idx) => ({
+                newLines: fileLines.length,
+                rawPatch,
+                lines: fileLines.map((line, idx) => ({
                   type: 'add' as const,
                   content: line,
                   newLineNumber: idx + 1,
+                  lineIndex: idx,
                 })),
               },
             ],
@@ -4134,6 +4218,7 @@ function parseDiff(diffOutput: string, filePath: string): StagingFileDiff {
   const lines = diffOutput.split('\n')
   const hunks: StagingDiffHunk[] = []
   let currentHunk: StagingDiffHunk | null = null
+  let currentHunkRawLines: string[] = []
   let oldLineNum = 0
   let newLineNum = 0
   let additions = 0
@@ -4141,6 +4226,17 @@ function parseDiff(diffOutput: string, filePath: string): StagingFileDiff {
   let isBinary = false
   let status: StagingFileDiff['status'] = 'modified'
   let oldPath: string | undefined
+
+  // Extract file header lines for building rawPatch
+  let fileHeader = ''
+  for (const line of lines) {
+    if (line.startsWith('diff --git') || line.startsWith('---') || line.startsWith('+++')) {
+      fileHeader += line + '\n'
+    }
+    if (line.startsWith('+++')) break
+  }
+
+  let lineIndex = 0
 
   for (const line of lines) {
     // Check for binary file
@@ -4171,12 +4267,16 @@ function parseDiff(diffOutput: string, filePath: string): StagingFileDiff {
     // Parse hunk header
     const hunkMatch = line.match(/^@@ -(\d+)(?:,(\d+))? \+(\d+)(?:,(\d+))? @@(.*)$/)
     if (hunkMatch) {
+      // Finalize previous hunk
       if (currentHunk) {
+        currentHunk.rawPatch = fileHeader + currentHunkRawLines.join('\n') + '\n'
         hunks.push(currentHunk)
       }
 
       oldLineNum = parseInt(hunkMatch[1])
       newLineNum = parseInt(hunkMatch[3])
+      lineIndex = 0
+      currentHunkRawLines = [line]
 
       currentHunk = {
         header: line,
@@ -4185,6 +4285,7 @@ function parseDiff(diffOutput: string, filePath: string): StagingFileDiff {
         newStart: newLineNum,
         newLines: parseInt(hunkMatch[4] || '1'),
         lines: [],
+        rawPatch: '', // Will be set when hunk is finalized
       }
       continue
     }
@@ -4192,25 +4293,31 @@ function parseDiff(diffOutput: string, filePath: string): StagingFileDiff {
     // Parse diff lines
     if (currentHunk) {
       if (line.startsWith('+') && !line.startsWith('+++')) {
+        currentHunkRawLines.push(line)
         additions++
         currentHunk.lines.push({
           type: 'add',
           content: line.slice(1),
           newLineNumber: newLineNum++,
+          lineIndex: lineIndex++,
         })
       } else if (line.startsWith('-') && !line.startsWith('---')) {
+        currentHunkRawLines.push(line)
         deletions++
         currentHunk.lines.push({
           type: 'delete',
           content: line.slice(1),
           oldLineNumber: oldLineNum++,
+          lineIndex: lineIndex++,
         })
       } else if (line.startsWith(' ')) {
+        currentHunkRawLines.push(line)
         currentHunk.lines.push({
           type: 'context',
           content: line.slice(1),
           oldLineNumber: oldLineNum++,
           newLineNumber: newLineNum++,
+          lineIndex: lineIndex++,
         })
       }
     }
@@ -4218,6 +4325,7 @@ function parseDiff(diffOutput: string, filePath: string): StagingFileDiff {
 
   // Don't forget the last hunk
   if (currentHunk) {
+    currentHunk.rawPatch = fileHeader + currentHunkRawLines.join('\n') + '\n'
     hunks.push(currentHunk)
   }
 
@@ -4391,25 +4499,40 @@ export async function getFileDiffInWorktree(
         const fullPath = path.join(worktreePath, filePath)
         try {
           const content = await fs.promises.readFile(fullPath, 'utf-8')
-          const lines = content.split('\n')
+          const fileLines = content.split('\n')
+
+          // Build raw patch for untracked file
+          const header = `@@ -0,0 +1,${fileLines.length} @@`
+          const patchLines = fileLines.map((l) => '+' + l)
+          const rawPatch =
+            `diff --git a/${filePath} b/${filePath}\n` +
+            `new file mode 100644\n` +
+            `--- /dev/null\n` +
+            `+++ b/${filePath}\n` +
+            header +
+            '\n' +
+            patchLines.join('\n') +
+            '\n'
 
           return {
             filePath,
             status: 'untracked',
             isBinary: false,
-            additions: lines.length,
+            additions: fileLines.length,
             deletions: 0,
             hunks: [
               {
-                header: `@@ -0,0 +1,${lines.length} @@`,
+                header,
                 oldStart: 0,
                 oldLines: 0,
                 newStart: 1,
-                newLines: lines.length,
-                lines: lines.map((line, idx) => ({
+                newLines: fileLines.length,
+                rawPatch,
+                lines: fileLines.map((line, idx) => ({
                   type: 'add' as const,
                   content: line,
                   newLineNumber: idx + 1,
+                  lineIndex: idx,
                 })),
               },
             ],
@@ -4605,7 +4728,7 @@ export async function commitChanges(
   message: string,
   description?: string,
   force: boolean = false
-): Promise<{ success: boolean; message: string; behindCount?: number }> {
+): Promise<{ success: boolean; message: string; behindCount?: number; hash?: string }> {
   if (!git) throw new Error('No repository selected')
 
   try {
@@ -4636,7 +4759,13 @@ export async function commitChanges(
     const fullMessage = description ? `${message}\n\n${description}` : message
 
     await git.commit(fullMessage)
-    return { success: true, message: `Committed: ${message}` }
+    let hash: string | undefined
+    try {
+      hash = (await git.revparse(['HEAD'])).trim()
+    } catch {
+      // Best-effort: commit succeeded but we couldn't resolve HEAD
+    }
+    return { success: true, message: `Committed: ${message}`, ...(hash && { hash }) }
   } catch (error) {
     return { success: false, message: (error as Error).message }
   }
@@ -4649,46 +4778,3 @@ export interface RepoInfo {
   isCurrent: boolean
 }
 
-/**
- * Get sibling repositories from the parent directory of the current repo.
- * Filters out worktrees (which have a .git file instead of directory).
- */
-export async function getSiblingRepos(): Promise<RepoInfo[]> {
-  if (!repoPath) return []
-
-  const parentDir = path.dirname(repoPath)
-  const repos: RepoInfo[] = []
-
-  try {
-    const entries = await fs.promises.readdir(parentDir, { withFileTypes: true })
-
-    for (const entry of entries) {
-      if (!entry.isDirectory()) continue
-
-      const entryPath = path.join(parentDir, entry.name)
-      const gitPath = path.join(entryPath, '.git')
-
-      try {
-        const gitStat = await fs.promises.stat(gitPath)
-        // Only include if .git is a directory (real repo, not a worktree)
-        if (gitStat.isDirectory()) {
-          repos.push({
-            path: entryPath,
-            name: entry.name,
-            isCurrent: entryPath === repoPath,
-          })
-        }
-      } catch {
-        // No .git or can't access - skip
-      }
-    }
-
-    // Sort alphabetically by name
-    repos.sort((a, b) => a.name.localeCompare(b.name))
-
-    return repos
-  } catch (error) {
-    console.error('Error scanning sibling repos:', error)
-    return []
-  }
-}

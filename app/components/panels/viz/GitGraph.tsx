@@ -8,6 +8,14 @@
 import { useMemo } from 'react'
 import type { GraphCommit } from '../../../types/electron'
 
+// Column width configuration
+export interface GitGraphColumnWidths {
+  graph: number | null      // SVG graph column, null = auto-size
+  refs: number | null       // Refs/tags column, null = auto
+  message: number | null    // Commit message column, null = flex
+  meta: number | null       // Meta info (hash, author, date), null = auto
+}
+
 export interface GitGraphProps {
   commits: GraphCommit[]
   selectedCommit: GraphCommit | null
@@ -15,10 +23,16 @@ export interface GitGraphProps {
   onDoubleClickCommit?: (commit: GraphCommit) => void // Open in editor
   formatRelativeTime: (date: string) => string
   showGraph?: boolean // Show graph lines/nodes, when false it's a flat list
-  graphWidth?: number | null // Manual width override, null = auto-size
-  onStartResize?: (startX: number, currentWidth: number) => void // Callback to start resizing
-  onResetWidth?: () => void // Double-click to reset to auto-size
-  isResizing?: boolean // Whether currently resizing
+  // Column widths and resize handlers
+  columnWidths?: Partial<GitGraphColumnWidths>
+  onStartColumnResize?: (column: keyof GitGraphColumnWidths, startX: number, currentWidth: number) => void
+  onResetColumnWidth?: (column: keyof GitGraphColumnWidths) => void
+  resizingColumn?: keyof GitGraphColumnWidths | null
+  // Legacy props (deprecated, use columnWidths instead)
+  graphWidth?: number | null
+  onStartResize?: (startX: number, currentWidth: number) => void
+  onResetWidth?: () => void
+  isResizing?: boolean
 }
 
 // Lane colors for branches
@@ -40,11 +54,25 @@ export function GitGraph({
   onDoubleClickCommit,
   formatRelativeTime,
   showGraph = true,
-  graphWidth: manualGraphWidth,
-  onStartResize,
-  onResetWidth,
-  isResizing,
+  columnWidths,
+  onStartColumnResize,
+  onResetColumnWidth,
+  resizingColumn,
+  // Legacy props - map to new system
+  graphWidth: legacyGraphWidth,
+  onStartResize: legacyOnStartResize,
+  onResetWidth: legacyOnResetWidth,
+  isResizing: legacyIsResizing,
 }: GitGraphProps) {
+  // Support both legacy and new column width props
+  const manualGraphWidth = columnWidths?.graph ?? legacyGraphWidth
+  const onStartResize = onStartColumnResize 
+    ? (startX: number, width: number) => onStartColumnResize('graph', startX, width)
+    : legacyOnStartResize
+  const onResetWidth = onResetColumnWidth 
+    ? () => onResetColumnWidth('graph')
+    : legacyOnResetWidth
+  const isResizing = resizingColumn === 'graph' || legacyIsResizing
   // Calculate lane assignments for the graph
   const { lanes, maxLane } = useMemo(() => {
     const laneMap = new Map<string, number>()
@@ -202,6 +230,52 @@ export function GitGraph({
 
       {/* Commit list */}
       <div className="git-graph-list">
+        {/* Column headers with resize handles */}
+        <div className="git-graph-header">
+          <div 
+            className="graph-col graph-col-refs" 
+            style={columnWidths?.refs ? { width: columnWidths.refs, minWidth: columnWidths.refs, flexShrink: 0 } : undefined}
+          >
+            {onStartColumnResize && (
+              <div 
+                className={`graph-col-resize-handle ${resizingColumn === 'refs' ? 'active' : ''}`}
+                onMouseDown={(e) => {
+                  e.stopPropagation()
+                  onStartColumnResize('refs', e.clientX, columnWidths?.refs ?? 120)
+                }}
+                onDoubleClick={(e) => {
+                  e.stopPropagation()
+                  onResetColumnWidth?.('refs')
+                }}
+                title="Drag to resize, double-click to reset"
+              />
+            )}
+          </div>
+          <div 
+            className="graph-col graph-col-message"
+            style={columnWidths?.message ? { width: columnWidths.message, minWidth: columnWidths.message, flexShrink: 0 } : undefined}
+          >
+            {onStartColumnResize && (
+              <div 
+                className={`graph-col-resize-handle ${resizingColumn === 'message' ? 'active' : ''}`}
+                onMouseDown={(e) => {
+                  e.stopPropagation()
+                  onStartColumnResize('message', e.clientX, columnWidths?.message ?? 300)
+                }}
+                onDoubleClick={(e) => {
+                  e.stopPropagation()
+                  onResetColumnWidth?.('message')
+                }}
+                title="Drag to resize, double-click to reset"
+              />
+            )}
+          </div>
+          <div 
+            className="graph-col graph-col-meta"
+            style={columnWidths?.meta ? { width: columnWidths.meta, minWidth: columnWidths.meta, flexShrink: 0 } : undefined}
+          />
+        </div>
+        {/* Commit rows */}
         {commits.map((commit) => (
           <div
             key={commit.hash}
@@ -210,7 +284,10 @@ export function GitGraph({
             onClick={() => onSelectCommit(commit)}
             onDoubleClick={() => onDoubleClickCommit?.(commit)}
           >
-            <div className="graph-commit-refs">
+            <div 
+              className="graph-commit-refs"
+              style={columnWidths?.refs ? { width: columnWidths.refs, minWidth: columnWidths.refs, flexShrink: 0 } : undefined}
+            >
               {commit.refs.map((ref, i) => {
                 const isHead = ref.includes('HEAD')
                 const isBranch = ref.includes('origin/') || !ref.includes('/')
@@ -222,10 +299,17 @@ export function GitGraph({
                 )
               })}
             </div>
-            <span className="graph-commit-message" title={commit.message}>
+            <span 
+              className="graph-commit-message" 
+              title={commit.message}
+              style={columnWidths?.message ? { width: columnWidths.message, minWidth: columnWidths.message, flexShrink: 0 } : undefined}
+            >
               {commit.message}
             </span>
-            <span className="graph-commit-meta">
+            <span 
+              className="graph-commit-meta"
+              style={columnWidths?.meta ? { width: columnWidths.meta, minWidth: columnWidths.meta, flexShrink: 0 } : undefined}
+            >
               <code className="commit-hash">{commit.shortHash}</code>
               <span className="graph-commit-author">{commit.author}</span>
               <span className="graph-commit-date">{formatRelativeTime(commit.date)}</span>

@@ -10,15 +10,17 @@ Version control is the heart of software development. The core ledger concept be
 
 ## Download
 
-**[⬇️ Download Ledger for Mac (Apple Silicon)](https://github.com/peterjthomson/ledger/releases)**
+- **macOS (Apple Silicon, zip):** [Releases](https://github.com/peterjthomson/ledger/releases)
+- **Linux (Ubuntu/Debian x64, .deb):** [Releases](https://github.com/peterjthomson/ledger/releases)
+- **Linux (AppImage x64, optional):** [Releases](https://github.com/peterjthomson/ledger/releases) — may require `fuse3` on some distros
+- **Windows (NSIS installer):** Built on a Windows runner; grab the Windows asset from Releases when available
 
-> **First launch:** MacOS may show a warning that the app is “damaged and can’t be opened” or "downloaded from the internet".
->
-> You can usually fix this by right-clicking the app and choosing **Open** (sometimes twice). Or on the command line:
+> **macOS first launch:** macOS may warn the app is “damaged” or “from the internet”.
+> Right-click → **Open** (sometimes twice) or:
 > ```bash
-> xattr -cr ~/Downloads/Ledger*.dmg
+> xattr -cr ~/Downloads/Ledger*.zip
 > ```
-> Then open the DMG and drag Ledger to Applications.
+> Then move Ledger to Applications.
 
 ## Features
 

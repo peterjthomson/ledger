@@ -16,6 +16,14 @@ export const commitIpcSchema = {
     args: z.tuple([z.number().optional()]),
     return: z.array(CommitSchema),
   },
+  'get-commit-history-for-ref': {
+    args: z.tuple([z.string(), z.number().optional()]),
+    return: z.array(CommitSchema),
+  },
+  'get-commit-details': {
+    args: z.tuple([z.string()]),
+    return: CommitSchema.nullable(),
+  },
   'get-working-status': {
     args: z.tuple([]),
     return: WorkingStatusSchema,

@@ -11,7 +11,7 @@ import * as path from 'path'
 import * as https from 'https'
 import * as http from 'http'
 import simpleGit from 'simple-git'
-import { safeExec, isValidNpmPackageName } from '@/lib/utils/safe-exec'
+import { safeExec, isValidNpmPackageName, isValidGitUrl } from '@/lib/utils/safe-exec'
 
 // Plugin storage directory
 const PLUGINS_DIR = 'plugins'
@@ -443,11 +443,6 @@ export function setPluginEnabled(
 // Helper Functions
 // ============================================================================
 
-function isValidGitUrl(url: string): boolean {
-  // Allow HTTPS git URLs and git@ SSH URLs
-  return /^(https:\/\/|git@)[\w.-]+[/:][\w./-]+\.git$/.test(url) ||
-         /^https:\/\/github\.com\/[\w.-]+\/[\w.-]+$/.test(url)
-}
 
 function isValidUrl(url: string): boolean {
   try {

@@ -67,7 +67,11 @@ test.describe('Ledger App - Main View', () => {
         path.join(__dirname, '../out/main/main.js'),
         `--repo=${TEST_REPO}`
       ],
-      env: { ...process.env, LEDGER_SETTINGS_PATH: settingsPath },
+      env: {
+        ...process.env,
+        LEDGER_SETTINGS_PATH: settingsPath,
+        LEDGER_MOCK_OPENROUTER: '1',
+      },
     })
     
     page = await app.firstWindow()
@@ -191,5 +195,130 @@ test.describe('Ledger App - Main View', () => {
     // Verify Radar canvas is active (has pr-list column, no sidebar)
     await expect(page.getByTestId('canvas-layout-radar')).toBeVisible()
     await expect(page.getByTestId('canvas-column-pr-list')).toBeVisible()
+  })
+})
+
+test.describe('Ledger App - AI Settings', () => {
+  let app: ElectronApplication
+  let page: Page
+  let repoLoaded = false
+  let settingsPath: string
+
+  test.beforeAll(async () => {
+    // Use an isolated settings file
+    const settingsDir = fs.mkdtempSync(path.join(os.tmpdir(), 'ledger-tests-'))
+    settingsPath = path.join(settingsDir, 'ledger-settings.json')
+    
+    // Launch app with --repo argument to load test repo directly
+    app = await electron.launch({
+      args: [
+        path.join(__dirname, '../out/main/main.js'),
+        `--repo=${TEST_REPO}`
+      ],
+      env: {
+        ...process.env,
+        LEDGER_SETTINGS_PATH: settingsPath,
+        LEDGER_MOCK_OPENROUTER: '1',
+      },
+    })
+    
+    page = await app.firstWindow()
+    await page.waitForLoadState('domcontentloaded')
+    
+    // Wait for repo to load
+    try {
+      await page.waitForSelector('.ledger-content', { timeout: 10000 })
+      repoLoaded = true
+    } catch {
+      const welcomeVisible = await page.locator('text=Welcome to Ledger').isVisible()
+      if (welcomeVisible) {
+        console.log('App showed welcome screen - AI tests will be skipped')
+      }
+    }
+  })
+
+  test.afterAll(async () => {
+    await app.close()
+  })
+
+  test('opens settings panel', async () => {
+    test.skip(!repoLoaded, 'Repo did not auto-load')
+    
+    // Click settings button in titlebar
+    const settingsButton = page.getByTestId('settings-button')
+    await expect(settingsButton).toBeVisible()
+    await settingsButton.click()
+    
+    // Wait for settings panel to be visible
+    // Settings appear in the editor column in Focus mode
+    await page.waitForSelector('[data-testid="ai-settings-section"]', { timeout: 5000 })
+    await expect(page.getByTestId('ai-settings-section')).toBeVisible()
+  })
+
+  test('displays all AI providers', async () => {
+    test.skip(!repoLoaded, 'Repo did not auto-load')
+    
+    // Ensure settings are open (check if not already active)
+    const settingsButton = page.getByTestId('settings-button')
+    const isActive = await settingsButton.evaluate((el) => el.classList.contains('active'))
+    if (!isActive) {
+      await settingsButton.click()
+    }
+    await page.waitForSelector('[data-testid="ai-settings-section"]', { timeout: 5000 })
+    
+    // Verify provider list is visible
+    await expect(page.getByTestId('ai-provider-list')).toBeVisible()
+    
+    // Verify all provider cards are present
+    await expect(page.getByTestId('ai-provider-card-openrouter')).toBeVisible()
+    await expect(page.getByTestId('ai-provider-card-anthropic')).toBeVisible()
+    await expect(page.getByTestId('ai-provider-card-openai')).toBeVisible()
+    await expect(page.getByTestId('ai-provider-card-gemini')).toBeVisible()
+  })
+
+  test('OpenRouter free tier works after enabling without API key', async () => {
+    test.skip(!repoLoaded, 'Repo did not auto-load')
+    
+    // Ensure settings are open
+    const settingsButton = page.getByTestId('settings-button')
+    const isActive = await settingsButton.evaluate((el) => el.classList.contains('active'))
+    if (!isActive) {
+      await settingsButton.click()
+    }
+    await page.waitForSelector('[data-testid="ai-settings-section"]', { timeout: 5000 })
+    
+    // Find OpenRouter provider card
+    const openrouterCard = page.getByTestId('ai-provider-card-openrouter')
+    await expect(openrouterCard).toBeVisible()
+    
+    // Expand it if not already expanded
+    const isExpanded = await openrouterCard.evaluate((el) => el.classList.contains('expanded'))
+    if (!isExpanded) {
+      await page.getByTestId('ai-provider-header-openrouter').click()
+      await page.waitForTimeout(300)
+    }
+    
+    // Enable OpenRouter without API key by clicking Enable button
+    // This enables the provider for free tier access
+    const enableButton = openrouterCard.locator('.ai-key-btn-save')
+    if (await enableButton.isVisible()) {
+      // Button should say "Enable" when no API key is entered
+      await enableButton.click()
+      await page.waitForTimeout(500)
+    }
+    
+    // Test button should now be visible (OpenRouter enabled via free tier)
+    const testButton = page.getByTestId('ai-test-btn-openrouter')
+    await expect(testButton).toBeVisible({ timeout: 2000 })
+    
+    // Click test button
+    await testButton.click()
+    
+    // Wait for test to complete - should see "Testing..." then "Connected" or "Failed"
+    const testStatus = page.getByTestId('ai-test-status-openrouter')
+    await expect(testStatus).toBeVisible({ timeout: 2000 })
+
+    // With mocked responses, the status can flip to Connected immediately.
+    await expect(testStatus).toContainText('Connected', { timeout: 5000 })
   })
 })

@@ -116,85 +116,43 @@ When "Uncommitted" is selected in Focus Mode sidebar:
 
 ---
 
-## API Requirements
+## API
 
-### New IPC Handlers Needed
+Canonical types and API surface live in `app/types/electron.d.ts`.
 
-```typescript
-// Stage a file
-stageFile(filePath: string): Promise<{ success: boolean; message: string }>
-
-// Unstage a file  
-unstageFile(filePath: string): Promise<{ success: boolean; message: string }>
-
-// Stage all changes
-stageAll(): Promise<{ success: boolean; message: string }>
-
-// Unstage all changes
-unstageAll(): Promise<{ success: boolean; message: string }>
-
-// Get diff for a specific file
-getFileDiff(filePath: string, staged: boolean): Promise<FileDiff>
-
-// Commit staged changes
-commitChanges(message: string, description?: string): Promise<{ success: boolean; message: string }>
-```
-
-### Data Types
-
-```typescript
-interface FileDiff {
-  filePath: string;
-  oldPath?: string; // for renames
-  status: 'added' | 'modified' | 'deleted' | 'renamed';
-  hunks: DiffHunk[];
-  isBinary: boolean;
-}
-
-interface DiffHunk {
-  header: string; // @@ -1,5 +1,7 @@
-  oldStart: number;
-  oldLines: number;
-  newStart: number;
-  newLines: number;
-  lines: DiffLine[];
-}
-
-interface DiffLine {
-  type: 'context' | 'add' | 'delete';
-  content: string;
-  oldLineNumber?: number;
-  newLineNumber?: number;
-}
-```
+Key types: `StagingFileDiff`, `StagingDiffHunk`, `StagingDiffLine`, `WorkingStatus`, `UncommittedFile`
 
 ---
 
-## Phase 2 Enhancements (Future)
+## Phase 2 Enhancements
 
-1. **Hunk-level staging**: Stage individual hunks instead of whole files
-2. **Line-level staging**: Stage specific lines within a hunk
-3. **Discard changes**: Revert unstaged changes for a file
-4. **Amend commit**: Modify the last commit
-5. **Commit templates**: Pre-fill commit message format
-6. **Keyboard shortcuts**: 
+1. ✅ **Hunk-level staging**: Stage individual hunks instead of whole files
+2. ✅ **Line-level staging**: Stage specific lines within a hunk
+3. ✅ **Discard changes**: Revert unstaged changes for a file
+4. ✅ **Inline editing**: Edit files directly in the diff view
+5. 🔲 **Amend commit**: Modify the last commit
+6. 🔲 **Commit templates**: Pre-fill commit message format
+7. 🔲 **Keyboard shortcuts**: 
    - `s` - Stage selected file
    - `u` - Unstage selected file
    - `Enter` - Commit (when in message field)
 
 ---
 
-## Implementation Order
+## Implementation Status
 
-1. **Add git-service functions**: `stageFile`, `unstageFile`, `stageAll`, `unstageAll`, `commitChanges`, `getFileDiff`
-2. **Add IPC handlers** in main.ts
-3. **Add preload bindings**
-4. **Update electron.d.ts** types
-5. **Build UI components**:
-   - StagingFileList (with stage/unstage buttons)
-   - FileDiffPreview (simple unified diff)
-   - CommitForm (message + button)
-6. **Integrate into Uncommitted panel** in Focus Mode
+### Phase 1 (Complete)
+1. ✅ Git-service functions: `stageFile`, `unstageFile`, `stageAll`, `unstageAll`, `commitChanges`, `getFileDiff`
+2. ✅ IPC handlers in main.ts
+3. ✅ Preload bindings
+4. ✅ Types in `electron.d.ts`
+5. ✅ UI in `CommitCreatePanel.tsx` (also exported as `StagingPanel`)
+
+### Phase 2 (Complete)
+6. ✅ Hunk-level operations: `stageHunk`, `unstageHunk`, `discardHunk`
+7. ✅ Line-level operations: `stageLines`, `unstageLines`, `discardLines`
+8. ✅ Inline file editing: `getFileContent`, `saveFileContent`
+9. ✅ Syntax highlighting via Shiki
 
 ---
 

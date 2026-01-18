@@ -1,0 +1,5 @@
+# .mailmap - Author identity mapping
+# Format: Canonical Name <canonical@email> Alias Name <alias@email>
+
+Mike Hall <mike@ab0t.com> Mike <mike@kaurifund.com>
+Peter Thomson <p.thomson@theicehouse.co.nz> <p.j.thomson@gmail.com>

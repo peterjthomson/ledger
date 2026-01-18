@@ -75,3 +75,19 @@ export function isValidNpmPackageName(name: string): boolean {
   // Only allows lowercase letters, numbers, hyphens, dots, underscores, and tildes
   return /^(@[a-z0-9-~][a-z0-9-._~]*\/)?[a-z0-9-~][a-z0-9-._~]*$/.test(name)
 }
+
+/**
+ * Validate git repository URL for clone operations
+ * Accepts HTTPS and SSH URLs, with or without .git suffix for GitHub
+ */
+export function isValidGitUrl(url: string): boolean {
+  // HTTPS or SSH URLs ending in .git
+  if (/^(https:\/\/|git@)[\w.-]+[/:][\w./-]+\.git$/.test(url)) {
+    return true
+  }
+  // GitHub URLs without .git suffix
+  if (/^https:\/\/github\.com\/[\w.-]+\/[\w.-]+$/.test(url)) {
+    return true
+  }
+  return false
+}

@@ -45,4 +45,46 @@ export const stagingIpcSchema = {
     args: z.tuple([z.string(), z.boolean()]),
     return: StagingFileDiffSchema.nullable(),
   },
+  'get-behind-main-count': {
+    args: z.tuple([]),
+    return: z.object({
+      behind: z.number(),
+      baseBranch: z.string(),
+    }).nullable(),
+  },
+  // Hunk-level operations
+  'stage-hunk': {
+    args: z.tuple([z.string(), z.number()]),
+    return: SuccessResultSchema,
+  },
+  'unstage-hunk': {
+    args: z.tuple([z.string(), z.number()]),
+    return: SuccessResultSchema,
+  },
+  'discard-hunk': {
+    args: z.tuple([z.string(), z.number()]),
+    return: SuccessResultSchema,
+  },
+  // Line-level operations
+  'stage-lines': {
+    args: z.tuple([z.string(), z.number(), z.array(z.number())]),
+    return: SuccessResultSchema,
+  },
+  'unstage-lines': {
+    args: z.tuple([z.string(), z.number(), z.array(z.number())]),
+    return: SuccessResultSchema,
+  },
+  'discard-lines': {
+    args: z.tuple([z.string(), z.number(), z.array(z.number())]),
+    return: SuccessResultSchema,
+  },
+  // File content operations (for inline editing)
+  'get-file-content': {
+    args: z.tuple([z.string()]),
+    return: z.string().nullable(),
+  },
+  'save-file-content': {
+    args: z.tuple([z.string(), z.string()]),
+    return: SuccessResultSchema,
+  },
 }

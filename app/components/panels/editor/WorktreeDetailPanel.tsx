@@ -8,6 +8,9 @@
 import { useState, useEffect, useRef } from 'react'
 import type { Worktree, UncommittedFile, StagingFileDiff, WorkingStatus } from '../../../types/electron'
 import type { StatusMessage } from '../../../types/app-types'
+import { formatRelativeTime } from '@/app/utils/time'
+
+// Local time formatting helpers are centralized in `app/utils/time.ts`
 
 export interface WorktreeDetailPanelProps {
   worktree: Worktree
@@ -19,6 +22,7 @@ export interface WorktreeDetailPanelProps {
   onClearFocus?: () => void
   onCheckoutWorktree?: (worktree: Worktree) => void
   onOpenStaging?: () => void
+  onBranchClick?: (branchName: string) => void
 }
 
 export function WorktreeDetailPanel({
@@ -31,6 +35,7 @@ export function WorktreeDetailPanel({
   onClearFocus,
   onCheckoutWorktree,
   onOpenStaging,
+  onBranchClick,
 }: WorktreeDetailPanelProps) {
   const [actionInProgress, setActionInProgress] = useState(false)
   // Herd preview state
@@ -386,7 +391,18 @@ export function WorktreeDetailPanel({
           {worktree.branch && (
             <div className="detail-meta-item">
               <span className="meta-label">Branch</span>
-              <code className="meta-value">{worktree.branch}</code>
+              {onBranchClick ? (
+                <button
+                  className="meta-value-link"
+                  onClick={() => onBranchClick(worktree.branch!)}
+                  title={`Go to branch: ${worktree.branch}`}
+                >
+                  <span className="branch-icon">⎇</span>
+                  {worktree.branch}
+                </button>
+              ) : (
+                <code className="meta-value">{worktree.branch}</code>
+              )}
             </div>
           )}
           <div className="detail-meta-item">
@@ -459,7 +475,18 @@ export function WorktreeDetailPanel({
         {worktree.branch && (
           <div className="detail-meta-item full-width">
             <span className="meta-label">Branch</span>
-            <code className="meta-value">{worktree.branch}</code>
+            {onBranchClick ? (
+              <button
+                className="meta-value-link"
+                onClick={() => onBranchClick(worktree.branch!)}
+                title={`Go to branch: ${worktree.branch}`}
+              >
+                <span className="branch-icon">⎇</span>
+                {worktree.branch}
+              </button>
+            ) : (
+              <code className="meta-value">{worktree.branch}</code>
+            )}
           </div>
         )}
         <div className="detail-meta-item full-width">
@@ -491,20 +518,45 @@ export function WorktreeDetailPanel({
         </div>
         {/* Activity status for agent worktrees */}
         {worktree.agent !== 'unknown' && worktree.agent !== 'working-folder' && (
-          <div className="detail-meta-item">
-            <span className="meta-label">Activity</span>
-            <span className={`meta-value activity-status activity-${worktree.activityStatus}`}>
-              {worktree.activityStatus === 'active' && '● Active now'}
-              {worktree.activityStatus === 'recent' && '◐ Recent (< 1 hour)'}
-              {worktree.activityStatus === 'stale' && '○ Stale (> 1 hour)'}
-              {worktree.activityStatus === 'unknown' && '○ Inactive'}
-            </span>
-          </div>
+          <>
+            <div className="detail-meta-item">
+              <span className="meta-label">Activity</span>
+              <span className={`meta-value activity-status activity-${worktree.activityStatus}`}>
+                {worktree.activityStatus === 'active' && '● Active now'}
+                {worktree.activityStatus === 'recent' && '◐ Recent (< 1 hour)'}
+                {worktree.activityStatus === 'stale' && '○ Stale (> 1 hour)'}
+                {worktree.activityStatus === 'unknown' && '○ Inactive'}
+                {worktree.activitySource && worktree.activitySource !== 'both' && (
+                  <span className="activity-source-hint" title={`Activity detected from ${worktree.activitySource === 'file' ? 'file changes' : 'git activity'}`}>
+                    {' '}({worktree.activitySource === 'file' ? 'files' : 'git'})
+                  </span>
+                )}
+              </span>
+            </div>
+            {/* Show detailed activity timestamps when status is active or recent */}
+            {(worktree.activityStatus === 'active' || worktree.activityStatus === 'recent') && (
+              <div className="detail-meta-item full-width activity-details">
+                <span className="meta-label">Activity Details</span>
+                <div className="activity-timestamps">
+                  <span className="activity-timestamp" title="Most recent file modification in worktree">
+                    <span className="timestamp-icon">📁</span>
+                    <span className="timestamp-label">Files:</span>
+                    <span className="timestamp-value">{formatRelativeTime(worktree.lastFileModified)}</span>
+                  </span>
+                  <span className="activity-timestamp" title="Last git commit or working directory change">
+                    <span className="timestamp-icon">📊</span>
+                    <span className="timestamp-label">Git:</span>
+                    <span className="timestamp-value">{formatRelativeTime(worktree.lastGitActivity)}</span>
+                  </span>
+                </div>
+              </div>
+            )}
+          </>
         )}
       </div>
 
-      {/* Show agent task hint for Cursor agents */}
-      {worktree.agent === 'cursor' && worktree.agentTaskHint && (
+      {/* Show agent task hint for AI agents (Cursor, Claude Code) */}
+      {(worktree.agent === 'cursor' || worktree.agent === 'claude') && worktree.agentTaskHint && (
         <div className="agent-task-callout">
           <div className="agent-task-header">
             <span className="agent-task-icon">🤖</span>

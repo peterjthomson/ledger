@@ -41,10 +41,13 @@ This document evaluates 5 conventions and explains Ledger's approach.
 ```
 ~/.cursor/worktrees/{repoName}/{hash}/   # Cursor
 ~/.claude/worktrees/{repoName}/{hash}/   # Claude Code
+~/.gemini/worktrees/{repoName}/{hash}/   # Gemini CLI (gemini-wt)
 ~/conductor/workspaces/{repoName}/{task}/# Conductor
 ```
 
 **Pattern**: `~/.{agent}/worktrees/{repoName}/{context}/`
+
+**Note**: Gemini CLI uses the `gemini-wt` tool for managing parallel worktrees. Branches are typically named `gemini-{timestamp}` or custom names.
 
 | Pros | Cons |
 |------|------|
@@ -212,5 +215,3 @@ For now, Ledger adds `.worktrees/` to the project's `.gitignore` and documents t
 - [git-worktree-runner (gtr)](https://github.com/coderabbitai/git-worktree-runner) - Uses sibling folder convention
 - [Ledger Worktrees Feature](./features/worktrees.md)
 - [Ledger Opinionated Git](./opinionated-git.md) - Includes Leapfrog Stash
-
-

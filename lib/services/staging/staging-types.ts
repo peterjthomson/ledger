@@ -15,6 +15,8 @@ export interface StagingDiffHunk {
   newStart: number
   newLines: number
   lines: StagingDiffLine[]
+  /** Raw patch text for this hunk (used for git apply) */
+  rawPatch: string
 }
 
 /**
@@ -25,6 +27,8 @@ export interface StagingDiffLine {
   content: string
   oldLineNumber?: number
   newLineNumber?: number
+  /** Index of this line within the hunk (0-based, for selection) */
+  lineIndex: number
 }
 
 /**

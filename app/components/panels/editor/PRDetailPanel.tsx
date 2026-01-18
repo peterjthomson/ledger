@@ -4,8 +4,9 @@
  * Shows PR details, allows commenting, merging, and viewing file diffs.
  */
 
-import { useState, useEffect, useMemo, useCallback, useRef } from 'react'
-import type { PullRequest, PRDetail, PRReviewComment } from '../../../types/electron'
+import { useState, useEffect, useMemo, useCallback, useRef, useLayoutEffect } from 'react'
+import type { PullRequest, PRDetail, PRReviewComment, StagingFileDiff } from '../../../types/electron'
+import { DiffViewer } from '../../ui/DiffViewer'
 
 export interface PRReviewPanelProps {
   pr: PullRequest
@@ -14,6 +15,7 @@ export interface PRReviewPanelProps {
   onCheckout?: (pr: PullRequest) => void
   onPRMerged?: () => void
   onStatusChange?: (status: { type: 'info' | 'success' | 'error'; message: string } | null) => void
+  onNavigateToBranch?: (branchName: string) => void
   switching?: boolean
 }
 
@@ -27,13 +29,13 @@ function isAIAuthor(login: string): boolean {
   return AI_AUTHORS.some((ai) => lower.includes(ai)) || lower.endsWith('[bot]') || lower.endsWith('-bot')
 }
 
-export function PRReviewPanel({ pr, repoPath, formatRelativeTime, onCheckout, onPRMerged, onStatusChange, switching }: PRReviewPanelProps) {
+export function PRReviewPanel({ pr, repoPath, formatRelativeTime, onCheckout, onPRMerged, onStatusChange, onNavigateToBranch, switching }: PRReviewPanelProps) {
   const [activeTab, setActiveTab] = useState<PRTab>('conversation')
   const [prDetail, setPrDetail] = useState<PRDetail | null>(null)
   const [reviewComments, setReviewComments] = useState<PRReviewComment[]>([])
   const [loading, setLoading] = useState(true)
   const [selectedFile, setSelectedFile] = useState<string | null>(null)
-  const [fileDiff, setFileDiff] = useState<string | null>(null)
+  const [fileDiff, setFileDiff] = useState<StagingFileDiff | null>(null)
   const [loadingDiff, setLoadingDiff] = useState(false)
   const [showAIComments, setShowAIComments] = useState(true)
   const [commentText, setCommentText] = useState('')
@@ -47,6 +49,9 @@ export function PRReviewPanel({ pr, repoPath, formatRelativeTime, onCheckout, on
 
   // Ref to track status timeout for cleanup
   const statusTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  
+  // Ref for the diff container to scroll into view
+  const diffContainerRef = useRef<HTMLDivElement>(null)
 
   // Cleanup timeout on unmount
   useEffect(() => {
@@ -180,7 +185,7 @@ export function PRReviewPanel({ pr, repoPath, formatRelativeTime, onCheckout, on
     }
   }
 
-  // Load file diff when selected
+  // Load file diff when selected (using parsed format with hunks)
   useEffect(() => {
     if (!selectedFile) {
       setFileDiff(null)
@@ -192,7 +197,7 @@ export function PRReviewPanel({ pr, repoPath, formatRelativeTime, onCheckout, on
     const loadDiff = async () => {
       setLoadingDiff(true)
       try {
-        const diff = await window.conveyor.pr.getPRFileDiff(pr.number, selectedFile)
+        const diff = await window.conveyor.pr.getPRFileDiffParsed(pr.number, selectedFile)
         if (!cancelled) {
           setFileDiff(diff)
         }
@@ -213,6 +218,16 @@ export function PRReviewPanel({ pr, repoPath, formatRelativeTime, onCheckout, on
       cancelled = true
     }
   }, [pr.number, selectedFile])
+
+  // Scroll diff into view when a file is selected
+  useLayoutEffect(() => {
+    if (selectedFile && diffContainerRef.current) {
+      // Small delay to ensure the DOM has updated
+      requestAnimationFrame(() => {
+        diffContainerRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' })
+      })
+    }
+  }, [selectedFile])
 
   // Filter comments by AI/human
   const filteredComments = useMemo(() => {
@@ -268,7 +283,9 @@ export function PRReviewPanel({ pr, repoPath, formatRelativeTime, onCheckout, on
   if (loading) {
     return (
       <div className="pr-review-panel">
-        <div className="pr-review-loading">Loading PR details...</div>
+        <div className="pr-review-loading">
+          <div className="editor-loading-spinner" />
+        </div>
       </div>
     )
   }
@@ -292,9 +309,29 @@ export function PRReviewPanel({ pr, repoPath, formatRelativeTime, onCheckout, on
         </div>
         <div className="pr-review-meta">
           <span className="pr-review-branch">
-            <code>{prDetail.headRefName}</code>
+            {onNavigateToBranch ? (
+              <button
+                className="branch-link"
+                onClick={() => onNavigateToBranch(prDetail.headRefName)}
+                title={`View branch: ${prDetail.headRefName}`}
+              >
+                <code>{prDetail.headRefName}</code>
+              </button>
+            ) : (
+              <code>{prDetail.headRefName}</code>
+            )}
             <span className="pr-arrow">→</span>
-            <code>{prDetail.baseRefName}</code>
+            {onNavigateToBranch ? (
+              <button
+                className="branch-link"
+                onClick={() => onNavigateToBranch(prDetail.baseRefName)}
+                title={`View branch: ${prDetail.baseRefName}`}
+              >
+                <code>{prDetail.baseRefName}</code>
+              </button>
+            ) : (
+              <code>{prDetail.baseRefName}</code>
+            )}
           </span>
           <span className="pr-review-author">@{prDetail.author.login}</span>
           <span className="pr-review-time">{formatRelativeTime(prDetail.updatedAt)}</span>
@@ -475,7 +512,7 @@ export function PRReviewPanel({ pr, repoPath, formatRelativeTime, onCheckout, on
 
             {/* File Diff Preview */}
             {selectedFile && (
-              <div className="pr-file-diff">
+              <div className="pr-file-diff" ref={diffContainerRef}>
                 <div className="pr-file-diff-header">
                   <span>{selectedFile}</span>
                   <a
@@ -490,13 +527,13 @@ export function PRReviewPanel({ pr, repoPath, formatRelativeTime, onCheckout, on
                   </a>
                 </div>
                 <div className="pr-file-diff-content">
-                  {loadingDiff ? (
-                    <div className="pr-diff-loading">Loading diff...</div>
-                  ) : fileDiff ? (
-                    <pre className="pr-diff-code">{fileDiff}</pre>
-                  ) : (
-                    <div className="pr-diff-empty">Could not load diff</div>
-                  )}
+                  <DiffViewer
+                    diff={fileDiff}
+                    filePath={selectedFile}
+                    loading={loadingDiff}
+                    emptyMessage="Could not load diff"
+                    className="pr-diff-viewer"
+                  />
                 </div>
 
                 {/* Inline Review Comments */}

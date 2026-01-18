@@ -25,7 +25,7 @@ files:
   - '!tests{,/**/*}'
   - '!test-results{,/**/*}'
   - '!scripts{,/**/*}'
-  - '!node_modules{,/**/*}'
+  # Note: node_modules MUST be included for native modules (better-sqlite3) and external deps
   - '!electron.vite.config.{js,ts,mjs,cjs}'
   - '!{.eslintignore,.eslintrc.cjs,.prettierignore,.prettierrc.yaml,.prettierrc,dev-app-update.yml}'
   - '!{CHANGELOG.md,README.md,AGENTS.md,CLAUDE.md,CONTRIBUTING.md,LICENSE}'
