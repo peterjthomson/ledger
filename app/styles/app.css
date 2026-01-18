@@ -9006,149 +9006,108 @@ body,
 }
 
 /* tldraw Theme Overrides for ERD */
-/* Light mode - explicit colors for tldraw UI visibility */
+/* Uses Ledger's CSS variables for consistent theming */
+
+/* Light mode - map tldraw variables to Ledger theme */
 .erd-canvas-wrapper .tl-container.tl-theme__light,
 .erd-canvas-wrapper .tl-theme__light {
-  --tl-color-background: #ffffff;
-  --tl-color-panel: #f5f5f5;
-  --tl-color-panel-contrast: #ffffff;
+  --tl-color-background: var(--bg-primary);
+  --tl-color-panel: var(--bg-secondary);
+  --tl-color-panel-contrast: var(--bg-primary);
   --tl-color-panel-overlay: rgba(255, 255, 255, 0.82);
   --tl-color-panel-transparent: rgba(255, 255, 255, 0);
-  --tl-color-low: #ededed;
-  --tl-color-low-border: #dddddd;
-  --tl-color-divider: #dddddd;
-  --tl-color-culled: #e5e5e5;
+  --tl-color-low: var(--bg-tertiary);
+  --tl-color-low-border: var(--border-subtle);
+  --tl-color-divider: var(--border-subtle);
+  --tl-color-culled: var(--bg-hover);
   --tl-color-muted-none: rgba(0, 0, 0, 0);
   --tl-color-muted-0: rgba(0, 0, 0, 0.02);
   --tl-color-muted-1: rgba(0, 0, 0, 0.1);
   --tl-color-muted-2: rgba(0, 0, 0, 0.05);
   --tl-color-hint: rgba(0, 0, 0, 0.06);
   --tl-color-overlay: rgba(0, 0, 0, 0.2);
-  --tl-color-text: #000000;
-  --tl-color-text-0: #1a1a1a;
-  --tl-color-text-1: #333333;
-  --tl-color-text-3: #666666;
+  --tl-color-text: var(--text-primary);
+  --tl-color-text-0: var(--text-primary);
+  --tl-color-text-1: var(--text-secondary);
+  --tl-color-text-3: var(--text-muted);
   --tl-color-text-shadow: rgba(255, 255, 255, 1);
-  --tl-color-selected: #5b9bd5;
+  --tl-color-selected: var(--accent);
   --tl-color-selected-contrast: #ffffff;
-  --tl-color-focus: #5b9bd5;
-  --tl-color-primary: #5b9bd5;
-  --tl-color-success: #4a8c50;
-  --tl-color-warning: #c08030;
-  --tl-color-danger: #c5060b;
-  --tl-color-info: #0066ff;
-  --tl-color-grid: #cccccc;
+  --tl-color-focus: var(--accent);
+  --tl-color-primary: var(--accent);
+  --tl-color-success: var(--success);
+  --tl-color-warning: var(--warning);
+  --tl-color-danger: var(--error);
+  --tl-color-info: var(--info);
+  --tl-color-grid: var(--border);
 }
 
-/* Dark mode - explicit colors for tldraw UI visibility */
+/* Dark mode - map tldraw variables to Ledger dark theme */
 .erd-canvas-wrapper .tl-container.tl-theme__dark,
 .erd-canvas-wrapper .tl-theme__dark {
-  --tl-color-background: #1e1e1e;
-  --tl-color-panel: #252526;
-  --tl-color-panel-contrast: #3c3c3c;
+  --tl-color-background: var(--bg-primary);
+  --tl-color-panel: var(--bg-secondary);
+  --tl-color-panel-contrast: var(--bg-hover);
   --tl-color-panel-overlay: rgba(37, 37, 38, 0.82);
   --tl-color-panel-transparent: rgba(37, 37, 38, 0);
-  --tl-color-low: #2d2d2d;
-  --tl-color-low-border: #3c3c3c;
-  --tl-color-divider: #3c3c3c;
-  --tl-color-culled: #333333;
+  --tl-color-low: var(--bg-tertiary);
+  --tl-color-low-border: var(--bg-hover);
+  --tl-color-divider: var(--bg-hover);
+  --tl-color-culled: var(--bg-tertiary);
   --tl-color-muted-none: rgba(255, 255, 255, 0);
   --tl-color-muted-0: rgba(255, 255, 255, 0.02);
   --tl-color-muted-1: rgba(255, 255, 255, 0.1);
   --tl-color-muted-2: rgba(255, 255, 255, 0.05);
   --tl-color-hint: rgba(255, 255, 255, 0.06);
   --tl-color-overlay: rgba(0, 0, 0, 0.35);
-  --tl-color-text: #e0e0e0;
-  --tl-color-text-0: #e0e0e0;
-  --tl-color-text-1: #c0c0c0;
-  --tl-color-text-3: #707070;
+  --tl-color-text: var(--text-primary);
+  --tl-color-text-0: var(--text-primary);
+  --tl-color-text-1: var(--text-secondary);
+  --tl-color-text-3: var(--text-muted);
   --tl-color-text-shadow: rgba(0, 0, 0, 1);
-  --tl-color-selected: #569cd6;
+  --tl-color-selected: var(--accent);
   --tl-color-selected-contrast: #ffffff;
-  --tl-color-focus: #569cd6;
-  --tl-color-primary: #569cd6;
-  --tl-color-success: #6a9955;
-  --tl-color-warning: #ddb76f;
-  --tl-color-danger: #f14c4c;
-  --tl-color-info: #569cd6;
-  --tl-color-grid: #444444;
+  --tl-color-focus: var(--accent);
+  --tl-color-primary: var(--accent);
+  --tl-color-success: var(--success);
+  --tl-color-warning: var(--warning);
+  --tl-color-danger: var(--error);
+  --tl-color-info: var(--info);
+  --tl-color-grid: var(--border);
 }
 
-/* Force text color on tldraw UI elements for visibility */
-/* Using high specificity selectors with !important to override tldraw's bundled CSS */
-
-/* Light mode: dark text/icons on light background */
+/* Force text/icon colors using Ledger theme variables */
 .erd-canvas-wrapper .tl-container.tl-theme__light {
-  color: #1a1a1a !important;
+  color: var(--text-primary) !important;
 }
 
 .erd-canvas-wrapper .tl-container.tl-theme__light .tlui-button,
 .erd-canvas-wrapper .tl-container.tl-theme__light .tlui-button__label {
-  color: #333333 !important;
+  color: var(--text-secondary) !important;
 }
 
-/* Icons use CSS mask - set color which becomes background-color via currentColor */
 .erd-canvas-wrapper .tl-container.tl-theme__light .tlui-icon {
-  color: #333333 !important;
+  color: var(--text-secondary) !important;
 }
 
 .erd-canvas-wrapper .tl-container.tl-theme__light .tlui-kbd {
-  color: #666666 !important;
+  color: var(--text-muted) !important;
 }
 
-/* Dark mode: light text/icons on dark background */
+/* Dark mode text/icon colors */
 .erd-canvas-wrapper .tl-container.tl-theme__dark {
-  color: #e0e0e0 !important;
+  color: var(--text-primary) !important;
 }
 
 .erd-canvas-wrapper .tl-container.tl-theme__dark .tlui-button,
 .erd-canvas-wrapper .tl-container.tl-theme__dark .tlui-button__label {
-  color: #c0c0c0 !important;
+  color: var(--text-secondary) !important;
 }
 
 .erd-canvas-wrapper .tl-container.tl-theme__dark .tlui-icon {
-  color: #c0c0c0 !important;
+  color: var(--text-secondary) !important;
 }
 
 .erd-canvas-wrapper .tl-container.tl-theme__dark .tlui-kbd {
-  color: #707070 !important;
-}
-
-/* Fallback: ensure ANY tldraw container in ERD panel has visible UI */
-/* Icons use mask with background-color:currentColor - force background-color directly */
-/* Also ensure mask/webkit-mask are not being stripped */
-.erd-canvas-wrapper .tl-container .tlui-icon {
-  color: #333333 !important;
-  background-color: #333333 !important;
-  -webkit-mask-size: contain !important;
-  mask-size: contain !important;
-}
-
-.erd-canvas-wrapper .tl-container .tlui-button {
-  color: #333333 !important;
-}
-
-/* Also target icons inside buttons specifically */
-.erd-canvas-wrapper .tlui-button > .tlui-icon,
-.erd-canvas-wrapper .tlui-button .tlui-icon {
-  color: #333333 !important;
-  background-color: #333333 !important;
-}
-
-/* Override for dark mode */
-.erd-canvas-wrapper .tl-container.tl-theme__dark .tlui-icon,
-.erd-canvas-wrapper .tl-theme__dark .tlui-icon {
-  color: #c0c0c0 !important;
-  background-color: #c0c0c0 !important;
-}
-
-.erd-canvas-wrapper .tl-container.tl-theme__dark .tlui-button,
-.erd-canvas-wrapper .tl-theme__dark .tlui-button {
-  color: #c0c0c0 !important;
-}
-
-.erd-canvas-wrapper .tl-theme__dark .tlui-button > .tlui-icon,
-.erd-canvas-wrapper .tl-theme__dark .tlui-button .tlui-icon {
-  color: #c0c0c0 !important;
-  background-color: #c0c0c0 !important;
+  color: var(--text-muted) !important;
 }

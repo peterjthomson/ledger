@@ -262,34 +262,12 @@ function findEdgePoint(
 }
 
 /**
- * Format relationship label with cardinality
+ * Format relationship label - just show the label name without cardinality symbols
  */
 function formatRelationshipLabel(rel: ERDRelationship): string {
-  const fromCard = cardinalityToSymbol(rel.from.cardinality)
-  const toCard = cardinalityToSymbol(rel.to.cardinality)
-
-  if (rel.label) {
-    return `${fromCard} ${rel.label} ${toCard}`
-  }
-  return `${fromCard}──${toCard}`
-}
-
-/**
- * Convert cardinality to crow's foot symbol
- */
-function cardinalityToSymbol(cardinality: ERDCardinality): string {
-  switch (cardinality) {
-    case 'one':
-      return '||'
-    case 'zero-or-one':
-      return '|o'
-    case 'many':
-      return '}o'
-    case 'one-or-more':
-      return '}|'
-    default:
-      return '──'
-  }
+  // Only show the relationship name/label, skip cardinality notation
+  // Cardinality is better shown visually with arrow heads
+  return rel.label || ''
 }
 
 /**

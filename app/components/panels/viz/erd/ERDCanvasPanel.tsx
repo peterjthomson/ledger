@@ -14,7 +14,7 @@ import type { ERDSchema, ERDFramework } from '@/lib/services/erd/erd-types'
 
 // Custom shape utilities
 const customShapeUtils = [EntityShapeUtil]
-const INITIAL_RELATIONSHIP_FILTER_MIN = 2
+const INITIAL_RELATIONSHIP_FILTER_MIN = 3
 
 interface ERDCanvasPanelProps {
   repoPath: string | null
