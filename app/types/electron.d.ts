@@ -522,25 +522,6 @@ export interface ElectronAPI {
   removeWorktree: (worktreePath: string, force?: boolean) => Promise<{ success: boolean; message: string }>
   createWorktree: (options: CreateWorktreeOptions) => Promise<{ success: boolean; message: string; path?: string }>
   selectWorktreeFolder: () => Promise<string | null>
-  // Herd preview operations
-  checkHerdAvailable: (worktreePath: string) => Promise<{ herdInstalled: boolean; isLaravel: boolean }>
-  openWorktreeInBrowser: (
-    worktreePath: string,
-    mainRepoPath: string
-  ) => Promise<{ success: boolean; message: string; url?: string; warnings?: string[] }>
-  previewBranchInBrowser: (
-    branchName: string,
-    mainRepoPath: string
-  ) => Promise<{ success: boolean; message: string; url?: string; worktreePath?: string; warnings?: string[] }>
-  previewPRInBrowser: (
-    prNumber: number,
-    prBranchName: string,
-    mainRepoPath: string
-  ) => Promise<{ success: boolean; message: string; url?: string; worktreePath?: string; warnings?: string[] }>
-  previewCommitInBrowser: (
-    commitHash: string,
-    mainRepoPath: string
-  ) => Promise<{ success: boolean; message: string; url?: string; worktreePath?: string; warnings?: string[] }>
   // Worktree-specific staging & commit operations
   getWorktreeWorkingStatus: (worktreePath: string) => Promise<WorkingStatus>
   stageFileInWorktree: (worktreePath: string, filePath: string) => Promise<{ success: boolean; message: string }>

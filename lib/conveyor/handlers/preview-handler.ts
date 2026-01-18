@@ -38,6 +38,37 @@ const createWorktreeFn: CreateWorktreeFn = async (options) => {
   })
 }
 
+/**
+ * Legacy Herd preview fallback for branches/PRs
+ * Used when no provider is available/compatible
+ */
+async function legacyHerdPreview(
+  worktreeName: string,
+  branchName: string,
+  mainRepoPath: string
+): Promise<{ success: boolean; message: string; url?: string; worktreePath?: string; warnings?: string[] }> {
+  await ensurePreviewsDirectory()
+  const worktreePath = getPreviewWorktreePath(worktreeName)
+
+  if (!existsSync(worktreePath)) {
+    const createResult = await createWorktree({
+      branchName,
+      isNewBranch: false,
+      folderPath: worktreePath,
+    })
+
+    if (!createResult.success) {
+      return createResult
+    }
+  }
+
+  const result = await setupWorktreeForPreview(worktreePath, mainRepoPath)
+  if (result.success && result.url) {
+    await shell.openExternal(result.url)
+  }
+  return { ...result, worktreePath }
+}
+
 export const registerPreviewHandlers = () => {
   ensureInitialized()
 
@@ -128,13 +159,18 @@ export const registerPreviewHandlers = () => {
 
   // Preview a commit with specific provider
   handle('preview:commit', async (providerId: string, commitHash: string, mainRepoPath: string) => {
-    // Use legacy Herd path for commits (not yet provider-based)
+    const provider = previewRegistry.get(providerId)
+    if (!provider) {
+      return { success: false, message: `Unknown provider: ${providerId}` }
+    }
+
     try {
       await ensurePreviewsDirectory()
 
       const shortHash = commitHash.substring(0, 7)
       const worktreePath = getPreviewWorktreePath(`commit-${shortHash}`)
 
+      // Create worktree at specific commit if it doesn't exist
       if (!existsSync(worktreePath)) {
         const createResult = await createWorktree({
           commitHash,
@@ -147,11 +183,12 @@ export const registerPreviewHandlers = () => {
         }
       }
 
-      const result = await setupWorktreeForPreview(worktreePath, mainRepoPath)
+      // Use the provider to preview the worktree
+      const result = await provider.previewWorktree(worktreePath, mainRepoPath, createWorktreeFn)
       if (result.success && result.url) {
         await shell.openExternal(result.url)
       }
-      return { ...result, worktreePath }
+      return { ...result, worktreePath, provider: provider.name }
     } catch (error) {
       return { success: false, message: (error as Error).message }
     }
@@ -190,27 +227,8 @@ export const registerPreviewHandlers = () => {
     if (!best) {
       // Fall back to legacy Herd preview
       try {
-        await ensurePreviewsDirectory()
         const safeBranchName = branchName.replace(/\//g, '-')
-        const worktreePath = getPreviewWorktreePath(safeBranchName)
-
-        if (!existsSync(worktreePath)) {
-          const createResult = await createWorktree({
-            branchName,
-            isNewBranch: false,
-            folderPath: worktreePath,
-          })
-
-          if (!createResult.success) {
-            return createResult
-          }
-        }
-
-        const result = await setupWorktreeForPreview(worktreePath, mainRepoPath)
-        if (result.success && result.url) {
-          await shell.openExternal(result.url)
-        }
-        return { ...result, worktreePath }
+        return await legacyHerdPreview(safeBranchName, branchName, mainRepoPath)
       } catch (error) {
         return { success: false, message: (error as Error).message }
       }
@@ -233,26 +251,7 @@ export const registerPreviewHandlers = () => {
     if (!best) {
       // Fall back to legacy Herd preview
       try {
-        await ensurePreviewsDirectory()
-        const worktreePath = getPreviewWorktreePath(`pr-${prNumber}`)
-
-        if (!existsSync(worktreePath)) {
-          const createResult = await createWorktree({
-            branchName: prBranchName,
-            isNewBranch: false,
-            folderPath: worktreePath,
-          })
-
-          if (!createResult.success) {
-            return createResult
-          }
-        }
-
-        const result = await setupWorktreeForPreview(worktreePath, mainRepoPath)
-        if (result.success && result.url) {
-          await shell.openExternal(result.url)
-        }
-        return { ...result, worktreePath }
+        return await legacyHerdPreview(`pr-${prNumber}`, prBranchName, mainRepoPath)
       } catch (error) {
         return { success: false, message: (error as Error).message }
       }

@@ -12,6 +12,8 @@ import { exec } from 'child_process'
 import { promisify } from 'util'
 import * as fs from 'fs'
 import * as path from 'path'
+import * as os from 'os'
+import { shellEscape } from '@/lib/utils/shell-escape'
 
 const execAsync = promisify(exec)
 
@@ -195,7 +197,7 @@ export async function linkWithHerd(
     const folderName = path.basename(dirPath)
 
     // Run herd link from the directory
-    await execAsync(`herd link ${folderName}`, { cwd: dirPath })
+    await execAsync(`herd link ${shellEscape(folderName)}`, { cwd: dirPath })
 
     const url = getHerdUrl(dirPath)
 
@@ -217,7 +219,7 @@ export async function linkWithHerd(
  * Stores preview worktrees in ~/.ledger/previews/
  */
 export function getPreviewWorktreePath(name: string): string {
-  const homeDir = process.env.HOME || '~'
+  const homeDir = os.homedir()
   return path.join(homeDir, '.ledger', 'previews', name)
 }
 

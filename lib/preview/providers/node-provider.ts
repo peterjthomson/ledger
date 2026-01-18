@@ -28,6 +28,7 @@
 import { spawn, ChildProcess } from 'child_process'
 import * as fs from 'fs'
 import * as path from 'path'
+import * as os from 'os'
 
 // ============================================================================
 // Types
@@ -429,7 +430,7 @@ export async function previewBranch(
 ): Promise<PreviewResult> {
   // Sanitize branch name for folder
   const safeBranchName = branchName.replace(/\//g, '-')
-  const homeDir = process.env.HOME || '~'
+  const homeDir = os.homedir()
   const worktreePath = path.join(homeDir, '.ledger', 'previews', safeBranchName)
 
   // Check if worktree already exists
@@ -460,7 +461,7 @@ export async function previewPR(
   mainRepoPath: string,
   createWorktree: (options: { branchName: string; folderPath: string; isNewBranch: boolean }) => Promise<{ success: boolean; message: string }>
 ): Promise<PreviewResult> {
-  const homeDir = process.env.HOME || '~'
+  const homeDir = os.homedir()
   const worktreePath = path.join(homeDir, '.ledger', 'previews', `pr-${prNumber}`)
 
   // Check if worktree already exists

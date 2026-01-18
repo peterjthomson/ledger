@@ -17,7 +17,9 @@ import { spawn, exec, ChildProcess } from 'child_process'
 import { promisify } from 'util'
 import * as fs from 'fs'
 import * as path from 'path'
+import * as os from 'os'
 import type { PreviewProvider, PreviewResult, ProviderAvailability, CreateWorktreeFn } from '../preview-types'
+import { shellEscape } from '@/lib/utils/shell-escape'
 
 const execAsync = promisify(exec)
 
@@ -360,7 +362,7 @@ async function buildAssets(worktreePath: string): Promise<{ success: boolean; me
 async function linkWithHerd(dirPath: string): Promise<{ success: boolean; url?: string; message: string }> {
   try {
     const folderName = path.basename(dirPath)
-    await execAsync(`herd link ${folderName}`, { cwd: dirPath })
+    await execAsync(`herd link ${shellEscape(folderName)}`, { cwd: dirPath })
     const url = getHerdUrl(dirPath)
     return { success: true, url, message: `Linked at ${url}` }
   } catch (error) {
@@ -608,7 +610,7 @@ export const laravelProvider: PreviewProvider = {
     createWorktree: CreateWorktreeFn
   ): Promise<PreviewResult> {
     const safeBranchName = branchName.replace(/\//g, '-')
-    const homeDir = process.env.HOME || '~'
+    const homeDir = os.homedir()
     const worktreePath = path.join(homeDir, '.ledger', 'previews', safeBranchName)
 
     if (!fs.existsSync(worktreePath)) {
@@ -635,7 +637,7 @@ export const laravelProvider: PreviewProvider = {
     mainRepoPath: string,
     createWorktree: CreateWorktreeFn
   ): Promise<PreviewResult> {
-    const homeDir = process.env.HOME || '~'
+    const homeDir = os.homedir()
     const worktreePath = path.join(homeDir, '.ledger', 'previews', `pr-${prNumber}`)
 
     if (!fs.existsSync(worktreePath)) {

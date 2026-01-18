@@ -154,16 +154,6 @@ const electronAPI = {
   createWorktree: (options: { branchName?: string; commitHash?: string; isNewBranch: boolean; folderPath: string }) =>
     ipcRenderer.invoke('create-worktree', options),
   selectWorktreeFolder: () => ipcRenderer.invoke('select-worktree-folder'),
-  // Herd preview operations
-  checkHerdAvailable: (worktreePath: string) => ipcRenderer.invoke('check-herd-available', worktreePath),
-  openWorktreeInBrowser: (worktreePath: string, mainRepoPath: string) =>
-    ipcRenderer.invoke('open-worktree-in-browser', worktreePath, mainRepoPath),
-  previewBranchInBrowser: (branchName: string, mainRepoPath: string) =>
-    ipcRenderer.invoke('preview-branch-in-browser', branchName, mainRepoPath),
-  previewPRInBrowser: (prNumber: number, prBranchName: string, mainRepoPath: string) =>
-    ipcRenderer.invoke('preview-pr-in-browser', prNumber, prBranchName, mainRepoPath),
-  previewCommitInBrowser: (commitHash: string, mainRepoPath: string) =>
-    ipcRenderer.invoke('preview-commit-in-browser', commitHash, mainRepoPath),
   // Worktree-specific staging & commit operations
   getWorktreeWorkingStatus: (worktreePath: string) => ipcRenderer.invoke('get-worktree-working-status', worktreePath),
   stageFileInWorktree: (worktreePath: string, filePath: string) =>

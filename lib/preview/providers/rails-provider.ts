@@ -31,6 +31,7 @@ import { spawn, exec, ChildProcess } from 'child_process'
 import { promisify } from 'util'
 import * as fs from 'fs'
 import * as path from 'path'
+import * as os from 'os'
 import type { PreviewProvider, PreviewResult, ProviderAvailability, CreateWorktreeFn } from '../preview-types'
 
 const execAsync = promisify(exec)
@@ -428,7 +429,7 @@ async function setupRailsWorktree(
  */
 async function linkWithPumaDev(dirPath: string): Promise<{ success: boolean; url?: string; message: string }> {
   const folderName = path.basename(dirPath)
-  const pumaDevDir = path.join(process.env.HOME || '~', '.puma-dev')
+  const pumaDevDir = path.join(os.homedir(), '.puma-dev')
   const linkPath = path.join(pumaDevDir, folderName)
 
   try {
@@ -643,7 +644,7 @@ export const railsProvider: PreviewProvider = {
               text.includes('Listening on') ||
               text.includes('Use Ctrl-C to stop') ||
               text.includes('Booting Puma') ||
-              text.includes('http://') && text.includes('localhost')
+              (text.includes('http://') && text.includes('localhost'))
             ) {
               if (!resolved) {
                 resolved = true
@@ -722,7 +723,7 @@ export const railsProvider: PreviewProvider = {
     createWorktree: CreateWorktreeFn
   ): Promise<PreviewResult> {
     const safeBranchName = branchName.replace(/\//g, '-')
-    const homeDir = process.env.HOME || '~'
+    const homeDir = os.homedir()
     const worktreePath = path.join(homeDir, '.ledger', 'previews', safeBranchName)
 
     if (!fs.existsSync(worktreePath)) {
@@ -749,7 +750,7 @@ export const railsProvider: PreviewProvider = {
     mainRepoPath: string,
     createWorktree: CreateWorktreeFn
   ): Promise<PreviewResult> {
-    const homeDir = process.env.HOME || '~'
+    const homeDir = os.homedir()
     const worktreePath = path.join(homeDir, '.ledger', 'previews', `pr-${prNumber}`)
 
     if (!fs.existsSync(worktreePath)) {
@@ -775,14 +776,12 @@ export const railsProvider: PreviewProvider = {
     if (!server) return
 
     if (server.usePumaDev) {
-      // For puma-dev, remove the symlink
+      // For puma-dev, remove the symlink (fire-and-forget, non-blocking)
       const folderName = path.basename(worktreePath)
-      const linkPath = path.join(process.env.HOME || '~', '.puma-dev', folderName)
-      try {
-        fs.unlinkSync(linkPath)
-      } catch {
-        // Ignore
-      }
+      const linkPath = path.join(os.homedir(), '.puma-dev', folderName)
+      fs.promises.unlink(linkPath).catch(() => {
+        // Ignore errors (file may not exist)
+      })
     } else {
       // Kill the server process
       try {
