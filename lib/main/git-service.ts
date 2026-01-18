@@ -3,6 +3,7 @@ import { exec } from 'child_process'
 import { promisify } from 'util'
 import * as fs from 'fs'
 import * as path from 'path'
+import { getCursorAgentTaskHint, getClaudeCodeAgentTaskHint } from '@/lib/utils/agent-hints'
 
 const execAsync = promisify(exec)
 const statAsync = promisify(fs.stat)
@@ -549,144 +550,7 @@ function calculateActivityStatus(
   return { status, source }
 }
 
-// Get agent task hint from Cursor transcript files
-async function getCursorAgentTaskHint(worktreePath: string): Promise<string | null> {
-  try {
-    const homeDir = process.env.HOME || ''
-    const projectsDir = path.join(homeDir, '.cursor', 'projects')
-
-    // Check if the projects directory exists
-    if (!fs.existsSync(projectsDir)) return null
-
-    // Get all project folders
-    const projectFolders = fs.readdirSync(projectsDir)
-
-    // Look for agent-transcripts in each project folder
-    for (const folder of projectFolders) {
-      const transcriptsDir = path.join(projectsDir, folder, 'agent-transcripts')
-      if (!fs.existsSync(transcriptsDir)) continue
-
-      // Get transcript files sorted by modification time (newest first)
-      const files = fs.readdirSync(transcriptsDir)
-        .filter(f => f.endsWith('.json'))
-        .map(f => ({
-          name: f,
-          path: path.join(transcriptsDir, f),
-          mtime: fs.statSync(path.join(transcriptsDir, f)).mtime.getTime()
-        }))
-        .sort((a, b) => b.mtime - a.mtime)
-
-      // Check the most recent transcripts for references to this worktree
-      for (const file of files.slice(0, 5)) { // Only check 5 most recent
-        try {
-          const content = fs.readFileSync(file.path, 'utf-8')
-
-          // Quick check if this transcript mentions the worktree path
-          if (!content.includes(worktreePath)) continue
-
-          // Parse and extract the first user query
-          const transcript = JSON.parse(content)
-          if (!Array.isArray(transcript)) continue
-
-          for (const message of transcript) {
-            if (message.role === 'user' && message.text) {
-              // Extract content from <user_query> tags if present
-              const match = message.text.match(/<user_query>([\s\S]*?)<\/user_query>/)
-              if (match) {
-                // Get first line and truncate
-                const firstLine = match[1].trim().split('\n')[0]
-                return firstLine.slice(0, 60) + (firstLine.length > 60 ? '…' : '')
-              }
-              // Fallback: just use first line of text
-              const firstLine = message.text.trim().split('\n')[0]
-              return firstLine.slice(0, 60) + (firstLine.length > 60 ? '…' : '')
-            }
-          }
-        } catch {
-          // Skip malformed transcript files
-          continue
-        }
-      }
-    }
-
-    return null
-  } catch {
-    return null
-  }
-}
-
-// Get agent task hint from Claude Code session files
-// Claude Code stores sessions in ~/.claude/projects/{encoded-path}/*.jsonl
-async function getClaudeCodeAgentTaskHint(worktreePath: string): Promise<string | null> {
-  try {
-    const homeDir = process.env.HOME || ''
-    const projectsDir = path.join(homeDir, '.claude', 'projects')
-
-    // Check if the projects directory exists
-    if (!fs.existsSync(projectsDir)) return null
-
-    // Claude Code encodes paths by replacing / with - (e.g., /Users/foo/bar -> -Users-foo-bar)
-    const encodedPath = worktreePath.replace(/\//g, '-')
-    const projectFolder = path.join(projectsDir, encodedPath)
-
-    // Check if this worktree has a Claude Code project folder
-    if (!fs.existsSync(projectFolder)) return null
-
-    // Get session files sorted by modification time (newest first)
-    // Session files are UUIDs.jsonl, skip agent-*.jsonl files
-    const files = fs.readdirSync(projectFolder)
-      .filter(f => f.endsWith('.jsonl') && !f.startsWith('agent-'))
-      .map(f => ({
-        name: f,
-        path: path.join(projectFolder, f),
-        mtime: fs.statSync(path.join(projectFolder, f)).mtime.getTime()
-      }))
-      .sort((a, b) => b.mtime - a.mtime)
-
-    // Check the most recent session file
-    for (const file of files.slice(0, 3)) { // Only check 3 most recent sessions
-      try {
-        const content = fs.readFileSync(file.path, 'utf-8')
-        const lines = content.split('\n').filter(Boolean)
-
-        // Find the first user message in the session
-        for (const line of lines) {
-          try {
-            const entry = JSON.parse(line)
-            
-            // Look for user messages
-            if (entry.type === 'user' && entry.message?.content) {
-              let userContent = entry.message.content
-              
-              // Strip system instruction tags if present
-              userContent = userContent.replace(/<system[_-]?instruction>[\s\S]*?<\/system[_-]?instruction>/gi, '')
-              
-              // Get the actual user query, trimming whitespace
-              const trimmed = userContent.trim()
-              if (!trimmed) continue
-              
-              // Get first meaningful line
-              const firstLine = trimmed.split('\n')[0].trim()
-              if (!firstLine) continue
-              
-              return firstLine.slice(0, 60) + (firstLine.length > 60 ? '…' : '')
-            }
-          } catch {
-            // Skip malformed lines
-            continue
-          }
-        }
-      } catch {
-        // Skip unreadable files
-        continue
-      }
-    }
-
-    return null
-  } catch {
-    return null
-  }
-}
+// Agent hint functions imported from @/lib/utils/agent-hints
 
 // Get enhanced worktrees with agent detection and metadata
 export async function getEnhancedWorktrees(): Promise<EnhancedWorktree[]> {
@@ -2434,7 +2298,8 @@ export async function removeWorktree(
 
 // Create a new worktree
 export interface CreateWorktreeOptions {
-  branchName: string
+  branchName?: string // Optional if using commitHash for detached HEAD
+  commitHash?: string // For creating worktree at specific commit (detached HEAD)
   isNewBranch: boolean
   folderPath: string
 }
@@ -2444,12 +2309,12 @@ export async function createWorktree(
 ): Promise<{ success: boolean; message: string; path?: string }> {
   if (!git) throw new Error('No repository selected')
 
-  const { branchName, isNewBranch, folderPath } = options
+  const { branchName, commitHash, isNewBranch, folderPath } = options
 
   try {
-    // Validate branch name
-    if (!branchName || !branchName.trim()) {
-      return { success: false, message: 'Branch name is required' }
+    // Validate - need either branchName or commitHash
+    if (!branchName && !commitHash) {
+      return { success: false, message: 'Branch name or commit hash is required' }
     }
 
     // Validate folder path
@@ -2462,9 +2327,27 @@ export async function createWorktree(
       return { success: false, message: `Folder already exists: ${folderPath}` }
     }
 
+    // Ensure parent directory exists
+    const parentDir = path.dirname(folderPath)
+    if (!fs.existsSync(parentDir)) {
+      await fs.promises.mkdir(parentDir, { recursive: true })
+    }
+
+    // Handle detached HEAD at specific commit
+    if (commitHash && !branchName) {
+      // Create worktree at specific commit (detached HEAD): git worktree add --detach <path> <commit>
+      await git.raw(['worktree', 'add', '--detach', folderPath, commitHash])
+      return {
+        success: true,
+        message: `Created worktree at ${path.basename(folderPath)} at commit ${commitHash.substring(0, 7)}`,
+        path: folderPath,
+      }
+    }
+
     // Check if branch already exists (for new branches)
     const branches = await git.branchLocal()
-    const branchExists = branches.all.includes(branchName)
+    const branchExists = branches.all.includes(branchName!)
+    let remoteBranchName: string | null = null
 
     if (isNewBranch && branchExists) {
       return { success: false, message: `Branch '${branchName}' already exists` }
@@ -2473,25 +2356,23 @@ export async function createWorktree(
     if (!isNewBranch && !branchExists) {
       // Check if it's a remote branch we can track
       const remoteBranches = await git.branch(['-r'])
-      const remoteBranchName = `origin/${branchName}`
-      if (!remoteBranches.all.includes(remoteBranchName)) {
+      const candidate = `origin/${branchName}`
+      if (!remoteBranches.all.includes(candidate)) {
         return { success: false, message: `Branch '${branchName}' does not exist` }
       }
-    }
-
-    // Ensure parent directory exists
-    const parentDir = path.dirname(folderPath)
-    if (!fs.existsSync(parentDir)) {
-      await fs.promises.mkdir(parentDir, { recursive: true })
+      remoteBranchName = candidate
     }
 
     // Create the worktree
     if (isNewBranch) {
       // Create worktree with new branch: git worktree add -b <branch> <path>
-      await git.raw(['worktree', 'add', '-b', branchName, folderPath])
+      await git.raw(['worktree', 'add', '-b', branchName!, folderPath])
+    } else if (branchExists) {
+      // Create worktree with existing local branch: git worktree add <path> <branch>
+      await git.raw(['worktree', 'add', folderPath, branchName!])
     } else {
-      // Create worktree with existing branch: git worktree add <path> <branch>
-      await git.raw(['worktree', 'add', folderPath, branchName])
+      // Create local tracking branch from remote
+      await git.raw(['worktree', 'add', '-b', branchName!, folderPath, remoteBranchName!])
     }
 
     return {

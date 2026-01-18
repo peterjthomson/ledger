@@ -1380,9 +1380,11 @@ export default function App() {
       return (
         <PRDetailPanel
           pr={sidebarFocus.data as PullRequest}
+          repoPath={repoPath}
           formatRelativeTime={formatRelativeTime}
           onCheckout={handlePRCheckout}
           onPRMerged={refresh}
+          onStatusChange={setStatus}
           onNavigateToBranch={(branchName) => {
             const branch = branches.find((b) => b.name === branchName)
             if (branch) {

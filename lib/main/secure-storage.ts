@@ -51,12 +51,22 @@ export function getEncryptionStatus(): SecureStorageStatus {
   }
 
   // Get the backend - this tells us what's actually being used
-  const backend = safeStorage.getSelectedStorageBackend() as EncryptionBackend
+  // Note: getSelectedStorageBackend() was added in Electron 25.5.0
+  // Check if it exists to handle edge cases with bundling/versions
+  let backend: EncryptionBackend = 'unknown'
+  if (typeof safeStorage.getSelectedStorageBackend === 'function') {
+    backend = safeStorage.getSelectedStorageBackend() as EncryptionBackend
+  } else {
+    // Fallback: on macOS it's always keychain when available
+    if (process.platform === 'darwin') {
+      backend = 'keychain'
+    }
+  }
 
   return {
     available: true,
     backend,
-    isStrong: backend !== 'basic_text',
+    isStrong: backend !== 'basic_text' && backend !== 'unknown',
   }
 }
 

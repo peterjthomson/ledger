@@ -85,6 +85,7 @@ export function EditorRouter({
       return (
         <BranchDetailPanel
           branch={branch}
+          repoPath={repoPath}
           formatDate={formatDate}
           onStatusChange={onStatusChange}
           onCheckoutBranch={onCheckoutBranch}
@@ -160,6 +161,7 @@ export function EditorRouter({
         <WorktreeDetailPanel
           worktree={wt}
           currentBranch={currentBranch}
+          repoPath={repoPath}
           switching={switching}
           onStatusChange={onStatusChange}
           onRefresh={onRefresh}

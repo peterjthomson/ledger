@@ -31,6 +31,7 @@ import { registerAIHandlers } from '@/lib/conveyor/handlers/ai-handler'
 import { registerMailmapHandlers } from '@/lib/conveyor/handlers/mailmap-handler'
 import { registerAnalyticsHandlers } from '@/lib/conveyor/handlers/analytics-handler'
 import { registerCanvasHandlers } from '@/lib/conveyor/handlers/canvas-handler'
+import { registerPreviewHandlers, cleanupPreviewHandlers } from '@/lib/conveyor/handlers/preview-handler'
 import { markChannelRegistered } from '@/lib/main/shared'
 
 // IPC channels registered in this file (for documentation/debugging)
@@ -150,6 +151,7 @@ import {
   mapVSCodeThemeToCSS,
   // Note: Canvas functions (getCanvases, saveCanvases, etc.) now handled by conveyor canvas handlers
 } from './settings-service'
+// Note: Herd service functions are now used via registerPreviewHandlers() in conveyor/handlers/preview-handler.ts
 
 // Check for --repo command line argument (for testing)
 const repoArgIndex = process.argv.findIndex((arg) => arg.startsWith('--repo='))
@@ -193,6 +195,7 @@ app.whenReady().then(() => {
   registerMailmapHandlers()
   registerAnalyticsHandlers()
   registerCanvasHandlers()
+  registerPreviewHandlers()
 
   // Register git IPC handlers
   ipcMain.handle('select-repo', async () => {
@@ -576,6 +579,8 @@ app.whenReady().then(() => {
     return result.filePaths[0]
   })
 
+  // Preview handlers are now registered via registerPreviewHandlers() in conveyor/handlers/preview-handler.ts
+
   ipcMain.handle('get-stashes', async () => {
     try {
       return await getStashes()
@@ -861,8 +866,9 @@ app.on('window-all-closed', () => {
   }
 })
 
-// Clean up database on quit
+// Clean up database and preview servers on quit
 app.on('will-quit', () => {
+  cleanupPreviewHandlers()
   closeAllCustomDatabases()
   closeDatabase()
 })

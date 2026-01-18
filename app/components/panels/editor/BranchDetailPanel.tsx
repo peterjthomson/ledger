@@ -5,12 +5,13 @@
  */
 
 import { useState, useEffect, useMemo, useRef } from 'react'
-import type { Branch, BranchDiff, BranchDiffType, PullRequest } from '../../../types/electron'
+import type { Branch, BranchDiff, BranchDiffType, PullRequest, PreviewProviderInfo } from '../../../types/electron'
 import type { StatusMessage } from '../../../types/app-types'
 import { DiffViewer } from '../../ui/DiffViewer'
 
 export interface BranchDetailPanelProps {
   branch: Branch
+  repoPath: string | null
   formatDate: (date?: string) => string
   onStatusChange?: (status: StatusMessage | null) => void
   onCheckoutBranch?: (branch: Branch) => void
@@ -26,6 +27,7 @@ export interface BranchDetailPanelProps {
 
 export function BranchDetailPanel({
   branch,
+  repoPath,
   formatDate,
   onStatusChange,
   onCheckoutBranch,
@@ -40,6 +42,9 @@ export function BranchDetailPanel({
 }: BranchDetailPanelProps) {
   const [creatingPR, setCreatingPR] = useState(false)
   const [pushing, setPushing] = useState(false)
+  // Preview provider state
+  const [previewProviders, setPreviewProviders] = useState<PreviewProviderInfo[]>([])
+  const [previewLoading, setPreviewLoading] = useState(false)
   const [branchDiff, setBranchDiff] = useState<BranchDiff | null>(null)
   const [loadingDiff, setLoadingDiff] = useState(false)
   const [expandedFiles, setExpandedFiles] = useState<Set<string>>(new Set())
@@ -100,6 +105,28 @@ export function BranchDetailPanel({
       cancelled = true
     }
   }, [branch.name, isMainOrMaster, diffType])
+
+  const bestProvider = useMemo(
+    () => previewProviders.find((provider) => provider.compatible) || null,
+    [previewProviders]
+  )
+
+  // Check preview providers when repoPath changes
+  useEffect(() => {
+    if (!repoPath) {
+      setPreviewProviders([])
+      return
+    }
+    const loadProviders = async () => {
+      try {
+        const providers = await window.conveyor.preview.getProviders(repoPath)
+        setPreviewProviders(providers)
+      } catch {
+        setPreviewProviders([])
+      }
+    }
+    loadProviders()
+  }, [repoPath])
 
   const handleStartPRCreation = () => {
     // Auto-generate title from branch name
@@ -181,6 +208,30 @@ export function BranchDetailPanel({
       onStatusChange?.({ type: 'error', message: (error as Error).message })
     } finally {
       setPushing(false)
+    }
+  }
+
+  const handlePreviewInBrowser = async () => {
+    if (!repoPath) {
+      onStatusChange?.({ type: 'error', message: 'No repository path available' })
+      return
+    }
+
+    setPreviewLoading(true)
+    onStatusChange?.({ type: 'info', message: `Creating preview for ${branch.name}...` })
+
+    try {
+      const result = await window.conveyor.preview.autoPreviewBranch(branch.name, repoPath)
+      if (result.success) {
+        const warningMsg = result.warnings?.length ? ` (${result.warnings.join(', ')})` : ''
+        onStatusChange?.({ type: 'success', message: `Opened ${result.url}${warningMsg}` })
+      } else {
+        onStatusChange?.({ type: 'error', message: result.message })
+      }
+    } catch (error) {
+      onStatusChange?.({ type: 'error', message: (error as Error).message })
+    } finally {
+      setPreviewLoading(false)
     }
   }
 
@@ -437,6 +488,20 @@ export function BranchDetailPanel({
           <button className="btn btn-secondary" onClick={() => window.electronAPI.openBranchInGitHub(branch.name)} disabled={deleting || renaming}>
             View on GitHub
           </button>
+          {bestProvider && (
+            <button
+              className="btn btn-secondary"
+              onClick={handlePreviewInBrowser}
+              disabled={!bestProvider.available || previewLoading || deleting}
+              title={
+                !bestProvider.available
+                  ? bestProvider.reason || 'Preview provider unavailable'
+                  : `Open preview with ${bestProvider.name}`
+              }
+            >
+              {previewLoading ? 'Opening...' : 'Preview'}
+            </button>
+          )}
           {!isMainOrMaster && onRenameBranch && (
             <button className="btn btn-secondary" onClick={handleStartRename} disabled={switching || deleting || renaming}>
               Rename Branch

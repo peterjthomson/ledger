@@ -6,7 +6,13 @@
  */
 
 import { useState, useEffect, useRef } from 'react'
-import type { Worktree, UncommittedFile, StagingFileDiff, WorkingStatus } from '../../../types/electron'
+import type {
+  Worktree,
+  UncommittedFile,
+  StagingFileDiff,
+  WorkingStatus,
+  PreviewProviderInfo,
+} from '../../../types/electron'
 import type { StatusMessage } from '../../../types/app-types'
 import { formatRelativeTime } from '@/app/utils/time'
 
@@ -15,6 +21,7 @@ import { formatRelativeTime } from '@/app/utils/time'
 export interface WorktreeDetailPanelProps {
   worktree: Worktree
   currentBranch: string
+  repoPath: string | null
   switching?: boolean
   onStatusChange?: (status: StatusMessage | null) => void
   onRefresh?: () => Promise<void>
@@ -27,6 +34,7 @@ export interface WorktreeDetailPanelProps {
 export function WorktreeDetailPanel({
   worktree,
   currentBranch,
+  repoPath,
   switching,
   onStatusChange,
   onRefresh,
@@ -36,6 +44,9 @@ export function WorktreeDetailPanel({
   onBranchClick,
 }: WorktreeDetailPanelProps) {
   const [actionInProgress, setActionInProgress] = useState(false)
+  // Preview provider state
+  const [previewProviders, setPreviewProviders] = useState<PreviewProviderInfo[]>([])
+  const [previewLoading, setPreviewLoading] = useState(false)
   // Staging/commit state
   const [showCommitUI, setShowCommitUI] = useState(false)
   const [workingStatus, setWorkingStatus] = useState<WorkingStatus | null>(null)
@@ -107,6 +118,25 @@ export function WorktreeDetailPanel({
       document.removeEventListener('keydown', handleEscape)
     }
   }, [fileContextMenu])
+
+  const bestProvider = previewProviders.find((provider) => provider.compatible) || null
+
+  // Check preview providers when worktree/repo changes
+  useEffect(() => {
+    if (!repoPath) {
+      setPreviewProviders([])
+      return
+    }
+    const loadProviders = async () => {
+      try {
+        const providers = await window.conveyor.preview.getProviders(repoPath, worktree.path)
+        setPreviewProviders(providers)
+      } catch {
+        setPreviewProviders([])
+      }
+    }
+    loadProviders()
+  }, [repoPath, worktree.path])
 
   const loadWorkingStatus = async () => {
     setLoadingStatus(true)
@@ -299,6 +329,30 @@ export function WorktreeDetailPanel({
     await window.electronAPI.openWorktree(worktree.path)
   }
 
+  const handlePreviewInBrowser = async () => {
+    if (!repoPath) {
+      onStatusChange?.({ type: 'error', message: 'No repository path available' })
+      return
+    }
+
+    setPreviewLoading(true)
+    onStatusChange?.({ type: 'info', message: 'Setting up preview...' })
+
+    try {
+      const result = await window.conveyor.preview.autoPreviewWorktree(worktree.path, repoPath)
+      if (result.success) {
+        const warningMsg = result.warnings?.length ? ` (${result.warnings.join(', ')})` : ''
+        onStatusChange?.({ type: 'success', message: `Opened ${result.url}${warningMsg}` })
+      } else {
+        onStatusChange?.({ type: 'error', message: result.message })
+      }
+    } catch (error) {
+      onStatusChange?.({ type: 'error', message: (error as Error).message })
+    } finally {
+      setPreviewLoading(false)
+    }
+  }
+
   const handleRemove = async (force: boolean = false) => {
     const confirmMsg = force
       ? `Force remove worktree "${worktree.displayName}"? This will discard any uncommitted changes.`
@@ -399,6 +453,20 @@ export function WorktreeDetailPanel({
           {onOpenStaging && (
             <button className="btn btn-secondary" onClick={onOpenStaging}>
               Open Staging
+            </button>
+          )}
+          {bestProvider && (
+            <button
+              className="btn btn-secondary"
+              onClick={handlePreviewInBrowser}
+              disabled={!bestProvider.available || previewLoading}
+              title={
+                !bestProvider.available
+                  ? bestProvider.reason || 'Preview provider unavailable'
+                  : `Open preview with ${bestProvider.name}`
+              }
+            >
+              {previewLoading ? 'Opening...' : 'Preview'}
             </button>
           )}
         </div>
@@ -800,6 +868,21 @@ export function WorktreeDetailPanel({
         <button className="btn btn-secondary" onClick={handleOpenInFinder} disabled={actionInProgress}>
           Open in Finder
         </button>
+
+        {bestProvider && (
+          <button
+            className="btn btn-secondary"
+            onClick={handlePreviewInBrowser}
+            disabled={!bestProvider.available || previewLoading || actionInProgress}
+            title={
+              !bestProvider.available
+                ? bestProvider.reason || 'Preview provider unavailable'
+                : `Open preview with ${bestProvider.name}`
+            }
+          >
+            {previewLoading ? 'Opening...' : 'Preview'}
+          </button>
+        )}
 
         {isCurrent && onOpenStaging && (
           <button className="btn btn-secondary" onClick={onOpenStaging} disabled={actionInProgress}>

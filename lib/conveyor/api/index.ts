@@ -14,6 +14,7 @@ import { AIApi } from './ai-api'
 import { MailmapApi } from './mailmap-api'
 import { AnalyticsApi } from './analytics-api'
 import { CanvasApi } from './canvas-api'
+import { PreviewApi } from './preview-api'
 
 export const conveyor = {
   app: new AppApi(electronAPI),
@@ -31,6 +32,7 @@ export const conveyor = {
   mailmap: new MailmapApi(electronAPI),
   analytics: new AnalyticsApi(electronAPI),
   canvas: new CanvasApi(electronAPI),
+  preview: new PreviewApi(electronAPI),
 }
 
 export type ConveyorApi = typeof conveyor
