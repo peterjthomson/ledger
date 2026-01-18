@@ -4,11 +4,10 @@ import { RepositoryContext, RepositoryType, createRepositoryContext } from './re
 /**
  * RepositoryManager - Singleton managing multiple repository contexts
  *
- * This replaces the global `let git` and `let repoPath` pattern in git-service.ts.
- * Instead of a single global repo, we can now:
- * - Track multiple repositories
+ * Capabilities:
+ * - Track multiple repositories simultaneously
  * - Switch between them
- * - Have a clear "active" repo concept
+ * - Maintain a clear "active" repo concept
  *
  * Key design decisions:
  * 1. Singleton pattern ensures one source of truth

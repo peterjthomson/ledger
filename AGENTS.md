@@ -23,7 +23,8 @@ Ledger is a macOS desktop app for viewing git branches, worktrees, and pull requ
 
 ```
 lib/main/main.ts         # IPC handlers, app lifecycle
-lib/main/git-service.ts  # All git operations (large)
+lib/services/            # Git operations as pure functions (branch, commit, stash, etc.)
+lib/conveyor/            # Typed IPC with Zod validation (schemas, handlers, APIs)
 lib/preload/preload.ts   # API exposed to renderer
 app/app.tsx              # Main React component (large)
 app/styles/app.css       # All styling (large)
@@ -35,11 +36,11 @@ app/components/          # UI components (panels, canvas, window)
 
 ### Adding a new git operation
 
-1. Add function to `lib/main/git-service.ts`
-2. Add IPC handler in `lib/main/main.ts`
-3. Expose in `lib/preload/preload.ts`
-4. Add types to `app/types/electron.d.ts`
-5. Call from `app/app.tsx`
+1. Add pure function to appropriate service in `lib/services/` (e.g., `branch-service.ts`)
+2. Add Zod schema in `lib/conveyor/schemas/`
+3. Add handler in `lib/conveyor/handlers/`
+4. Add API method in `lib/conveyor/api/`
+5. Call via `window.conveyor.*` from renderer
 
 ### Adding UI elements
 
@@ -64,14 +65,15 @@ npm run build:mac:arm64  # Build for Apple Silicon
 
 ```
 Main Process (Node.js)
-├── main.ts - IPC handlers
-├── git-service.ts - git commands via simple-git
-└── settings-service.ts - persistent storage
+├── main.ts - App lifecycle, handler registration
+├── lib/services/ - Pure functions for git operations
+├── lib/conveyor/handlers/ - IPC handlers with Zod validation
+└── settings-service.ts - Persistent storage
 
-    ↕ IPC (ipcMain.handle / ipcRenderer.invoke)
+    ↕ IPC (conveyor: typed + validated)
 
 Preload Script
-└── preload.ts - exposes window.electronAPI
+└── preload.ts - Exposes window.electronAPI + window.conveyor
 
     ↕ contextBridge
 
@@ -104,29 +106,17 @@ Run with `npm test` (builds first) or `npm run test:headed`.
 
 ## Chrome DevTools Protocol (CDP) Access
 
-AI agents can interact with the running Electron app via Chrome DevTools Protocol for debugging, validation, and UI interaction.
-
-### Starting the App with Debugging
+AI agents can interact with the running Electron app via CDP for debugging and UI interaction.
 
 ```bash
+# Start with CDP enabled
 npm run dev -- --remote-debugging-port=9222
-```
 
-This starts the app with CDP enabled on port 9222.
-
-### Checking if Debugging is Available
-
-```bash
-# List available debug targets
+# Verify available
 curl -s http://127.0.0.1:9222/json
-
-# Get browser/app version info
-curl -s http://127.0.0.1:9222/json/version
 ```
 
-### CDP Helper Scripts
-
-Helper scripts are available in `tools/electron-mcp-server/`:
+Helper scripts in `tools/electron-mcp-server/`:
 
 | Script | Purpose |
 |--------|---------|
@@ -134,156 +124,15 @@ Helper scripts are available in `tools/electron-mcp-server/`:
 | `cdp-screenshot.js` | Capture PNG screenshot |
 | `cdp-click.js` | Click element by CSS selector |
 
-### Common CDP Operations
-
-**1. Get Page Content (text, element count)**
-
-```javascript
-import CDP from 'chrome-remote-interface';
-
-const client = await CDP({ port: 9222 });
-const { Runtime } = client;
-
-const { result } = await Runtime.evaluate({
-  expression: `({
-    title: document.title,
-    url: window.location.href,
-    bodyText: document.body?.innerText?.substring(0, 5000),
-    elementCount: document.querySelectorAll('*').length
-  })`,
-  returnByValue: true
-});
-
-console.log(result.value);
-await client.close();
-```
-
-**2. Take a Screenshot**
-
-```javascript
-import CDP from 'chrome-remote-interface';
-import fs from 'fs';
-
-const client = await CDP({ port: 9222 });
-const { Page } = client;
-
-await Page.enable();
-const { data } = await Page.captureScreenshot({ format: 'png' });
-fs.writeFileSync('screenshot.png', Buffer.from(data, 'base64'));
-
-await client.close();
-```
-
-**3. Click an Element**
-
-```javascript
-import CDP from 'chrome-remote-interface';
-
-const client = await CDP({ port: 9222 });
-const { Runtime, Input } = client;
-
-// Find element and get its position
-const { result } = await Runtime.evaluate({
-  expression: `(() => {
-    const el = document.querySelector('[data-testid="my-button"]');
-    if (!el) return null;
-    const rect = el.getBoundingClientRect();
-    return { x: rect.x + rect.width/2, y: rect.y + rect.height/2 };
-  })()`,
-  returnByValue: true
-});
-
-if (result.value) {
-  await Input.dispatchMouseEvent({
-    type: 'mousePressed',
-    x: result.value.x,
-    y: result.value.y,
-    button: 'left',
-    clickCount: 1
-  });
-  await Input.dispatchMouseEvent({
-    type: 'mouseReleased',
-    x: result.value.x,
-    y: result.value.y,
-    button: 'left'
-  });
-}
-
-await client.close();
-```
-
-**4. Execute Arbitrary JavaScript**
-
-```javascript
-import CDP from 'chrome-remote-interface';
-
-const client = await CDP({ port: 9222 });
-const { Runtime } = client;
-
-// Access React state, trigger actions, etc.
-const { result } = await Runtime.evaluate({
-  expression: `window.someGlobalFunction?.() || 'not available'`,
-  returnByValue: true
-});
-
-await client.close();
-```
-
-**5. Monitor Console Output**
-
-```javascript
-import CDP from 'chrome-remote-interface';
-
-const client = await CDP({ port: 9222 });
-const { Runtime } = client;
-
-await Runtime.enable();
-client.on('Runtime.consoleAPICalled', (params) => {
-  console.log('Console:', params.type, params.args);
-});
-
-// Keep listening...
-```
-
-### Quick One-Liner Examples
-
-```bash
-# Get page content and text
-cd tools/electron-mcp-server && node cdp-snapshot.js
-
-# Take a screenshot (saves to wip/app-screenshot.png)
-cd tools/electron-mcp-server && node cdp-screenshot.js
-
-# Take screenshot to custom path
-cd tools/electron-mcp-server && node cdp-screenshot.js /path/to/output.png
-
-# Click an element by selector
-cd tools/electron-mcp-server && node cdp-click.js "button.refresh"
-cd tools/electron-mcp-server && node cdp-click.js "[data-testid='submit']"
-```
-
-### Typical Validation Workflow
-
-1. Start app with debugging: `npm run dev -- --remote-debugging-port=9222`
-2. Wait for app to load (~5 seconds)
-3. Verify debugging available: `curl -s http://127.0.0.1:9222/json`
-4. Run CDP scripts to inspect/interact with the UI
-5. Take screenshots to validate visual state
-
-### Notes
-
-- CDP scripts require `chrome-remote-interface` package (installed in `tools/electron-mcp-server/`)
-- Screenshots saved to `wip/` are gitignored
-- The app must be running for CDP to connect
-- Port 9222 is the standard Chrome debugging port
+Usage: `cd tools/electron-mcp-server && node cdp-screenshot.js`
 
 ## Git Operations Available
 
-This list is intentionally **non-exhaustive**. The canonical contract is:
+The canonical sources are:
 
-- `app/types/electron.d.ts` (renderer-facing `window.electronAPI`)
-- `lib/main/git-service.ts` (git operations)
-- `lib/main/settings-service.ts` (persistent settings: themes, canvases, etc.)
+- `app/types/electron.d.ts` - Renderer-facing API types
+- `lib/services/` - Git operations as pure functions
+- `lib/conveyor/schemas/` - IPC channel definitions with Zod validation
 
 ## Error Handling
 
@@ -384,12 +233,10 @@ xcrun notarytool info <submission-id> --keychain-profile "AC_PASSWORD"
 
 ## Areas for Improvement
 
-1. The `git-service.ts` file is large (~5400 lines) - partially modularized into `lib/services/`
-2. No loading skeletons - just "Loading..." text
-3. No keyboard shortcuts yet
-4. PR integration requires `gh` CLI - could add fallback
-5. Only macOS supported currently
-6. React hooks exhaustive-deps warnings (intentional to prevent infinite loops)
+1. No loading skeletons - just "Loading..." text
+2. No keyboard shortcuts yet
+3. PR integration requires `gh` CLI - could add fallback
+4. Only macOS supported currently
 
 ## IPC Naming Convention
 

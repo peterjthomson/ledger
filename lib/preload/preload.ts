@@ -90,6 +90,7 @@ const electronAPI = {
   getWorktrees: () => ipcRenderer.invoke('get-worktrees'),
   // Checkout operations
   checkoutBranch: (branchName: string) => ipcRenderer.invoke('checkout-branch', branchName),
+  checkoutCommit: (commitHash: string, branchName?: string) => ipcRenderer.invoke('checkout-commit', commitHash, branchName),
   createBranch: (branchName: string, checkout?: boolean) => ipcRenderer.invoke('create-branch', branchName, checkout),
   deleteBranch: (branchName: string, force?: boolean) => ipcRenderer.invoke('delete-branch', branchName, force),
   renameBranch: (oldName: string, newName: string) => ipcRenderer.invoke('rename-branch', oldName, newName),
@@ -150,7 +151,7 @@ const electronAPI = {
   applyWorktreeChanges: (worktreePath: string) => ipcRenderer.invoke('apply-worktree-changes', worktreePath),
   removeWorktree: (worktreePath: string, force?: boolean) =>
     ipcRenderer.invoke('remove-worktree', worktreePath, force ?? false),
-  createWorktree: (options: { branchName: string; isNewBranch: boolean; folderPath: string }) =>
+  createWorktree: (options: { branchName?: string; commitHash?: string; isNewBranch: boolean; folderPath: string }) =>
     ipcRenderer.invoke('create-worktree', options),
   selectWorktreeFolder: () => ipcRenderer.invoke('select-worktree-folder'),
   // Worktree-specific staging & commit operations

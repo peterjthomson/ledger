@@ -105,6 +105,11 @@ Tests use Playwright and are located in `tests/`. The test suite covers:
 - Welcome screen (no repo selected)
 - Main view with repository
 
+Selector guidance:
+- Prefer user-facing selectors (role, text, label) where possible.
+- Use `data-testid` sparingly and only when other selectors would be brittle or ambiguous.
+- Avoid adding new `data-testid` attributes unless they materially improve test stability.
+
 ## Submitting Changes
 
 ### Pull Request Process
@@ -150,7 +155,7 @@ All communication between main and renderer processes uses `ipcMain.handle` / `i
 
 ### State Management
 
-Uses React hooks (useState, useMemo, useCallback, useEffect). No external state library needed for current complexity.
+Uses React hooks for local UI state, plus a small shared store for cross-component state and optional persistence (e.g., active panels, plugin navigation).
 
 ### Git Operations
 

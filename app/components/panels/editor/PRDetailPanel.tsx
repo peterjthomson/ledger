@@ -5,14 +5,22 @@
  */
 
 import { useState, useEffect, useMemo, useCallback, useRef, useLayoutEffect } from 'react'
-import type { PullRequest, PRDetail, PRReviewComment, StagingFileDiff } from '../../../types/electron'
+import type {
+  PullRequest,
+  PRDetail,
+  PRReviewComment,
+  StagingFileDiff,
+  PreviewProviderInfo,
+} from '../../../types/electron'
 import { DiffViewer } from '../../ui/DiffViewer'
 
 export interface PRReviewPanelProps {
   pr: PullRequest
+  repoPath: string | null
   formatRelativeTime: (date: string) => string
   onCheckout?: (pr: PullRequest) => void
   onPRMerged?: () => void
+  onStatusChange?: (status: { type: 'info' | 'success' | 'error'; message: string } | null) => void
   onNavigateToBranch?: (branchName: string) => void
   switching?: boolean
 }
@@ -27,7 +35,7 @@ function isAIAuthor(login: string): boolean {
   return AI_AUTHORS.some((ai) => lower.includes(ai)) || lower.endsWith('[bot]') || lower.endsWith('-bot')
 }
 
-export function PRReviewPanel({ pr, formatRelativeTime, onCheckout, onPRMerged, onNavigateToBranch, switching }: PRReviewPanelProps) {
+export function PRReviewPanel({ pr, repoPath, formatRelativeTime, onCheckout, onPRMerged, onStatusChange, onNavigateToBranch, switching }: PRReviewPanelProps) {
   const [activeTab, setActiveTab] = useState<PRTab>('conversation')
   const [prDetail, setPrDetail] = useState<PRDetail | null>(null)
   const [reviewComments, setReviewComments] = useState<PRReviewComment[]>([])
@@ -40,6 +48,9 @@ export function PRReviewPanel({ pr, formatRelativeTime, onCheckout, onPRMerged, 
   const [submittingComment, setSubmittingComment] = useState(false)
   const [commentStatus, setCommentStatus] = useState<{ type: 'success' | 'error'; message: string } | null>(null)
   const [mergingPR, setMergingPR] = useState(false)
+  // Preview provider state
+  const [previewProviders, setPreviewProviders] = useState<PreviewProviderInfo[]>([])
+  const [previewLoading, setPreviewLoading] = useState(false)
 
   // Ref to track status timeout for cleanup
   const statusTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -76,6 +87,28 @@ export function PRReviewPanel({ pr, formatRelativeTime, onCheckout, onPRMerged, 
   useEffect(() => {
     loadPRDetail()
   }, [loadPRDetail])
+
+  const bestProvider = useMemo(
+    () => previewProviders.find((provider) => provider.compatible) || null,
+    [previewProviders]
+  )
+
+  // Check preview providers when repoPath changes
+  useEffect(() => {
+    if (!repoPath) {
+      setPreviewProviders([])
+      return
+    }
+    const loadProviders = async () => {
+      try {
+        const providers = await window.conveyor.preview.getProviders(repoPath)
+        setPreviewProviders(providers)
+      } catch {
+        setPreviewProviders([])
+      }
+    }
+    loadProviders()
+  }, [repoPath])
 
   // Submit a comment
   const handleSubmitComment = async () => {
@@ -131,6 +164,31 @@ export function PRReviewPanel({ pr, formatRelativeTime, onCheckout, onPRMerged, 
       setCommentStatus({ type: 'error', message: (error as Error).message })
     } finally {
       setMergingPR(false)
+    }
+  }
+
+  // Preview PR in browser
+  const handlePreviewInBrowser = async () => {
+    if (!repoPath || !prDetail) {
+      onStatusChange?.({ type: 'error', message: 'No repository path available' })
+      return
+    }
+
+    setPreviewLoading(true)
+    onStatusChange?.({ type: 'info', message: `Creating preview for PR #${pr.number}...` })
+
+    try {
+      const result = await window.conveyor.preview.autoPreviewPR(pr.number, prDetail.headRefName, repoPath)
+      if (result.success) {
+        const warningMsg = result.warnings?.length ? ` (${result.warnings.join(', ')})` : ''
+        onStatusChange?.({ type: 'success', message: `Opened ${result.url}${warningMsg}` })
+      } else {
+        onStatusChange?.({ type: 'error', message: result.message })
+      }
+    } catch (error) {
+      onStatusChange?.({ type: 'error', message: (error as Error).message })
+    } finally {
+      setPreviewLoading(false)
     }
   }
 
@@ -232,7 +290,9 @@ export function PRReviewPanel({ pr, formatRelativeTime, onCheckout, onPRMerged, 
   if (loading) {
     return (
       <div className="pr-review-panel">
-        <div className="pr-review-loading">Loading PR details...</div>
+        <div className="pr-review-loading">
+          <div className="editor-loading-spinner" />
+        </div>
       </div>
     )
   }
@@ -306,6 +366,20 @@ export function PRReviewPanel({ pr, formatRelativeTime, onCheckout, onPRMerged, 
         >
           View on GitHub
         </button>
+        {bestProvider && (
+          <button
+            className="btn btn-secondary"
+            onClick={handlePreviewInBrowser}
+            disabled={!bestProvider.available || previewLoading}
+            title={
+              !bestProvider.available
+                ? bestProvider.reason || 'Preview provider unavailable'
+                : `Open preview with ${bestProvider.name}`
+            }
+          >
+            {previewLoading ? 'Opening...' : 'Preview'}
+          </button>
+        )}
         <button
           className="btn btn-primary"
           onClick={handleMergePR}

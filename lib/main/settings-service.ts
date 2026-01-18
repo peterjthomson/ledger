@@ -1,8 +1,13 @@
 import { app, dialog } from 'electron';
 import * as fs from 'fs';
 import * as path from 'path';
-import type { AISettings } from './ai/types';
+import type { AISettings, AIProvider } from './ai/types';
 import type { NotionSettings } from './notion/types';
+import { DEFAULT_MODELS } from './ai/models';
+import { encryptApiKey, decryptApiKey } from './secure-storage';
+
+// Re-export encryption status for use by handlers
+export { getEncryptionStatus } from './secure-storage';
 
 type ViewMode = 'columns' | 'work';
 type ThemeMode = 'light' | 'dark' | 'system' | 'custom';
@@ -35,6 +40,7 @@ interface CanvasColumn {
 interface CanvasConfig {
   id: string;
   name: string;
+  icon?: string;
   columns: CanvasColumn[];
   isPreset?: boolean;
 }
@@ -305,14 +311,59 @@ export function removeRecentRepo(repoPath: string): void {
 }
 
 // AI Settings functions
+
+/**
+ * Helper to decrypt all API keys in AI settings
+ */
+function decryptAISettings(ai: AISettings): AISettings {
+  const decrypted = { ...ai, providers: { ...ai.providers } };
+  const providers: AIProvider[] = ['anthropic', 'openai', 'gemini', 'openrouter'];
+
+  for (const provider of providers) {
+    const settings = decrypted.providers[provider];
+    if (settings?.apiKey) {
+      decrypted.providers[provider] = {
+        ...settings,
+        apiKey: decryptApiKey(settings.apiKey),
+      };
+    }
+  }
+
+  return decrypted;
+}
+
+/**
+ * Helper to encrypt all API keys in AI settings
+ */
+function encryptAISettings(ai: AISettings): AISettings {
+  const encrypted = { ...ai, providers: { ...ai.providers } };
+  const providers: AIProvider[] = ['anthropic', 'openai', 'gemini', 'openrouter'];
+
+  for (const provider of providers) {
+    const settings = encrypted.providers[provider];
+    if (settings?.apiKey) {
+      encrypted.providers[provider] = {
+        ...settings,
+        apiKey: encryptApiKey(settings.apiKey),
+      };
+    }
+  }
+
+  return encrypted;
+}
+
 export function getAISettings(): AISettings | null {
   const settings = loadSettings();
-  return settings.ai || null;
+  if (!settings.ai) return null;
+
+  // Decrypt API keys when loading
+  return decryptAISettings(settings.ai);
 }
 
 export function saveAISettings(aiSettings: AISettings): void {
   const settings = loadSettings();
-  settings.ai = aiSettings;
+  // Encrypt API keys when saving
+  settings.ai = encryptAISettings(aiSettings);
   saveSettings(settings);
 }
 
@@ -336,7 +387,7 @@ export function updateAISettings(updates: Partial<AISettings>): AISettings {
 }
 
 export function setAIProviderKey(
-  provider: 'anthropic' | 'openai' | 'gemini',
+  provider: 'anthropic' | 'openai' | 'gemini' | 'openrouter',
   apiKey: string,
   enabled: boolean = true,
   organization?: string
@@ -356,7 +407,8 @@ export function setAIProviderKey(
 
   currentAI.providers = currentAI.providers || {};
   currentAI.providers[provider] = {
-    apiKey,
+    // Encrypt the API key before storing
+    apiKey: encryptApiKey(apiKey),
     enabled,
     ...(organization && { organization }),
   };
@@ -365,7 +417,7 @@ export function setAIProviderKey(
   saveSettings(settings);
 }
 
-export function removeAIProviderKey(provider: 'anthropic' | 'openai' | 'gemini'): void {
+export function removeAIProviderKey(provider: 'anthropic' | 'openai' | 'gemini' | 'openrouter'): void {
   const settings = loadSettings();
   if (settings.ai?.providers) {
     delete settings.ai.providers[provider];
@@ -373,23 +425,69 @@ export function removeAIProviderKey(provider: 'anthropic' | 'openai' | 'gemini')
   }
 }
 
-export function setDefaultAIProvider(provider: 'anthropic' | 'openai' | 'gemini'): void {
+export function setDefaultAIProvider(provider: 'anthropic' | 'openai' | 'gemini' | 'openrouter'): void {
   const settings = loadSettings();
-  if (settings.ai) {
-    settings.ai.defaults.provider = provider;
-    saveSettings(settings);
-  }
+  // Initialize AI settings if missing (same pattern as setAIProviderKey)
+  const currentAI = settings.ai || {
+    providers: {},
+    defaults: {
+      provider: 'anthropic',
+      models: {
+        quick: 'claude-3-5-haiku-20241022',
+        balanced: 'claude-sonnet-4-20250514',
+        powerful: 'claude-opus-4-20250514',
+      },
+    },
+  };
+
+  currentAI.defaults.provider = provider;
+  // Keep defaults.models consistent with the selected provider.
+  currentAI.defaults.models = {
+    quick: DEFAULT_MODELS[provider].quick,
+    balanced: DEFAULT_MODELS[provider].balanced,
+    powerful: DEFAULT_MODELS[provider].powerful,
+  };
+
+  settings.ai = currentAI;
+  saveSettings(settings);
 }
 
 // Notion Settings functions
+
+/**
+ * Helper to decrypt Notion API key
+ */
+function decryptNotionSettings(notion: NotionSettings): NotionSettings {
+  const decrypted = { ...notion };
+  if (decrypted.apiKey) {
+    decrypted.apiKey = decryptApiKey(decrypted.apiKey);
+  }
+  return decrypted;
+}
+
+/**
+ * Helper to encrypt Notion API key
+ */
+function encryptNotionSettings(notion: NotionSettings): NotionSettings {
+  const encrypted = { ...notion };
+  if (encrypted.apiKey) {
+    encrypted.apiKey = encryptApiKey(encrypted.apiKey);
+  }
+  return encrypted;
+}
+
 export function getNotionSettings(): NotionSettings | null {
   const settings = loadSettings();
-  return settings.notion || null;
+  if (!settings.notion) return null;
+
+  // Decrypt API key when loading
+  return decryptNotionSettings(settings.notion);
 }
 
 export function saveNotionSettings(notionSettings: NotionSettings): void {
   const settings = loadSettings();
-  settings.notion = notionSettings;
+  // Encrypt API key when saving
+  settings.notion = encryptNotionSettings(notionSettings);
   saveSettings(settings);
 }
 
@@ -397,15 +495,23 @@ export function updateNotionSettings(updates: Partial<NotionSettings>): NotionSe
   const settings = loadSettings();
   const currentNotion = settings.notion || {};
 
-  settings.notion = { ...currentNotion, ...updates };
+  // If updates include an API key, encrypt it
+  const encryptedUpdates = updates.apiKey
+    ? { ...updates, apiKey: encryptApiKey(updates.apiKey) }
+    : updates;
+
+  settings.notion = { ...currentNotion, ...encryptedUpdates };
   saveSettings(settings);
-  return settings.notion;
+
+  // Return decrypted version for immediate use
+  return decryptNotionSettings(settings.notion);
 }
 
 export function setNotionApiKey(apiKey: string): void {
   const settings = loadSettings();
   settings.notion = settings.notion || {};
-  settings.notion.apiKey = apiKey;
+  // Encrypt the API key before storing
+  settings.notion.apiKey = encryptApiKey(apiKey);
   saveSettings(settings);
 }
 
@@ -417,4 +523,3 @@ export function removeNotionApiKey(): void {
     saveSettings(settings);
   }
 }
-

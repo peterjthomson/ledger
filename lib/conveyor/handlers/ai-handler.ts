@@ -13,6 +13,7 @@ import {
   setAIProviderKey,
   removeAIProviderKey,
   setDefaultAIProvider,
+  getEncryptionStatus,
 } from '@/lib/main/settings-service'
 import type { AIProvider, AIMessage, CompletionOptions, AISettings } from '@/lib/main/ai/types'
 
@@ -115,11 +116,11 @@ export const registerAIHandlers = () => {
     }
   })
 
-  handle('ai:is-provider-configured', async (provider: AIProvider) => {
+  handle('ai:is-provider-available', async (provider: AIProvider) => {
     try {
-      return aiService.isProviderConfigured(provider)
+      return aiService.isProviderAvailable(provider)
     } catch (error) {
-      logHandlerError('ai:is-provider-configured', error)
+      logHandlerError('ai:is-provider-available', error)
       return false
     }
   })
@@ -207,6 +208,7 @@ export const registerAIHandlers = () => {
           anthropic: { cost: 0, requests: 0 },
           openai: { cost: 0, requests: 0 },
           gemini: { cost: 0, requests: 0 },
+          openrouter: { cost: 0, requests: 0 },
         },
       }
     }
@@ -219,6 +221,20 @@ export const registerAIHandlers = () => {
     } catch (error) {
       logHandlerError('ai:clear-usage-history', error)
       return { success: false, message: serializeError(error) }
+    }
+  })
+
+  // Security handlers
+  handle('ai:get-encryption-status', async () => {
+    try {
+      return getEncryptionStatus()
+    } catch (error) {
+      logHandlerError('ai:get-encryption-status', error)
+      return {
+        available: false,
+        backend: 'unknown',
+        isStrong: false,
+      }
     }
   })
 }

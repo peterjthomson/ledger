@@ -13,7 +13,7 @@
  */
 
 // Types
-export type { StashEntry, StashFile, StashResult } from './stash-types'
+export type { StashEntry, StashFile, StashResult, ApplyStashToBranchResult } from './stash-types'
 
 // Service functions
 export {
@@ -25,4 +25,5 @@ export {
   popStash,
   dropStash,
   stashToBranch,
+  applyStashToBranch,
 } from './stash-service'

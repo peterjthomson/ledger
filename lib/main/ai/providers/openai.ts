@@ -40,6 +40,14 @@ export class OpenAIProvider implements AIProviderInterface {
   }
 
   /**
+   * Reset the provider, clearing credentials and client state
+   */
+  reset(): void {
+    this.client = null
+    this.apiKey = null
+  }
+
+  /**
    * Convert our message format to OpenAI's format
    */
   private convertMessages(

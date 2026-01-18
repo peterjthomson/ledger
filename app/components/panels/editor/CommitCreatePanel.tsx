@@ -31,6 +31,8 @@ export function StagingPanel({ workingStatus, currentBranch, onRefresh, onStatus
   const [pushAfterCommit, setPushAfterCommit] = useState(true)
   const [fileContextMenu, setFileContextMenu] = useState<{ x: number; y: number; file: UncommittedFile } | null>(null)
   const fileMenuRef = useRef<HTMLDivElement>(null)
+  const stagedListRef = useRef<HTMLUListElement>(null)
+  const unstagedListRef = useRef<HTMLUListElement>(null)
   // New branch creation
   const [createNewBranch, setCreateNewBranch] = useState(false)
   const [branchFolder, setBranchFolder] = useState<string>('feature')
@@ -53,9 +55,18 @@ export function StagingPanel({ workingStatus, currentBranch, onRefresh, onStatus
   const [editContent, setEditContent] = useState('')
   const [loadingEdit, setLoadingEdit] = useState(false)
   const [savingEdit, setSavingEdit] = useState(false)
+  // Discard All confirmation state
+  const [discardAllConfirm, setDiscardAllConfirm] = useState(false)
+  // Per-file discard confirmation state (stores file path)
+  const [discardFileConfirm, setDiscardFileConfirm] = useState<string | null>(null)
+  // Optimistic updates: track files being staged/unstaged/discarded for immediate UI feedback
+  const [pendingStage, setPendingStage] = useState<Set<string>>(new Set())
+  const [pendingUnstage, setPendingUnstage] = useState<Set<string>>(new Set())
+  const [pendingDiscard, setPendingDiscard] = useState<Set<string>>(new Set())
 
-  const stagedFiles = workingStatus.files.filter((f) => f.staged)
-  const unstagedFiles = workingStatus.files.filter((f) => !f.staged)
+  // Filter out files that are pending operations for instant visual feedback
+  const stagedFiles = workingStatus.files.filter((f) => f.staged && !pendingDiscard.has(f.path) && !pendingUnstage.has(f.path))
+  const unstagedFiles = workingStatus.files.filter((f) => !f.staged && !pendingStage.has(f.path) && !pendingDiscard.has(f.path))
 
   // Load behind main count
   useEffect(() => {
@@ -80,6 +91,59 @@ export function StagingPanel({ workingStatus, currentBranch, onRefresh, onStatus
       cancelled = true
     }
   }, [currentBranch]) // Re-check when branch changes
+
+  // Global Enter key listener to confirm discard when in confirm state
+  // This allows: click X with mouse → show ? → press Enter to confirm
+  useEffect(() => {
+    if (!discardFileConfirm) return
+
+    const handleGlobalKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Enter') {
+        e.preventDefault()
+        
+        // Find the file being discarded
+        const fileToDiscard = unstagedFiles.find(f => f.path === discardFileConfirm)
+        if (!fileToDiscard) {
+          setDiscardFileConfirm(null)
+          return
+        }
+        
+        // Calculate next file
+        const currentIndex = unstagedFiles.findIndex(f => f.path === discardFileConfirm)
+        let nextFile: UncommittedFile | null = null
+        if (unstagedFiles.length > 1) {
+          if (currentIndex < unstagedFiles.length - 1) {
+            nextFile = unstagedFiles[currentIndex + 1]
+          } else if (currentIndex > 0) {
+            nextFile = unstagedFiles[currentIndex - 1]
+          }
+        }
+        
+        // Optimistic update
+        setDiscardFileConfirm(null)
+        setPendingDiscard(prev => new Set(prev).add(fileToDiscard.path))
+        setSelectedFile(nextFile)
+        
+        window.conveyor.staging.discardFileChanges(fileToDiscard.path).then(async (result) => {
+          if (result.success) {
+            await onRefresh()
+          } else {
+            onStatusChange({ type: 'error', message: result.message })
+          }
+          
+          // Clear pending state AFTER refresh so file doesn't flicker back
+          setPendingDiscard(prev => {
+            const next = new Set(prev)
+            next.delete(fileToDiscard.path)
+            return next
+          })
+        })
+      }
+    }
+
+    document.addEventListener('keydown', handleGlobalKeyDown)
+    return () => document.removeEventListener('keydown', handleGlobalKeyDown)
+  }, [discardFileConfirm, unstagedFiles, onRefresh, onStatusChange])
 
   // Close file context menu when clicking outside
   useEffect(() => {
@@ -373,44 +437,179 @@ export function StagingPanel({ workingStatus, currentBranch, onRefresh, onStatus
     await onRefresh()
   }
 
-  // Stage a file
+  // Stage a file (silently, no toast on success) - with optimistic update
   const handleStageFile = async (file: UncommittedFile) => {
+    // Calculate next file to select before staging (file will be removed from unstaged list)
+    const currentIndex = unstagedFiles.findIndex(f => f.path === file.path)
+    let nextFile: UncommittedFile | null = null
+    
+    if (unstagedFiles.length > 1) {
+      if (currentIndex < unstagedFiles.length - 1) {
+        // Next file down
+        nextFile = unstagedFiles[currentIndex + 1]
+      } else if (currentIndex > 0) {
+        // Previous file up
+        nextFile = unstagedFiles[currentIndex - 1]
+      } else {
+        // First file (fallback)
+        nextFile = unstagedFiles[0] === file ? unstagedFiles[1] : unstagedFiles[0]
+      }
+    }
+    
+    // Optimistic update: immediately hide file and move selection
+    setPendingStage(prev => new Set(prev).add(file.path))
+    setSelectedFile(nextFile)
+    
     const result = await window.conveyor.staging.stageFile(file.path)
+    
     if (result.success) {
-      onStatusChange({ type: 'success', message: result.message })
       await onRefresh()
     } else {
       onStatusChange({ type: 'error', message: result.message })
     }
+    
+    // Clear pending state AFTER refresh so file doesn't flicker back
+    setPendingStage(prev => {
+      const next = new Set(prev)
+      next.delete(file.path)
+      return next
+    })
   }
 
-  // Unstage a file
-  const handleUnstageFile = async (file: UncommittedFile) => {
+  // Keyboard navigation for unstaged files list
+  const handleUnstagedKeyDown = useCallback((e: React.KeyboardEvent) => {
+    if (unstagedFiles.length === 0) return
+    
+    const currentIndex = selectedFile && !selectedFile.staged 
+      ? unstagedFiles.findIndex(f => f.path === selectedFile.path)
+      : -1
+
+    if (e.key === 'ArrowDown') {
+      e.preventDefault()
+      const nextIndex = currentIndex < unstagedFiles.length - 1 ? currentIndex + 1 : 0
+      setSelectedFile(unstagedFiles[nextIndex])
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault()
+      const prevIndex = currentIndex > 0 ? currentIndex - 1 : unstagedFiles.length - 1
+      setSelectedFile(unstagedFiles[prevIndex])
+    } else if (e.key === ' ' && selectedFile && !selectedFile.staged) {
+      e.preventDefault()
+      handleStageFile(selectedFile)
+    } else if (e.key === 'x' && selectedFile && !selectedFile.staged) {
+      // Start discard confirmation (same as clicking the X button once)
+      e.preventDefault()
+      if (discardFileConfirm !== selectedFile.path) {
+        setDiscardFileConfirm(selectedFile.path)
+        // Auto-clear confirmation after 3 seconds
+        setTimeout(() => setDiscardFileConfirm(null), 3000)
+      }
+    } else if (e.key === 'Enter' && selectedFile && !selectedFile.staged && discardFileConfirm === selectedFile.path) {
+      // Confirm discard if in confirm state - with optimistic update
+      e.preventDefault()
+      const fileToDiscard = selectedFile
+      const nextFile = getNextFileAfterRemoval(fileToDiscard)
+      
+      // Optimistic update: immediately hide file and move selection
+      setDiscardFileConfirm(null)
+      setPendingDiscard(prev => new Set(prev).add(fileToDiscard.path))
+      setSelectedFile(nextFile)
+      
+      window.conveyor.staging.discardFileChanges(fileToDiscard.path).then(async (result) => {
+        if (result.success) {
+          await onRefresh()
+        } else {
+          onStatusChange({ type: 'error', message: result.message })
+        }
+        
+        // Clear pending state AFTER refresh so file doesn't flicker back
+        setPendingDiscard(prev => {
+          const next = new Set(prev)
+          next.delete(fileToDiscard.path)
+          return next
+        })
+      })
+    }
+  }, [unstagedFiles, selectedFile, handleStageFile, discardFileConfirm, onRefresh, onStatusChange])
+
+  // Unstage a file (silently, no toast on success) - with optimistic update
+  const handleUnstageFile = useCallback(async (file: UncommittedFile) => {
+    // Calculate next file before unstaging
+    const currentIndex = stagedFiles.findIndex(f => f.path === file.path)
+    let nextFile: UncommittedFile | null = null
+    
+    if (stagedFiles.length > 1) {
+      if (currentIndex < stagedFiles.length - 1) {
+        // Next file down
+        nextFile = stagedFiles[currentIndex + 1]
+      } else if (currentIndex > 0) {
+        // Previous file up
+        nextFile = stagedFiles[currentIndex - 1]
+      } else {
+        // First file (fallback)
+        nextFile = stagedFiles[0] === file ? stagedFiles[1] : stagedFiles[0]
+      }
+    }
+    
+    // Optimistic update: immediately hide file and move selection
+    setPendingUnstage(prev => new Set(prev).add(file.path))
+    setSelectedFile(nextFile)
+    
     const result = await window.conveyor.staging.unstageFile(file.path)
+    
     if (result.success) {
-      onStatusChange({ type: 'success', message: result.message })
       await onRefresh()
     } else {
       onStatusChange({ type: 'error', message: result.message })
     }
-  }
+    
+    // Clear pending state AFTER refresh so file doesn't flicker back
+    setPendingUnstage(prev => {
+      const next = new Set(prev)
+      next.delete(file.path)
+      return next
+    })
+  }, [stagedFiles, onRefresh, onStatusChange])
+
+  // Keyboard navigation for staged files list
+  const handleStagedKeyDown = useCallback((e: React.KeyboardEvent) => {
+    if (stagedFiles.length === 0) return
+    
+    const currentIndex = selectedFile?.staged 
+      ? stagedFiles.findIndex(f => f.path === selectedFile.path)
+      : -1
+
+    if (e.key === 'ArrowDown') {
+      e.preventDefault()
+      const nextIndex = currentIndex < stagedFiles.length - 1 ? currentIndex + 1 : 0
+      setSelectedFile(stagedFiles[nextIndex])
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault()
+      const prevIndex = currentIndex > 0 ? currentIndex - 1 : stagedFiles.length - 1
+      setSelectedFile(stagedFiles[prevIndex])
+    } else if ((e.key === ' ' || e.key === 'Enter') && selectedFile?.staged) {
+      // Space or Enter to unstage
+      e.preventDefault()
+      handleUnstageFile(selectedFile)
+    }
+  }, [stagedFiles, selectedFile, handleUnstageFile])
 
   // Stage all files
+  // Stage all files (silently, no toast on success)
   const handleStageAll = async () => {
     const result = await window.conveyor.staging.stageAll()
     if (result.success) {
-      onStatusChange({ type: 'success', message: result.message })
+      setSelectedFile(null)
       await onRefresh()
     } else {
       onStatusChange({ type: 'error', message: result.message })
     }
   }
 
-  // Unstage all files
+  // Unstage all files (silently, no toast on success)
   const handleUnstageAll = async () => {
     const result = await window.conveyor.staging.unstageAll()
     if (result.success) {
-      onStatusChange({ type: 'success', message: result.message })
+      setSelectedFile(null)
       await onRefresh()
     } else {
       onStatusChange({ type: 'error', message: result.message })
@@ -430,6 +629,87 @@ export function StagingPanel({ workingStatus, currentBranch, onRefresh, onStatus
     } else {
       onStatusChange({ type: 'error', message: result.message })
     }
+  }
+
+  // Helper to calculate next file after removing one from unstaged list
+  const getNextFileAfterRemoval = (file: UncommittedFile): UncommittedFile | null => {
+    const currentIndex = unstagedFiles.findIndex(f => f.path === file.path)
+    if (unstagedFiles.length <= 1) return null
+    
+    if (currentIndex < unstagedFiles.length - 1) {
+      // Next file down
+      return unstagedFiles[currentIndex + 1]
+    } else if (currentIndex > 0) {
+      // Previous file up
+      return unstagedFiles[currentIndex - 1]
+    }
+    // First file (fallback)
+    return unstagedFiles[0] === file ? unstagedFiles[1] : unstagedFiles[0]
+  }
+
+  // Discard changes in a file with inline confirmation - with optimistic update
+  const handleDiscardFileInline = async (file: UncommittedFile) => {
+    // Show confirmation first
+    if (discardFileConfirm !== file.path) {
+      setDiscardFileConfirm(file.path)
+      // Auto-clear confirmation after 3 seconds
+      setTimeout(() => setDiscardFileConfirm(null), 3000)
+      return
+    }
+
+    // Calculate next file before discarding
+    const nextFile = getNextFileAfterRemoval(file)
+
+    // Optimistic update: immediately hide file and move selection
+    setDiscardFileConfirm(null)
+    setPendingDiscard(prev => new Set(prev).add(file.path))
+    setSelectedFile(nextFile)
+
+    const result = await window.conveyor.staging.discardFileChanges(file.path)
+    
+    if (result.success) {
+      await onRefresh()
+    } else {
+      onStatusChange({ type: 'error', message: result.message })
+    }
+    
+    // Clear pending state AFTER refresh so file doesn't flicker back
+    setPendingDiscard(prev => {
+      const next = new Set(prev)
+      next.delete(file.path)
+      return next
+    })
+  }
+
+  // Discard all unstaged changes with inline confirmation
+  const handleDiscardAll = async () => {
+    // Show confirmation first
+    if (!discardAllConfirm) {
+      setDiscardAllConfirm(true)
+      // Auto-clear confirmation after 3 seconds
+      setTimeout(() => setDiscardAllConfirm(false), 3000)
+      return
+    }
+
+    // User confirmed - proceed with discard all
+    setDiscardAllConfirm(false)
+    
+    // Discard all unstaged files
+    let hasError = false
+    for (const file of unstagedFiles) {
+      const result = await window.conveyor.staging.discardFileChanges(file.path)
+      if (!result.success) {
+        hasError = true
+        onStatusChange({ type: 'error', message: result.message })
+        break
+      }
+    }
+    
+    if (!hasError) {
+      onStatusChange({ type: 'success', message: `Discarded ${unstagedFiles.length} file(s)` })
+      setSelectedFile(null)
+    }
+    await onRefresh()
   }
 
   // Start editing a file
@@ -793,7 +1073,12 @@ export function StagingPanel({ workingStatus, currentBranch, onRefresh, onStatus
             )}
           </div>
           {stagedFiles.length > 0 ? (
-            <ul className="staging-file-list">
+            <ul 
+              ref={stagedListRef}
+              className="staging-file-list"
+              tabIndex={0}
+              onKeyDown={handleStagedKeyDown}
+            >
               {stagedFiles.map((file) => (
                 <li
                   key={file.path}
@@ -812,7 +1097,7 @@ export function StagingPanel({ workingStatus, currentBranch, onRefresh, onStatus
                     }}
                     title="Unstage file"
                   >
-                    −
+                    ✓
                   </button>
                 </li>
               ))}
@@ -828,13 +1113,27 @@ export function StagingPanel({ workingStatus, currentBranch, onRefresh, onStatus
             <span className="staging-section-title">Unstaged</span>
             <span className="staging-section-count">{unstagedFiles.length}</span>
             {unstagedFiles.length > 0 && (
-              <button className="staging-action-btn" onClick={handleStageAll} title="Stage all">
-                Stage All ↑
-              </button>
+              <div className="staging-section-actions">
+                <button 
+                  className={`staging-action-btn discard-all ${discardAllConfirm ? 'confirm' : ''}`} 
+                  onClick={handleDiscardAll} 
+                  title={discardAllConfirm ? 'Click again to confirm' : 'Discard all'}
+                >
+                  {discardAllConfirm ? 'Confirm?' : '✕ Discard All'}
+                </button>
+                <button className="staging-action-btn" onClick={handleStageAll} title="Stage all">
+                  Stage All ↑
+                </button>
+              </div>
             )}
           </div>
           {unstagedFiles.length > 0 ? (
-            <ul className="staging-file-list">
+            <ul 
+              ref={unstagedListRef}
+              className="staging-file-list"
+              tabIndex={0}
+              onKeyDown={handleUnstagedKeyDown}
+            >
               {unstagedFiles.map((file) => (
                 <li
                   key={file.path}
@@ -846,16 +1145,28 @@ export function StagingPanel({ workingStatus, currentBranch, onRefresh, onStatus
                   <span className="file-path" title={file.path}>
                     {file.path}
                   </span>
-                  <button
-                    className="file-action-btn stage"
-                    onClick={(e) => {
-                      e.stopPropagation()
-                      handleStageFile(file)
-                    }}
-                    title="Stage file"
-                  >
-                    ✓
-                  </button>
+                  <div className="file-action-btns">
+                    <button
+                      className={`file-action-btn discard ${discardFileConfirm === file.path ? 'confirm' : ''}`}
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        handleDiscardFileInline(file)
+                      }}
+                      title={discardFileConfirm === file.path ? 'Click again to confirm' : 'Discard changes'}
+                    >
+                      {discardFileConfirm === file.path ? '?' : '✕'}
+                    </button>
+                    <button
+                      className="file-action-btn stage"
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        handleStageFile(file)
+                      }}
+                      title="Stage file"
+                    >
+                      ✓
+                    </button>
+                  </div>
                 </li>
               ))}
             </ul>

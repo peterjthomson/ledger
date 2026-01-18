@@ -73,3 +73,21 @@ export interface PullResult {
   behind?: number
   ahead?: number
 }
+
+/**
+ * Result of pull current branch operations (with auto-stash)
+ */
+export interface PullCurrentBranchResult {
+  success: boolean
+  message: string
+  hadConflicts?: boolean
+  autoStashed?: boolean
+}
+
+/**
+ * Result of rename branch operations
+ */
+export interface RenameBranchResult {
+  success: boolean
+  message: string
+}

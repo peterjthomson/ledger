@@ -3,7 +3,7 @@ import { z } from 'zod'
 // Common result schema used by many handlers
 export const SuccessResultSchema = z.object({
   success: z.boolean(),
-  message: z.string(),
+  message: z.string().optional(),
 })
 
 export const CheckoutResultSchema = z.object({
@@ -317,6 +317,7 @@ export const CommitResultSchema = z.object({
   success: z.boolean(),
   message: z.string(),
   behindCount: z.number().optional(),
+  hash: z.string().optional(),
 })
 
 export const PullResultSchema = z.object({
@@ -390,3 +391,5 @@ export type CustomTheme = z.infer<typeof CustomThemeSchema>
 export type ThemeData = z.infer<typeof ThemeDataSchema>
 export type MergeMethod = z.infer<typeof MergeMethodSchema>
 export type ResetMode = z.infer<typeof ResetModeSchema>
+export type CreatePROptions = z.infer<typeof CreatePROptionsSchema>
+export type CreatePRResult = z.infer<typeof CreatePRResultSchema>

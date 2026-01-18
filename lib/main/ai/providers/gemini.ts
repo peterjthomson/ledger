@@ -37,6 +37,14 @@ export class GeminiProvider implements AIProviderInterface {
   }
 
   /**
+   * Reset the provider, clearing credentials and client state
+   */
+  reset(): void {
+    this.client = null
+    this.apiKey = null
+  }
+
+  /**
    * Get a generative model instance
    */
   private getGenerativeModel(modelId: string, options: CompletionOptions): GenerativeModel {
@@ -59,7 +67,7 @@ export class GeminiProvider implements AIProviderInterface {
   /**
    * Convert our message format to Gemini's format
    */
-  private convertMessages(messages: AIMessage[], options: CompletionOptions): Content[] {
+  private convertMessages(messages: AIMessage[], _options: CompletionOptions): Content[] {
     const contents: Content[] = []
 
     for (const msg of messages) {

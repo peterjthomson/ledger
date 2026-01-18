@@ -44,7 +44,10 @@ export {
   anthropicProvider,
   openaiProvider,
   geminiProvider,
+  openrouterProvider,
   AnthropicProvider,
   OpenAIProvider,
   GeminiProvider,
+  OpenRouterProvider,
+  OPENROUTER_DEFAULTS,
 } from './providers'

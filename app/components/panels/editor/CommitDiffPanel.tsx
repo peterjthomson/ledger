@@ -5,7 +5,7 @@
  * with syntax highlighting for additions/deletions.
  */
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import type { CommitDiff, GraphCommit, Branch } from '../../../types/electron'
 
 export interface CommitDiffPanelProps {
@@ -13,11 +13,15 @@ export interface CommitDiffPanelProps {
   selectedCommit?: GraphCommit | null
   formatRelativeTime: (date: string) => string
   onBranchClick?: (branchName: string) => void
+  onCheckoutCommit?: (commitHash: string, branchName?: string) => void
   branches?: Branch[]
+  switching?: boolean
 }
 
-export function CommitDiffPanel({ diff, selectedCommit, formatRelativeTime, onBranchClick, branches }: CommitDiffPanelProps) {
+export function CommitDiffPanel({ diff, selectedCommit, formatRelativeTime, onBranchClick, onCheckoutCommit, branches, switching }: CommitDiffPanelProps) {
   const [expandedFiles, setExpandedFiles] = useState<Set<string>>(new Set())
+  const [fileContextMenu, setFileContextMenu] = useState<{ x: number; y: number } | null>(null)
+  const fileMenuRef = useRef<HTMLDivElement>(null)
 
   const toggleFile = (path: string) => {
     setExpandedFiles((prev) => {
@@ -31,10 +35,50 @@ export function CommitDiffPanel({ diff, selectedCommit, formatRelativeTime, onBr
     })
   }
 
+  const expandAll = () => {
+    setExpandedFiles(new Set(diff.files.map((f) => f.file.path)))
+    setFileContextMenu(null)
+  }
+
+  const collapseAll = () => {
+    setExpandedFiles(new Set())
+    setFileContextMenu(null)
+  }
+
+  const handleFileContextMenu = (e: React.MouseEvent) => {
+    e.preventDefault()
+    setFileContextMenu({ x: e.clientX, y: e.clientY })
+  }
+
   // Expand all files by default on mount or diff change
   useEffect(() => {
     setExpandedFiles(new Set(diff.files.map((f) => f.file.path)))
   }, [diff])
+
+  // Close file context menu when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (fileMenuRef.current && !fileMenuRef.current.contains(e.target as Node)) {
+        setFileContextMenu(null)
+      }
+    }
+
+    const handleEscape = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        setFileContextMenu(null)
+      }
+    }
+
+    if (fileContextMenu) {
+      document.addEventListener('mousedown', handleClickOutside)
+      document.addEventListener('keydown', handleEscape)
+    }
+
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside)
+      document.removeEventListener('keydown', handleEscape)
+    }
+  }, [fileContextMenu])
 
   // Extract branch refs from selectedCommit (filter out tags and standalone HEAD)
   // Handle formats like: "HEAD -> feature/branch", "origin/main", "tag: v1.0"
@@ -112,11 +156,24 @@ export function CommitDiffPanel({ diff, selectedCommit, formatRelativeTime, onBr
         </div>
       </div>
 
+      {/* Actions */}
+      {onCheckoutCommit && (
+        <div className="detail-actions">
+          <button
+            className="btn btn-primary"
+            onClick={() => onCheckoutCommit(diff.hash, primaryBranch || undefined)}
+            disabled={switching}
+          >
+            {switching ? 'Checking out...' : primaryBranch ? `Checkout ${primaryBranch}` : 'Checkout Commit'}
+          </button>
+        </div>
+      )}
+
       {/* File list with diffs */}
       <div className="diff-files">
         {diff.files.map((fileDiff) => (
           <div key={fileDiff.file.path} className="diff-file">
-            <div className="diff-file-header" onClick={() => toggleFile(fileDiff.file.path)}>
+            <div className="diff-file-header" onClick={() => toggleFile(fileDiff.file.path)} onContextMenu={handleFileContextMenu}>
               <span className={`diff-file-chevron ${expandedFiles.has(fileDiff.file.path) ? 'open' : ''}`}>▸</span>
               <span className={`diff-file-status diff-status-${fileDiff.file.status}`}>
                 {fileDiff.file.status === 'added'
@@ -169,6 +226,18 @@ export function CommitDiffPanel({ diff, selectedCommit, formatRelativeTime, onBr
           </div>
         ))}
       </div>
+
+      {/* File Context Menu */}
+      {fileContextMenu && (
+        <div ref={fileMenuRef} className="context-menu" style={{ left: fileContextMenu.x, top: fileContextMenu.y }}>
+          <button className="context-menu-item" onClick={expandAll}>
+            Expand All
+          </button>
+          <button className="context-menu-item" onClick={collapseAll}>
+            Collapse All
+          </button>
+        </div>
+      )}
     </div>
   )
 }

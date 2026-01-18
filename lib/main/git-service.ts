@@ -3,6 +3,7 @@ import { exec } from 'child_process'
 import { promisify } from 'util'
 import * as fs from 'fs'
 import * as path from 'path'
+import { getCursorAgentTaskHint, getClaudeCodeAgentTaskHint } from '@/lib/utils/agent-hints'
 
 const execAsync = promisify(exec)
 const statAsync = promisify(fs.stat)
@@ -549,144 +550,7 @@ function calculateActivityStatus(
   return { status, source }
 }
 
-// Get agent task hint from Cursor transcript files
-async function getCursorAgentTaskHint(worktreePath: string): Promise<string | null> {
-  try {
-    const homeDir = process.env.HOME || ''
-    const projectsDir = path.join(homeDir, '.cursor', 'projects')
-
-    // Check if the projects directory exists
-    if (!fs.existsSync(projectsDir)) return null
-
-    // Get all project folders
-    const projectFolders = fs.readdirSync(projectsDir)
-
-    // Look for agent-transcripts in each project folder
-    for (const folder of projectFolders) {
-      const transcriptsDir = path.join(projectsDir, folder, 'agent-transcripts')
-      if (!fs.existsSync(transcriptsDir)) continue
-
-      // Get transcript files sorted by modification time (newest first)
-      const files = fs.readdirSync(transcriptsDir)
-        .filter(f => f.endsWith('.json'))
-        .map(f => ({
-          name: f,
-          path: path.join(transcriptsDir, f),
-          mtime: fs.statSync(path.join(transcriptsDir, f)).mtime.getTime()
-        }))
-        .sort((a, b) => b.mtime - a.mtime)
-
-      // Check the most recent transcripts for references to this worktree
-      for (const file of files.slice(0, 5)) { // Only check 5 most recent
-        try {
-          const content = fs.readFileSync(file.path, 'utf-8')
-
-          // Quick check if this transcript mentions the worktree path
-          if (!content.includes(worktreePath)) continue
-
-          // Parse and extract the first user query
-          const transcript = JSON.parse(content)
-          if (!Array.isArray(transcript)) continue
-
-          for (const message of transcript) {
-            if (message.role === 'user' && message.text) {
-              // Extract content from <user_query> tags if present
-              const match = message.text.match(/<user_query>([\s\S]*?)<\/user_query>/)
-              if (match) {
-                // Get first line and truncate
-                const firstLine = match[1].trim().split('\n')[0]
-                return firstLine.slice(0, 60) + (firstLine.length > 60 ? '…' : '')
-              }
-              // Fallback: just use first line of text
-              const firstLine = message.text.trim().split('\n')[0]
-              return firstLine.slice(0, 60) + (firstLine.length > 60 ? '…' : '')
-            }
-          }
-        } catch {
-          // Skip malformed transcript files
-          continue
-        }
-      }
-    }
-
-    return null
-  } catch {
-    return null
-  }
-}
-
-// Get agent task hint from Claude Code session files
-// Claude Code stores sessions in ~/.claude/projects/{encoded-path}/*.jsonl
-async function getClaudeCodeAgentTaskHint(worktreePath: string): Promise<string | null> {
-  try {
-    const homeDir = process.env.HOME || ''
-    const projectsDir = path.join(homeDir, '.claude', 'projects')
-
-    // Check if the projects directory exists
-    if (!fs.existsSync(projectsDir)) return null
-
-    // Claude Code encodes paths by replacing / with - (e.g., /Users/foo/bar -> -Users-foo-bar)
-    const encodedPath = worktreePath.replace(/\//g, '-')
-    const projectFolder = path.join(projectsDir, encodedPath)
-
-    // Check if this worktree has a Claude Code project folder
-    if (!fs.existsSync(projectFolder)) return null
-
-    // Get session files sorted by modification time (newest first)
-    // Session files are UUIDs.jsonl, skip agent-*.jsonl files
-    const files = fs.readdirSync(projectFolder)
-      .filter(f => f.endsWith('.jsonl') && !f.startsWith('agent-'))
-      .map(f => ({
-        name: f,
-        path: path.join(projectFolder, f),
-        mtime: fs.statSync(path.join(projectFolder, f)).mtime.getTime()
-      }))
-      .sort((a, b) => b.mtime - a.mtime)
-
-    // Check the most recent session file
-    for (const file of files.slice(0, 3)) { // Only check 3 most recent sessions
-      try {
-        const content = fs.readFileSync(file.path, 'utf-8')
-        const lines = content.split('\n').filter(Boolean)
-
-        // Find the first user message in the session
-        for (const line of lines) {
-          try {
-            const entry = JSON.parse(line)
-            
-            // Look for user messages
-            if (entry.type === 'user' && entry.message?.content) {
-              let userContent = entry.message.content
-              
-              // Strip system instruction tags if present
-              userContent = userContent.replace(/<system[_-]?instruction>[\s\S]*?<\/system[_-]?instruction>/gi, '')
-              
-              // Get the actual user query, trimming whitespace
-              const trimmed = userContent.trim()
-              if (!trimmed) continue
-              
-              // Get first meaningful line
-              const firstLine = trimmed.split('\n')[0].trim()
-              if (!firstLine) continue
-              
-              return firstLine.slice(0, 60) + (firstLine.length > 60 ? '…' : '')
-            }
-          } catch {
-            // Skip malformed lines
-            continue
-          }
-        }
-      } catch {
-        // Skip unreadable files
-        continue
-      }
-    }
-
-    return null
-  } catch {
-    return null
-  }
-}
+// Agent hint functions imported from @/lib/utils/agent-hints
 
 // Get enhanced worktrees with agent detection and metadata
 export async function getEnhancedWorktrees(): Promise<EnhancedWorktree[]> {
@@ -821,6 +685,82 @@ export async function checkoutBranch(
     return {
       success: true,
       message: `Switched to branch '${branchName}'`,
+    }
+  } catch (error) {
+    return {
+      success: false,
+      message: (error as Error).message,
+    }
+  }
+}
+
+// Checkout a specific commit (creates detached HEAD state unless on a branch tip)
+export async function checkoutCommit(
+  commitHash: string,
+  branchName?: string
+): Promise<{ success: boolean; message: string; stashed?: string }> {
+  if (!git) throw new Error('No repository selected')
+
+  try {
+    // Stash any uncommitted changes first
+    const stashResult = await stashChanges()
+
+    // If a branch name is provided and the commit is the tip of that branch, checkout the branch instead
+    if (branchName) {
+      const branches = await git.branchLocal()
+      if (branches.all.includes(branchName)) {
+        // Check if the branch tip matches the commit
+        const branchCommit = await git.revparse([branchName])
+        if (branchCommit.trim() === commitHash || branchCommit.trim().startsWith(commitHash)) {
+          // Checkout the branch (avoids detached HEAD)
+          await git.checkout(['--ignore-other-worktrees', branchName])
+          
+          if (stashResult.stashed) {
+            try {
+              await git.raw(['stash', 'pop'])
+              return {
+                success: true,
+                message: `Switched to branch '${branchName}' with uncommitted changes`,
+              }
+            } catch (_popError) {
+              return {
+                success: true,
+                message: `Switched to '${branchName}'. Uncommitted changes moved to stash (conflicts detected).`,
+                stashed: stashResult.message,
+              }
+            }
+          }
+          
+          return {
+            success: true,
+            message: `Switched to branch '${branchName}'`,
+          }
+        }
+      }
+    }
+
+    // Checkout the commit directly (detached HEAD)
+    await git.checkout(commitHash)
+
+    if (stashResult.stashed) {
+      try {
+        await git.raw(['stash', 'pop'])
+        return {
+          success: true,
+          message: `Checked out commit ${commitHash.slice(0, 7)} (detached HEAD) with uncommitted changes`,
+        }
+      } catch (_popError) {
+        return {
+          success: true,
+          message: `Checked out commit ${commitHash.slice(0, 7)} (detached HEAD). Uncommitted changes moved to stash.`,
+          stashed: stashResult.message,
+        }
+      }
+    }
+
+    return {
+      success: true,
+      message: `Checked out commit ${commitHash.slice(0, 7)} (detached HEAD)`,
     }
   } catch (error) {
     return {
@@ -2358,7 +2298,8 @@ export async function removeWorktree(
 
 // Create a new worktree
 export interface CreateWorktreeOptions {
-  branchName: string
+  branchName?: string // Optional if using commitHash for detached HEAD
+  commitHash?: string // For creating worktree at specific commit (detached HEAD)
   isNewBranch: boolean
   folderPath: string
 }
@@ -2368,12 +2309,12 @@ export async function createWorktree(
 ): Promise<{ success: boolean; message: string; path?: string }> {
   if (!git) throw new Error('No repository selected')
 
-  const { branchName, isNewBranch, folderPath } = options
+  const { branchName, commitHash, isNewBranch, folderPath } = options
 
   try {
-    // Validate branch name
-    if (!branchName || !branchName.trim()) {
-      return { success: false, message: 'Branch name is required' }
+    // Validate - need either branchName or commitHash
+    if (!branchName && !commitHash) {
+      return { success: false, message: 'Branch name or commit hash is required' }
     }
 
     // Validate folder path
@@ -2386,9 +2327,27 @@ export async function createWorktree(
       return { success: false, message: `Folder already exists: ${folderPath}` }
     }
 
+    // Ensure parent directory exists
+    const parentDir = path.dirname(folderPath)
+    if (!fs.existsSync(parentDir)) {
+      await fs.promises.mkdir(parentDir, { recursive: true })
+    }
+
+    // Handle detached HEAD at specific commit
+    if (commitHash && !branchName) {
+      // Create worktree at specific commit (detached HEAD): git worktree add --detach <path> <commit>
+      await git.raw(['worktree', 'add', '--detach', folderPath, commitHash])
+      return {
+        success: true,
+        message: `Created worktree at ${path.basename(folderPath)} at commit ${commitHash.substring(0, 7)}`,
+        path: folderPath,
+      }
+    }
+
     // Check if branch already exists (for new branches)
     const branches = await git.branchLocal()
-    const branchExists = branches.all.includes(branchName)
+    const branchExists = branches.all.includes(branchName!)
+    let remoteBranchName: string | null = null
 
     if (isNewBranch && branchExists) {
       return { success: false, message: `Branch '${branchName}' already exists` }
@@ -2397,25 +2356,23 @@ export async function createWorktree(
     if (!isNewBranch && !branchExists) {
       // Check if it's a remote branch we can track
       const remoteBranches = await git.branch(['-r'])
-      const remoteBranchName = `origin/${branchName}`
-      if (!remoteBranches.all.includes(remoteBranchName)) {
+      const candidate = `origin/${branchName}`
+      if (!remoteBranches.all.includes(candidate)) {
         return { success: false, message: `Branch '${branchName}' does not exist` }
       }
-    }
-
-    // Ensure parent directory exists
-    const parentDir = path.dirname(folderPath)
-    if (!fs.existsSync(parentDir)) {
-      await fs.promises.mkdir(parentDir, { recursive: true })
+      remoteBranchName = candidate
     }
 
     // Create the worktree
     if (isNewBranch) {
       // Create worktree with new branch: git worktree add -b <branch> <path>
-      await git.raw(['worktree', 'add', '-b', branchName, folderPath])
+      await git.raw(['worktree', 'add', '-b', branchName!, folderPath])
+    } else if (branchExists) {
+      // Create worktree with existing local branch: git worktree add <path> <branch>
+      await git.raw(['worktree', 'add', folderPath, branchName!])
     } else {
-      // Create worktree with existing branch: git worktree add <path> <branch>
-      await git.raw(['worktree', 'add', folderPath, branchName])
+      // Create local tracking branch from remote
+      await git.raw(['worktree', 'add', '-b', branchName!, folderPath, remoteBranchName!])
     }
 
     return {
@@ -2554,788 +2511,6 @@ export async function getCommitGraphHistory(
     return commits
   } catch {
     return []
-  }
-}
-
-// Contributor statistics for ridgeline chart
-export interface ContributorTimeSeries {
-  author: string
-  email: string
-  totalCommits: number
-  // Array of commit counts per time bucket
-  timeSeries: { date: string; count: number }[]
-}
-
-export interface ContributorStats {
-  contributors: ContributorTimeSeries[]
-  startDate: string
-  endDate: string
-  bucketSize: 'day' | 'week' | 'month'
-}
-
-// ========================================
-// Mailmap Management - Opinionated Git
-// ========================================
-
-export interface AuthorIdentity {
-  name: string
-  email: string
-  commitCount: number
-}
-
-export interface MailmapSuggestion {
-  canonicalName: string
-  canonicalEmail: string
-  aliases: AuthorIdentity[]
-  confidence: 'high' | 'medium' | 'low'
-}
-
-export interface MailmapEntry {
-  canonicalName: string
-  canonicalEmail: string
-  aliasName?: string
-  aliasEmail: string
-}
-
-// Read current .mailmap file
-export async function getMailmap(): Promise<MailmapEntry[]> {
-  if (!repoPath) return []
-  
-  const mailmapPath = path.join(repoPath, '.mailmap')
-  try {
-    const content = await fs.promises.readFile(mailmapPath, 'utf-8')
-    const entries: MailmapEntry[] = []
-    
-    for (const line of content.split('\n')) {
-      const trimmed = line.trim()
-      if (!trimmed || trimmed.startsWith('#')) continue
-      
-      // Parse .mailmap format:
-      // Canonical Name <canonical@email> Alias Name <alias@email>
-      // Canonical Name <canonical@email> <alias@email>
-      const match = trimmed.match(/^(.+?)\s*<([^>]+)>\s+(?:(.+?)\s+)?<([^>]+)>$/)
-      if (match) {
-        entries.push({
-          canonicalName: match[1].trim(),
-          canonicalEmail: match[2].trim(),
-          aliasName: match[3]?.trim(),
-          aliasEmail: match[4].trim(),
-        })
-      }
-    }
-    
-    return entries
-  } catch {
-    return [] // No .mailmap file
-  }
-}
-
-// Get all unique author identities from the repo
-export async function getAuthorIdentities(): Promise<AuthorIdentity[]> {
-  if (!git) throw new Error('No repository selected')
-  
-  try {
-    // Get raw identities (without mailmap) to see what needs mapping
-    const output = await git.raw([
-      'shortlog', '-sne', '--all'
-    ])
-    
-    const identities: AuthorIdentity[] = []
-    for (const line of output.trim().split('\n')) {
-      const match = line.match(/^\s*(\d+)\s+(.+?)\s+<([^>]+)>$/)
-      if (match) {
-        identities.push({
-          name: match[2].trim(),
-          email: match[3].trim(),
-          commitCount: parseInt(match[1], 10),
-        })
-      }
-    }
-    
-    return identities.sort((a, b) => b.commitCount - a.commitCount)
-  } catch {
-    return []
-  }
-}
-
-// Suggest mailmap entries by detecting potential duplicates
-export async function suggestMailmapEntries(): Promise<MailmapSuggestion[]> {
-  const identities = await getAuthorIdentities()
-  const suggestions: MailmapSuggestion[] = []
-  const used = new Set<string>()
-  
-  // Helper to normalize for comparison
-  const normalize = (s: string) => s.toLowerCase().replace(/[._-]/g, '').replace(/\s+/g, '')
-  
-  for (let i = 0; i < identities.length; i++) {
-    const primary = identities[i]
-    if (used.has(primary.email)) continue
-    
-    const aliases: AuthorIdentity[] = []
-    let confidence: 'high' | 'medium' | 'low' = 'low'
-    
-    for (let j = i + 1; j < identities.length; j++) {
-      const candidate = identities[j]
-      if (used.has(candidate.email)) continue
-      
-      const nameMatch = normalize(primary.name) === normalize(candidate.name)
-      const emailPrefixMatch = normalize(primary.email.split('@')[0]) === normalize(candidate.email.split('@')[0])
-      const partialNameMatch = normalize(primary.name).includes(normalize(candidate.name)) ||
-                               normalize(candidate.name).includes(normalize(primary.name))
-      
-      // Exact name match = high confidence
-      if (nameMatch) {
-        aliases.push(candidate)
-        used.add(candidate.email)
-        confidence = 'high'
-      }
-      // Email prefix matches = high confidence  
-      else if (emailPrefixMatch && primary.email.split('@')[0].length >= 3) {
-        aliases.push(candidate)
-        used.add(candidate.email)
-        confidence = confidence === 'low' ? 'medium' : confidence
-      }
-      // Partial name overlap = medium confidence
-      else if (partialNameMatch && normalize(candidate.name).length >= 3) {
-        aliases.push(candidate)
-        used.add(candidate.email)
-        confidence = confidence === 'low' ? 'medium' : confidence
-      }
-    }
-    
-    if (aliases.length > 0) {
-      suggestions.push({
-        canonicalName: primary.name,
-        canonicalEmail: primary.email,
-        aliases,
-        confidence,
-      })
-    }
-    
-    used.add(primary.email)
-  }
-  
-  return suggestions.sort((a, b) => {
-    // Sort by confidence, then by total commits
-    const confOrder = { high: 0, medium: 1, low: 2 }
-    if (confOrder[a.confidence] !== confOrder[b.confidence]) {
-      return confOrder[a.confidence] - confOrder[b.confidence]
-    }
-    const aTotal = a.aliases.reduce((sum, x) => sum + x.commitCount, 0)
-    const bTotal = b.aliases.reduce((sum, x) => sum + x.commitCount, 0)
-    return bTotal - aTotal
-  })
-}
-
-// Add entries to .mailmap file
-export async function addMailmapEntries(entries: MailmapEntry[]): Promise<{ success: boolean; message: string }> {
-  if (!repoPath) return { success: false, message: 'No repository selected' }
-  
-  const mailmapPath = path.join(repoPath, '.mailmap')
-  
-  try {
-    // Read existing content
-    let content = ''
-    try {
-      content = await fs.promises.readFile(mailmapPath, 'utf-8')
-      if (!content.endsWith('\n')) content += '\n'
-    } catch {
-      // File doesn't exist, start fresh with header
-      content = '# .mailmap - Author identity mapping\n# Format: Canonical Name <canonical@email> Alias Name <alias@email>\n\n'
-    }
-    
-    // Add new entries
-    for (const entry of entries) {
-      const line = entry.aliasName
-        ? `${entry.canonicalName} <${entry.canonicalEmail}> ${entry.aliasName} <${entry.aliasEmail}>`
-        : `${entry.canonicalName} <${entry.canonicalEmail}> <${entry.aliasEmail}>`
-      content += line + '\n'
-    }
-    
-    await fs.promises.writeFile(mailmapPath, content, 'utf-8')
-    return { success: true, message: `Added ${entries.length} entries to .mailmap` }
-  } catch (error) {
-    return { success: false, message: `Failed to update .mailmap: ${error}` }
-  }
-}
-
-// Remove a specific entry from .mailmap
-export async function removeMailmapEntry(entry: MailmapEntry): Promise<{ success: boolean; message: string }> {
-  if (!repoPath) return { success: false, message: 'No repository selected' }
-  
-  const mailmapPath = path.join(repoPath, '.mailmap')
-  
-  try {
-    const content = await fs.promises.readFile(mailmapPath, 'utf-8')
-    const lines = content.split('\n')
-    
-    // Build the line pattern to remove
-    const targetLine = entry.aliasName
-      ? `${entry.canonicalName} <${entry.canonicalEmail}> ${entry.aliasName} <${entry.aliasEmail}>`
-      : `${entry.canonicalName} <${entry.canonicalEmail}> <${entry.aliasEmail}>`
-    
-    // Filter out the matching line (case-sensitive match)
-    const newLines = lines.filter(line => line.trim() !== targetLine.trim())
-    
-    if (newLines.length === lines.length) {
-      return { success: false, message: 'Entry not found in .mailmap' }
-    }
-    
-    await fs.promises.writeFile(mailmapPath, newLines.join('\n'), 'utf-8')
-    return { success: true, message: 'Removed entry from .mailmap' }
-  } catch (error) {
-    return { success: false, message: `Failed to update .mailmap: ${error}` }
-  }
-}
-
-// Normalize and cluster author identities
-// Groups commits by the same person using email domain, name similarity, and common patterns
-function clusterAuthors(
-  commits: { author: string; email: string; date: Date }[]
-): Map<string, { canonicalName: string; canonicalEmail: string; dates: Date[] }> {
-  // First pass: group by normalized email (ignoring + suffixes and case)
-  const emailGroups = new Map<string, { names: Map<string, number>; emails: Set<string>; dates: Date[] }>()
-  
-  for (const { author, email, date } of commits) {
-    // Normalize email: lowercase, remove + suffix (user+tag@domain -> user@domain)
-    const normalizedEmail = email.toLowerCase().replace(/\+[^@]*@/, '@')
-    
-    // Extract email prefix for matching (before @)
-    const emailPrefix = normalizedEmail.split('@')[0].replace(/[._-]/g, '').toLowerCase()
-    
-    // Try to find existing group by email or email prefix
-    let groupKey: string | null = null
-    
-    // Check exact email match first
-    if (emailGroups.has(normalizedEmail)) {
-      groupKey = normalizedEmail
-    } else {
-      // Check if email prefix matches an existing group's prefix
-      for (const [key, _group] of emailGroups) {
-        const existingPrefix = key.split('@')[0].replace(/[._-]/g, '').toLowerCase()
-        if (emailPrefix === existingPrefix && emailPrefix.length >= 3) {
-          groupKey = key
-          break
-        }
-      }
-    }
-    
-    if (!groupKey) {
-      groupKey = normalizedEmail
-      emailGroups.set(groupKey, { names: new Map(), emails: new Set(), dates: [] })
-    }
-    
-    const group = emailGroups.get(groupKey)!
-    group.emails.add(email)
-    group.dates.push(date)
-    group.names.set(author, (group.names.get(author) || 0) + 1)
-  }
-  
-  // Second pass: merge groups with similar names (handles different emails, same person)
-  const mergedGroups = new Map<string, typeof emailGroups extends Map<string, infer V> ? V : never>()
-  
-  const normalizeNameForComparison = (name: string): string => {
-    return name
-      .toLowerCase()
-      .replace(/[._-]/g, ' ')  // jp-guiang -> jp guiang
-      .replace(/\s+/g, ' ')    // normalize spaces
-      .trim()
-  }
-  
-  for (const [key, group] of emailGroups) {
-    // Get most common name from this group
-    let mostCommonName = ''
-    let maxCount = 0
-    for (const [name, count] of group.names) {
-      if (count > maxCount) {
-        maxCount = count
-        mostCommonName = name
-      }
-    }
-    
-    const normalizedName = normalizeNameForComparison(mostCommonName)
-    
-    // Check if this name matches an existing merged group
-    let merged = false
-    for (const [_mergedKey, mergedGroup] of mergedGroups) {
-      let mergedMostCommonName = ''
-      let mergedMaxCount = 0
-      for (const [name, count] of mergedGroup.names) {
-        if (count > mergedMaxCount) {
-          mergedMaxCount = count
-          mergedMostCommonName = name
-        }
-      }
-      
-      const mergedNormalizedName = normalizeNameForComparison(mergedMostCommonName)
-      
-      // Check name similarity
-      if (normalizedName === mergedNormalizedName || 
-          normalizedName.includes(mergedNormalizedName) ||
-          mergedNormalizedName.includes(normalizedName)) {
-        // Merge into existing group
-        for (const [name, count] of group.names) {
-          mergedGroup.names.set(name, (mergedGroup.names.get(name) || 0) + count)
-        }
-        for (const email of group.emails) {
-          mergedGroup.emails.add(email)
-        }
-        mergedGroup.dates.push(...group.dates)
-        merged = true
-        break
-      }
-    }
-    
-    if (!merged) {
-      mergedGroups.set(key, group)
-    }
-  }
-  
-  // Final pass: create canonical result
-  const result = new Map<string, { canonicalName: string; canonicalEmail: string; dates: Date[] }>()
-  
-  for (const [key, group] of mergedGroups) {
-    // Pick canonical name: prefer title case, most common
-    let canonicalName = ''
-    let maxCount = 0
-    for (const [name, count] of group.names) {
-      // Prefer proper cased names over all-lowercase
-      const isProperCase = name !== name.toLowerCase()
-      const effectiveCount = isProperCase ? count * 1.5 : count
-      if (effectiveCount > maxCount) {
-        maxCount = effectiveCount
-        canonicalName = name
-      }
-    }
-    
-    // Pick canonical email: prefer non-noreply, most common domain
-    const emails = Array.from(group.emails)
-    const canonicalEmail = emails.find(e => !e.includes('noreply')) || emails[0]
-    
-    result.set(key, {
-      canonicalName,
-      canonicalEmail,
-      dates: group.dates,
-    })
-  }
-  
-  return result
-}
-
-// Get commit statistics by contributor over time for ridgeline chart
-export async function getContributorStats(
-  topN: number = 10,
-  bucketSize: 'day' | 'week' | 'month' = 'week'
-): Promise<ContributorStats> {
-  if (!git) throw new Error('No repository selected')
-
-  try {
-    // Get all commits with author and date info
-    // Use --use-mailmap to respect .mailmap file for identity normalization
-    const format = '%aN|%aE|%ci'  // %aN/%aE = mailmap-aware name/email
-    const output = await git.raw([
-      'log',
-      '--use-mailmap',
-      `--format=${format}`,
-      '--all',
-    ])
-
-    const lines = output.trim().split('\n').filter(Boolean)
-    
-    // Parse commits
-    const rawCommits: { author: string; email: string; date: Date }[] = []
-    let minDate = new Date()
-    let maxDate = new Date(0)
-
-    for (const line of lines) {
-      const [author, email, dateStr] = line.split('|')
-      const date = new Date(dateStr)
-      
-      if (date < minDate) minDate = date
-      if (date > maxDate) maxDate = date
-      
-      rawCommits.push({ author, email, date })
-    }
-    
-    // Cluster authors to deduplicate identities
-    const authorCommits = clusterAuthors(rawCommits)
-
-    // Sort authors by total commits and take top N
-    const sortedAuthors = Array.from(authorCommits.entries())
-      .map(([_key, data]) => ({
-        author: data.canonicalName,
-        email: data.canonicalEmail,
-        totalCommits: data.dates.length,
-        dates: data.dates,
-      }))
-      .sort((a, b) => b.totalCommits - a.totalCommits)
-      .slice(0, topN)
-
-    // Create time buckets
-    const buckets: Date[] = []
-    const current = new Date(minDate)
-    
-    // Align to bucket boundaries
-    if (bucketSize === 'week') {
-      current.setDate(current.getDate() - current.getDay()) // Start of week
-    } else if (bucketSize === 'month') {
-      current.setDate(1) // Start of month
-    }
-    current.setHours(0, 0, 0, 0)
-
-    while (current <= maxDate) {
-      buckets.push(new Date(current))
-      if (bucketSize === 'day') {
-        current.setDate(current.getDate() + 1)
-      } else if (bucketSize === 'week') {
-        current.setDate(current.getDate() + 7)
-      } else {
-        current.setMonth(current.getMonth() + 1)
-      }
-    }
-
-    // Helper to find bucket for a date
-    const getBucketIndex = (date: Date): number => {
-      for (let i = buckets.length - 1; i >= 0; i--) {
-        if (date >= buckets[i]) return i
-      }
-      return 0
-    }
-
-    // Build time series for each contributor
-    const contributors: ContributorTimeSeries[] = sortedAuthors.map(({ author, email, totalCommits, dates }) => {
-      // Count commits per bucket
-      const bucketCounts = new Array(buckets.length).fill(0)
-      for (const date of dates) {
-        const idx = getBucketIndex(date)
-        bucketCounts[idx]++
-      }
-
-      return {
-        author, // Already canonical from clustering
-        email,
-        totalCommits,
-        timeSeries: buckets.map((bucket, i) => ({
-          date: bucket.toISOString().split('T')[0],
-          count: bucketCounts[i],
-        })),
-      }
-    })
-
-    return {
-      contributors,
-      startDate: minDate.toISOString().split('T')[0],
-      endDate: maxDate.toISOString().split('T')[0],
-      bucketSize,
-    }
-  } catch (error) {
-    console.error('Error getting contributor stats:', error)
-    return {
-      contributors: [],
-      startDate: '',
-      endDate: '',
-      bucketSize,
-    }
-  }
-}
-
-// ========================================
-// Tech Tree - Merged Branch Visualization
-// ========================================
-
-export type TechTreeSizeTier = 'xs' | 'sm' | 'md' | 'lg' | 'xl'
-export type TechTreeBranchType = 'feature' | 'fix' | 'chore' | 'refactor' | 'docs' | 'test' | 'release' | 'unknown'
-
-export interface TechTreeNodeStats {
-  linesAdded: number
-  linesRemoved: number
-  filesChanged: number
-  filesAdded: number
-  filesRemoved: number
-  commitCount: number
-  daysSinceMerge: number
-}
-
-export interface TechTreeNode {
-  id: string
-  branchName: string
-  commitHash: string
-  mergeCommitHash: string
-  author: string
-  mergeDate: string
-  message: string
-  prNumber?: number
-  stats: TechTreeNodeStats
-  sizeTier: TechTreeSizeTier
-  branchType: TechTreeBranchType
-  badges: {
-    massive: boolean
-    destructive: boolean
-    additive: boolean
-    multiFile: boolean
-    surgical: boolean
-    ancient: boolean
-    fresh: boolean
-  }
-}
-
-export interface TechTreeData {
-  masterBranch: string
-  nodes: TechTreeNode[]
-  stats: {
-    minLoc: number
-    maxLoc: number
-    minFiles: number
-    maxFiles: number
-    minAge: number
-    maxAge: number
-  }
-}
-
-// Determine branch type from branch name prefix
-function getBranchType(branchName: string): TechTreeBranchType {
-  const lower = branchName.toLowerCase()
-  if (lower.startsWith('feature/') || lower.startsWith('feat/')) return 'feature'
-  if (lower.startsWith('fix/') || lower.startsWith('bugfix/') || lower.startsWith('hotfix/')) return 'fix'
-  if (lower.startsWith('chore/') || lower.startsWith('deps/') || lower.startsWith('build/')) return 'chore'
-  if (lower.startsWith('refactor/')) return 'refactor'
-  if (lower.startsWith('docs/') || lower.startsWith('doc/')) return 'docs'
-  if (lower.startsWith('test/') || lower.startsWith('tests/')) return 'test'
-  if (lower.startsWith('release/') || lower.startsWith('v')) return 'release'
-  return 'unknown'
-}
-
-// Extract branch name and PR number from merge commit message
-function parseMergeCommitMessage(message: string): { branchName: string; prNumber?: number } {
-  // GitHub PR merge: "Merge pull request #123 from owner/branch-name"
-  const prMatch = message.match(/Merge pull request #(\d+) from [^/]+\/(.+)/)
-  if (prMatch) {
-    return { branchName: prMatch[2], prNumber: parseInt(prMatch[1], 10) }
-  }
-
-  // Standard git merge: "Merge branch 'branch-name'"
-  const branchMatch = message.match(/Merge branch '([^']+)'/)
-  if (branchMatch) {
-    return { branchName: branchMatch[1] }
-  }
-
-  // Alternative format: "Merge branch-name into master"
-  const intoMatch = message.match(/Merge (\S+) into/)
-  if (intoMatch) {
-    return { branchName: intoMatch[1] }
-  }
-
-  // Fallback: use first line of message
-  return { branchName: message.split('\n')[0].slice(0, 50) }
-}
-
-// Assign size tiers based on percentiles
-function assignSizeTiers(nodes: TechTreeNode[]): void {
-  if (nodes.length === 0) return
-
-  // Sort by total LOC
-  const sorted = [...nodes].sort((a, b) => {
-    const aLoc = a.stats.linesAdded + a.stats.linesRemoved
-    const bLoc = b.stats.linesAdded + b.stats.linesRemoved
-    return aLoc - bLoc
-  })
-
-  const n = sorted.length
-  sorted.forEach((node, index) => {
-    const percentile = index / n
-    let tier: TechTreeSizeTier
-    if (percentile < 0.10) tier = 'xs'
-    else if (percentile < 0.30) tier = 'sm'
-    else if (percentile < 0.60) tier = 'md'
-    else if (percentile < 0.85) tier = 'lg'
-    else tier = 'xl'
-
-    // Find the original node and update its tier
-    const originalNode = nodes.find(n => n.id === node.id)
-    if (originalNode) {
-      originalNode.sizeTier = tier
-    }
-  })
-}
-
-// Assign badges based on percentiles
-function assignBadges(nodes: TechTreeNode[]): void {
-  if (nodes.length === 0) return
-
-  // Sort nodes by different metrics to find percentiles
-  const byLoc = [...nodes].sort((a, b) =>
-    (a.stats.linesAdded + a.stats.linesRemoved) - (b.stats.linesAdded + b.stats.linesRemoved)
-  )
-  const byAdded = [...nodes].sort((a, b) => a.stats.linesAdded - b.stats.linesAdded)
-  const byRemoved = [...nodes].sort((a, b) => a.stats.linesRemoved - b.stats.linesRemoved)
-  const byFiles = [...nodes].sort((a, b) => a.stats.filesChanged - b.stats.filesChanged)
-  const byAge = [...nodes].sort((a, b) => a.stats.daysSinceMerge - b.stats.daysSinceMerge)
-
-  const n = nodes.length
-
-  // Helper to check if node is in top X%
-  const isInTopPercentile = (sorted: TechTreeNode[], node: TechTreeNode, topPercent: number): boolean => {
-    const idx = sorted.findIndex(n => n.id === node.id)
-    return idx >= n * (1 - topPercent)
-  }
-
-  // Helper to check if node is in bottom X%
-  const isInBottomPercentile = (sorted: TechTreeNode[], node: TechTreeNode, bottomPercent: number): boolean => {
-    const idx = sorted.findIndex(n => n.id === node.id)
-    return idx < n * bottomPercent
-  }
-
-  for (const node of nodes) {
-    node.badges = {
-      massive: isInTopPercentile(byLoc, node, 0.10),        // Top 10% by total LOC
-      destructive: isInTopPercentile(byRemoved, node, 0.15), // Top 15% by lines removed
-      additive: isInTopPercentile(byAdded, node, 0.15),     // Top 15% by lines added
-      multiFile: isInTopPercentile(byFiles, node, 0.20),    // Top 20% by files changed
-      surgical: isInBottomPercentile(byLoc, node, 0.10),    // Bottom 10% by LOC
-      ancient: isInTopPercentile(byAge, node, 0.15),        // Top 15% oldest (highest daysSinceMerge)
-      fresh: isInBottomPercentile(byAge, node, 0.15),       // Bottom 15% newest (lowest daysSinceMerge)
-    }
-  }
-}
-
-// Get merged branch tree for tech tree visualization
-export async function getMergedBranchTree(limit: number = 50): Promise<TechTreeData> {
-  if (!git) throw new Error('No repository selected')
-
-  // Detect master branch name
-  let masterBranch = 'main'
-  try {
-    const branches = await git.branch()
-    if (branches.all.includes('master')) masterBranch = 'master'
-    else if (branches.all.includes('main')) masterBranch = 'main'
-  } catch {
-    // Default to main
-  }
-
-  try {
-    // Get merge commits on the main branch
-    // Format: hash|author_date|author_name|subject
-    const format = '%H|%ai|%an|%s'
-    const output = await git.raw([
-      'log',
-      masterBranch,
-      '--first-parent',
-      '--merges',
-      `--format=${format}`,
-      '-n',
-      limit.toString(),
-    ])
-
-    const lines = output.trim().split('\n').filter(Boolean)
-    const nodes: TechTreeNode[] = []
-    const now = Date.now()
-
-    for (const line of lines) {
-      const [mergeCommitHash, dateStr, author, message] = line.split('|')
-      if (!mergeCommitHash || !message) continue
-
-      const { branchName, prNumber } = parseMergeCommitMessage(message)
-
-      // Get diff stats for this merge commit
-      let linesAdded = 0
-      let linesRemoved = 0
-      let filesChanged = 0
-      let filesAdded = 0
-      let filesRemoved = 0
-      const commitCount = 1
-
-      try {
-        // Get stat info for the merge commit
-        const statOutput = await git.raw([
-          'show',
-          '--stat',
-          '--format=',
-          mergeCommitHash,
-        ])
-        const statLines = statOutput.trim().split('\n')
-        const summaryLine = statLines[statLines.length - 1]
-
-        // Parse: "3 files changed, 10 insertions(+), 5 deletions(-)"
-        const filesMatch = summaryLine.match(/(\d+) files? changed/)
-        const addMatch = summaryLine.match(/(\d+) insertions?\(\+\)/)
-        const delMatch = summaryLine.match(/(\d+) deletions?\(-\)/)
-
-        filesChanged = filesMatch ? parseInt(filesMatch[1]) : 0
-        linesAdded = addMatch ? parseInt(addMatch[1]) : 0
-        linesRemoved = delMatch ? parseInt(delMatch[1]) : 0
-
-        // Count new/deleted files from the stat output
-        for (const sl of statLines) {
-          if (sl.includes('(new)') || sl.includes('create mode')) filesAdded++
-          if (sl.includes('(gone)') || sl.includes('delete mode')) filesRemoved++
-        }
-      } catch {
-        // Ignore stat errors
-      }
-
-      // Calculate days since merge
-      const mergeDate = new Date(dateStr)
-      const daysSinceMerge = Math.floor((now - mergeDate.getTime()) / (1000 * 60 * 60 * 24))
-
-      nodes.push({
-        id: mergeCommitHash.slice(0, 8),
-        branchName,
-        commitHash: mergeCommitHash,
-        mergeCommitHash,
-        author,
-        mergeDate: dateStr,
-        message,
-        prNumber,
-        stats: {
-          linesAdded,
-          linesRemoved,
-          filesChanged,
-          filesAdded,
-          filesRemoved,
-          commitCount,
-          daysSinceMerge,
-        },
-        sizeTier: 'md', // Will be assigned by assignSizeTiers
-        branchType: getBranchType(branchName),
-        badges: {
-          massive: false,
-          destructive: false,
-          additive: false,
-          multiFile: false,
-          surgical: false,
-          ancient: false,
-          fresh: false,
-        },
-      })
-    }
-
-    // Compute percentile-based tiers and badges
-    assignSizeTiers(nodes)
-    assignBadges(nodes)
-
-    // Calculate global stats
-    const allLoc = nodes.map(n => n.stats.linesAdded + n.stats.linesRemoved)
-    const allFiles = nodes.map(n => n.stats.filesChanged)
-    const allAge = nodes.map(n => n.stats.daysSinceMerge)
-
-    return {
-      masterBranch,
-      nodes,
-      stats: {
-        minLoc: Math.min(...allLoc, 0),
-        maxLoc: Math.max(...allLoc, 1),
-        minFiles: Math.min(...allFiles, 0),
-        maxFiles: Math.max(...allFiles, 1),
-        minAge: Math.min(...allAge, 0),
-        maxAge: Math.max(...allAge, 1),
-      },
-    }
-  } catch {
-    return {
-      masterBranch,
-      nodes: [],
-      stats: { minLoc: 0, maxLoc: 1, minFiles: 0, maxFiles: 1, minAge: 0, maxAge: 1 },
-    }
   }
 }
 
@@ -4352,25 +3527,28 @@ export async function discardAllChanges(): Promise<{ success: boolean; message: 
   if (!git) throw new Error('No repository selected')
 
   try {
-    const status = await git.status()
-    
-    // First unstage everything
-    if (status.staged.length > 0) {
+    const statusBefore = await git.status()
+    const totalChanges = statusBefore.files.length
+
+    if (totalChanges === 0) {
+      return { success: true, message: 'No changes to discard' }
+    }
+
+    // 1) Unstage everything.
+    // Important: staged-only changes (including newly added files) become unstaged after this.
+    if (statusBefore.staged.length > 0) {
       await git.raw(['restore', '--staged', '.'])
     }
-    
-    // Restore tracked files to last commit
-    const trackedModified = [...status.modified, ...status.deleted]
-    if (trackedModified.length > 0) {
-      await git.raw(['restore', '.'])
-    }
-    
-    // Remove untracked files
-    if (status.not_added.length > 0) {
+
+    // 2) Restore tracked files to last commit (covers both previously-unstaged and previously-staged changes)
+    await git.raw(['restore', '.'])
+
+    // 3) Remove untracked files (covers initially-untracked and "unstaged new files" created by step 1)
+    const statusAfter = await git.status()
+    if (statusAfter.not_added.length > 0) {
       await git.raw(['clean', '-fd'])
     }
-    
-    const totalChanges = status.files.length
+
     return { success: true, message: `Discarded all ${totalChanges} changes` }
   } catch (error) {
     return { success: false, message: (error as Error).message }
@@ -5419,7 +4597,7 @@ export async function commitChanges(
   message: string,
   description?: string,
   force: boolean = false
-): Promise<{ success: boolean; message: string; behindCount?: number }> {
+): Promise<{ success: boolean; message: string; behindCount?: number; hash?: string }> {
   if (!git) throw new Error('No repository selected')
 
   try {
@@ -5450,7 +4628,13 @@ export async function commitChanges(
     const fullMessage = description ? `${message}\n\n${description}` : message
 
     await git.commit(fullMessage)
-    return { success: true, message: `Committed: ${message}` }
+    let hash: string | undefined
+    try {
+      hash = (await git.revparse(['HEAD'])).trim()
+    } catch {
+      // Best-effort: commit succeeded but we couldn't resolve HEAD
+    }
+    return { success: true, message: `Committed: ${message}`, ...(hash && { hash }) }
   } catch (error) {
     return { success: false, message: (error as Error).message }
   }
@@ -5463,46 +4647,3 @@ export interface RepoInfo {
   isCurrent: boolean
 }
 
-/**
- * Get sibling repositories from the parent directory of the current repo.
- * Filters out worktrees (which have a .git file instead of directory).
- */
-export async function getSiblingRepos(): Promise<RepoInfo[]> {
-  if (!repoPath) return []
-
-  const parentDir = path.dirname(repoPath)
-  const repos: RepoInfo[] = []
-
-  try {
-    const entries = await fs.promises.readdir(parentDir, { withFileTypes: true })
-
-    for (const entry of entries) {
-      if (!entry.isDirectory()) continue
-
-      const entryPath = path.join(parentDir, entry.name)
-      const gitPath = path.join(entryPath, '.git')
-
-      try {
-        const gitStat = await fs.promises.stat(gitPath)
-        // Only include if .git is a directory (real repo, not a worktree)
-        if (gitStat.isDirectory()) {
-          repos.push({
-            path: entryPath,
-            name: entry.name,
-            isCurrent: entryPath === repoPath,
-          })
-        }
-      } catch {
-        // No .git or can't access - skip
-      }
-    }
-
-    // Sort alphabetically by name
-    repos.sort((a, b) => a.name.localeCompare(b.name))
-
-    return repos
-  } catch (error) {
-    console.error('Error scanning sibling repos:', error)
-    return []
-  }
-}

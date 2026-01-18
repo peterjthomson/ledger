@@ -53,6 +53,35 @@ export type BranchFilter = 'all' | 'local-only' | 'unmerged'
 export type BranchSort = 'name' | 'last-commit' | 'first-commit' | 'most-commits'
 
 export type WorktreeSort = 'folder-name' | 'last-modified' | 'branch-name'
+
+// Preview system types
+export type PreviewType = 'local' | 'cloud'
+
+export interface PreviewProviderInfo {
+  id: string
+  name: string
+  description: string
+  icon: string
+  type: PreviewType
+  available: boolean
+  compatible: boolean
+  reason?: string
+}
+
+export interface PreviewResult {
+  success: boolean
+  message: string
+  url?: string
+  deploymentId?: string
+  warnings?: string[]
+  worktreePath?: string
+  provider?: string
+}
+
+export interface PreviewAvailability {
+  herdInstalled: boolean
+  isLaravel: boolean
+}
 export type StashFilter = 'all' | 'has-changes' | 'redundant'
 export type StashSort = 'date' | 'message' | 'branch'
 
@@ -342,7 +371,8 @@ export interface WorkingStatus {
 }
 
 export interface CreateWorktreeOptions {
-  branchName: string
+  branchName?: string // Optional if using commitHash for detached HEAD
+  commitHash?: string // For creating worktree at specific commit (detached HEAD)
   isNewBranch: boolean
   folderPath: string
 }
@@ -429,6 +459,7 @@ export interface ElectronAPI {
   getWorktrees: () => Promise<Worktree[] | { error: string }>
   // Checkout operations
   checkoutBranch: (branchName: string) => Promise<CheckoutResult>
+  checkoutCommit: (commitHash: string, branchName?: string) => Promise<CheckoutResult>
   createBranch: (branchName: string, checkout?: boolean) => Promise<{ success: boolean; message: string }>
   deleteBranch: (branchName: string, force?: boolean) => Promise<{ success: boolean; message: string }>
   renameBranch: (oldName: string, newName: string) => Promise<{ success: boolean; message: string }>

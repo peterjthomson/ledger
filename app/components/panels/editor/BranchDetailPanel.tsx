@@ -4,13 +4,14 @@
  * Displays branch metadata, allows PR creation, and shows diff against base branch.
  */
 
-import { useState, useEffect, useMemo } from 'react'
-import type { Branch, BranchDiff, BranchDiffType, PullRequest } from '../../../types/electron'
+import { useState, useEffect, useMemo, useRef } from 'react'
+import type { Branch, BranchDiff, BranchDiffType, PullRequest, PreviewProviderInfo } from '../../../types/electron'
 import type { StatusMessage } from '../../../types/app-types'
 import { DiffViewer } from '../../ui/DiffViewer'
 
 export interface BranchDetailPanelProps {
   branch: Branch
+  repoPath: string | null
   formatDate: (date?: string) => string
   onStatusChange?: (status: StatusMessage | null) => void
   onCheckoutBranch?: (branch: Branch) => void
@@ -26,6 +27,7 @@ export interface BranchDetailPanelProps {
 
 export function BranchDetailPanel({
   branch,
+  repoPath,
   formatDate,
   onStatusChange,
   onCheckoutBranch,
@@ -40,10 +42,15 @@ export function BranchDetailPanel({
 }: BranchDetailPanelProps) {
   const [creatingPR, setCreatingPR] = useState(false)
   const [pushing, setPushing] = useState(false)
+  // Preview provider state
+  const [previewProviders, setPreviewProviders] = useState<PreviewProviderInfo[]>([])
+  const [previewLoading, setPreviewLoading] = useState(false)
   const [branchDiff, setBranchDiff] = useState<BranchDiff | null>(null)
   const [loadingDiff, setLoadingDiff] = useState(false)
   const [expandedFiles, setExpandedFiles] = useState<Set<string>>(new Set())
   const [diffType, setDiffType] = useState<BranchDiffType>('preview')
+  const [fileContextMenu, setFileContextMenu] = useState<{ x: number; y: number } | null>(null)
+  const fileMenuRef = useRef<HTMLDivElement>(null)
 
   // PR creation form state
   const [showPRForm, setShowPRForm] = useState(false)
@@ -98,6 +105,28 @@ export function BranchDetailPanel({
       cancelled = true
     }
   }, [branch.name, isMainOrMaster, diffType])
+
+  const bestProvider = useMemo(
+    () => previewProviders.find((provider) => provider.compatible) || null,
+    [previewProviders]
+  )
+
+  // Check preview providers when repoPath changes
+  useEffect(() => {
+    if (!repoPath) {
+      setPreviewProviders([])
+      return
+    }
+    const loadProviders = async () => {
+      try {
+        const providers = await window.conveyor.preview.getProviders(repoPath)
+        setPreviewProviders(providers)
+      } catch {
+        setPreviewProviders([])
+      }
+    }
+    loadProviders()
+  }, [repoPath])
 
   const handleStartPRCreation = () => {
     // Auto-generate title from branch name
@@ -182,6 +211,30 @@ export function BranchDetailPanel({
     }
   }
 
+  const handlePreviewInBrowser = async () => {
+    if (!repoPath) {
+      onStatusChange?.({ type: 'error', message: 'No repository path available' })
+      return
+    }
+
+    setPreviewLoading(true)
+    onStatusChange?.({ type: 'info', message: `Creating preview for ${branch.name}...` })
+
+    try {
+      const result = await window.conveyor.preview.autoPreviewBranch(branch.name, repoPath)
+      if (result.success) {
+        const warningMsg = result.warnings?.length ? ` (${result.warnings.join(', ')})` : ''
+        onStatusChange?.({ type: 'success', message: `Opened ${result.url}${warningMsg}` })
+      } else {
+        onStatusChange?.({ type: 'error', message: result.message })
+      }
+    } catch (error) {
+      onStatusChange?.({ type: 'error', message: (error as Error).message })
+    } finally {
+      setPreviewLoading(false)
+    }
+  }
+
   const toggleFile = (path: string) => {
     setExpandedFiles((prev) => {
       const next = new Set(prev)
@@ -193,6 +246,48 @@ export function BranchDetailPanel({
       return next
     })
   }
+
+  const expandAll = () => {
+    if (branchDiff) {
+      setExpandedFiles(new Set(branchDiff.files.map((f) => f.file.path)))
+    }
+    setFileContextMenu(null)
+  }
+
+  const collapseAll = () => {
+    setExpandedFiles(new Set())
+    setFileContextMenu(null)
+  }
+
+  const handleFileContextMenu = (e: React.MouseEvent) => {
+    e.preventDefault()
+    setFileContextMenu({ x: e.clientX, y: e.clientY })
+  }
+
+  // Close file context menu when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (fileMenuRef.current && !fileMenuRef.current.contains(e.target as Node)) {
+        setFileContextMenu(null)
+      }
+    }
+
+    const handleEscape = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        setFileContextMenu(null)
+      }
+    }
+
+    if (fileContextMenu) {
+      document.addEventListener('mousedown', handleClickOutside)
+      document.addEventListener('keydown', handleEscape)
+    }
+
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside)
+      document.removeEventListener('keydown', handleEscape)
+    }
+  }, [fileContextMenu])
 
   return (
     <div className="sidebar-detail-panel">
@@ -393,6 +488,20 @@ export function BranchDetailPanel({
           <button className="btn btn-secondary" onClick={() => window.electronAPI.openBranchInGitHub(branch.name)} disabled={deleting || renaming}>
             View on GitHub
           </button>
+          {bestProvider && (
+            <button
+              className="btn btn-secondary"
+              onClick={handlePreviewInBrowser}
+              disabled={!bestProvider.available || previewLoading || deleting}
+              title={
+                !bestProvider.available
+                  ? bestProvider.reason || 'Preview provider unavailable'
+                  : `Open preview with ${bestProvider.name}`
+              }
+            >
+              {previewLoading ? 'Opening...' : 'Preview'}
+            </button>
+          )}
           {!isMainOrMaster && onRenameBranch && (
             <button className="btn btn-secondary" onClick={handleStartRename} disabled={switching || deleting || renaming}>
               Rename Branch
@@ -461,7 +570,7 @@ export function BranchDetailPanel({
                 const hasConflict = branchDiff.conflictFiles?.includes(fileDiff.file.path)
                 return (
                 <div key={fileDiff.file.path} className={`branch-diff-file ${hasConflict ? 'has-conflict' : ''}`}>
-                  <div className="branch-diff-file-header" onClick={() => toggleFile(fileDiff.file.path)}>
+                  <div className="branch-diff-file-header" onClick={() => toggleFile(fileDiff.file.path)} onContextMenu={handleFileContextMenu}>
                     <span className={`diff-file-chevron ${expandedFiles.has(fileDiff.file.path) ? 'open' : ''}`}>
                       ▸
                     </span>
@@ -507,6 +616,18 @@ export function BranchDetailPanel({
               )})}
             </div>
           )}
+        </div>
+      )}
+
+      {/* File Context Menu */}
+      {fileContextMenu && (
+        <div ref={fileMenuRef} className="context-menu" style={{ left: fileContextMenu.x, top: fileContextMenu.y }}>
+          <button className="context-menu-item" onClick={expandAll}>
+            Expand All
+          </button>
+          <button className="context-menu-item" onClick={collapseAll}>
+            Collapse All
+          </button>
         </div>
       )}
     </div>

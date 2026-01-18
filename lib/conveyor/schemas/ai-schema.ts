@@ -1,7 +1,7 @@
 import { z } from 'zod'
 
 // AI Provider schema
-export const AIProviderSchema = z.enum(['anthropic', 'openai', 'gemini'])
+export const AIProviderSchema = z.enum(['anthropic', 'openai', 'gemini', 'openrouter'])
 
 // AI Content block schema
 export const AIContentBlockSchema = z.object({
@@ -58,6 +58,7 @@ export const AISettingsSchema = z.object({
     anthropic: AIProviderSettingsSchema.optional(),
     openai: AIProviderSettingsSchema.optional(),
     gemini: AIProviderSettingsSchema.optional(),
+    openrouter: AIProviderSettingsSchema.optional(),
   }),
   defaults: z.object({
     provider: AIProviderSchema,
@@ -116,6 +117,16 @@ export const UsageStatsSchema = z.object({
   ),
 })
 
+// Encryption status schema
+export const EncryptionStatusSchema = z.object({
+  /** Whether encryption is available at all */
+  available: z.boolean(),
+  /** The backend being used (keychain, dpapi, gnome_libsecret, kwallet, basic_text, etc.) */
+  backend: z.string(),
+  /** Whether the encryption is considered strong (not basic_text fallback) */
+  isStrong: z.boolean(),
+})
+
 // Result schemas
 const SuccessResultSchema = z.object({
   success: z.boolean(),
@@ -156,7 +167,7 @@ export const aiIpcSchema = {
     args: z.tuple([]),
     return: z.array(AIProviderSchema),
   },
-  'ai:is-provider-configured': {
+  'ai:is-provider-available': {
     args: z.tuple([AIProviderSchema]),
     return: z.boolean(),
   },
@@ -198,6 +209,12 @@ export const aiIpcSchema = {
     args: z.tuple([]),
     return: SuccessResultSchema,
   },
+
+  // Security
+  'ai:get-encryption-status': {
+    args: z.tuple([]),
+    return: EncryptionStatusSchema,
+  },
 }
 
 // Type exports
@@ -208,3 +225,4 @@ export type AIResponse = z.infer<typeof AIResponseSchema>
 export type AISettings = z.infer<typeof AISettingsSchema>
 export type ModelDefinition = z.infer<typeof ModelDefinitionSchema>
 export type UsageStats = z.infer<typeof UsageStatsSchema>
+export type EncryptionStatus = z.infer<typeof EncryptionStatusSchema>

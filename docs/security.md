@@ -8,16 +8,11 @@ This document describes the security architecture of the Ledger application, inc
 
 Ledger uses Electron's security best practices with explicit configuration in `lib/main/app.ts`:
 
-```typescript
-webPreferences: {
-  preload: join(__dirname, '../preload/preload.js'),
-  sandbox: true,              // V8 sandbox enabled
-  contextIsolation: true,     // Preload isolated from renderer
-  nodeIntegration: false,     // No Node.js in renderer
-  nodeIntegrationInWorker: false, // No Node.js in workers
-  webSecurity: true,          // Same-origin policy enforced
-}
-```
+Key settings applied:
+- Sandbox is enabled to keep renderer processes constrained.
+- Context isolation is enabled so preload runs in a separate context.
+- Node.js integration is disabled in renderers and workers.
+- Web security (same-origin policy) is enforced.
 
 **Why these settings matter:**
 
@@ -28,24 +23,13 @@ webPreferences: {
 
 ### Runtime Security Assertion
 
-The preload script (`lib/preload/preload.ts`) includes a runtime check to catch configuration errors:
-
-```typescript
-if (!process.contextIsolated) {
-  console.error('[SECURITY] Context isolation is DISABLED! This is a security risk.')
-}
-```
+The preload script (`lib/preload/preload.ts`) performs a runtime check to warn if context isolation is unexpectedly disabled.
 
 ### Content Security Policy
 
 The application uses a restrictive CSP in `app/index.html`:
 
-```html
-<meta http-equiv="Content-Security-Policy"
-  content="default-src 'self'; script-src 'self';
-           style-src 'self' 'unsafe-inline'; img-src 'self' data: res:;"
-/>
-```
+The policy restricts scripts to `self`, limits styles to `self` (plus inline for app styles), and only allows images from `self`, `data:`, and `res:`.
 
 This prevents:
 - Loading scripts from external sources
@@ -58,58 +42,21 @@ This prevents:
 
 All renderer-to-main process communication uses `ipcRenderer.invoke()` with typed channels:
 
-```typescript
-// Preload exposes limited API via contextBridge
-contextBridge.exposeInMainWorld('conveyor', {
-  repo: new RepoApi(),
-  branch: new BranchApi(),
-  // ... other APIs
-})
-
-// Main process validates all inputs with Zod schemas
-handle('channel-name', async (data) => {
-  const validated = schema.parse(data)
-  // ... process validated data
-})
-```
+Patterns:
+- Preload exposes a narrow, versioned API surface via `contextBridge` (`lib/preload/preload.ts`).
+- Main process handlers validate all inputs with Zod schemas (`lib/conveyor/schemas`, `lib/conveyor/handlers`).
 
 ### Error Handling
 
 IPC handlers use safe error serialization (`lib/utils/error-helpers.ts`) to prevent leaking sensitive information:
-
-```typescript
-export function serializeError(error: unknown): string {
-  if (error instanceof Error) return error.message
-  if (typeof error === 'string') return error
-  if (typeof error === 'object' && error !== null && 'message' in error) {
-    return String((error as { message: unknown }).message)
-  }
-  return 'Unknown error'
-}
-```
+Errors are normalized to safe, serializable messages before crossing the process boundary.
 
 ## Command Injection Prevention
 
 ### Safe Shell Execution
 
 The application uses `safeExec()` (`lib/utils/safe-exec.ts`) for all shell commands:
-
-```typescript
-export const safeExec = async (
-  command: string,
-  args: string[],
-  options?: { cwd?: string; timeout?: number }
-): Promise<ExecResult> => {
-  return new Promise((resolve) => {
-    const proc = spawn(command, args, {
-      cwd: options?.cwd,
-      timeout: options?.timeout ?? 30000,
-      shell: false,  // CRITICAL: No shell interpolation
-    })
-    // ...
-  })
-}
-```
+It always uses argv-style invocation (no shell interpolation) and sets explicit timeouts to reduce risk.
 
 **Key security feature:** `shell: false` ensures arguments are passed directly to the process without shell interpretation, preventing injection attacks.
 
@@ -117,40 +64,16 @@ export const safeExec = async (
 
 #### NPM Package Names
 
-```typescript
-export function isValidNpmPackageName(name: string): boolean {
-  return /^(@[a-z0-9-~][a-z0-9-._~]*\/)?[a-z0-9-~][a-z0-9-._~]*$/.test(name)
-}
-```
-
-Prevents: `lodash; rm -rf /`, `$(whoami)`, backtick injection
+Validated against strict npm naming rules to prevent shell metacharacters and traversal.
 
 #### Git URLs
 
-```typescript
-function isValidGitUrl(url: string): boolean {
-  return /^(https:\/\/|git@)[a-zA-Z0-9.-]+[/:][a-zA-Z0-9._/-]+\.git$/.test(url)
-}
-```
-
-Prevents: `https://evil.com/; rm -rf /`, command substitution
+Validated against strict HTTPS/SSH patterns to prevent command substitution and malformed URLs.
 
 ### Path Traversal Prevention
 
 File path operations validate against directory traversal attacks:
-
-```typescript
-// Security: Validate path doesn't contain traversal attempts
-const resolvedPath = path.resolve(folderPath)
-if (folderPath.includes('..') || resolvedPath !== path.normalize(folderPath)) {
-  return { success: false, message: 'Invalid folder path: path traversal not allowed' }
-}
-
-// Security: Ensure path is absolute to prevent relative path attacks
-if (!path.isAbsolute(folderPath)) {
-  return { success: false, message: 'Folder path must be absolute' }
-}
-```
+Paths are normalized, checked for traversal sequences, and required to be absolute before use.
 
 ### Protected Operations
 
@@ -167,17 +90,7 @@ if (!path.isAbsolute(folderPath)) {
 
 ### Permission Types
 
-```typescript
-type PluginPermission =
-  | 'git:read'      // Read repository info
-  | 'git:write'     // Perform git operations
-  | 'fs:read'       // Read files
-  | 'fs:write'      // Write files
-  | 'network'       // Make network requests
-  | 'shell'         // Execute shell commands
-  | 'clipboard'     // Access clipboard
-  | 'notifications' // Show notifications
-```
+Permissions are explicit and granular, including: `git:read`, `git:write`, `fs:read`, `fs:write`, `network`, `shell`, `clipboard`, and `notifications`.
 
 ### Permission Request Flow
 
@@ -191,22 +104,7 @@ type PluginPermission =
 ### Permission Enforcement
 
 Plugin API methods in `lib/plugins/plugin-context.ts` check permissions:
-
-```typescript
-const checkPermission = (permission: PluginPermission): boolean => {
-  if (!hasPermission(pluginId, permission)) {
-    logger.warn(`Missing permission: ${permission}`)
-    return false
-  }
-  return true
-}
-
-// Example: git:read required
-getBranches: async () => {
-  if (!checkPermission('git:read')) return []
-  return deps.getBranches()
-}
-```
+Calls are gated at the API boundary so unapproved permissions are denied before any side effects.
 
 ### Trust Levels
 
@@ -219,43 +117,21 @@ getBranches: async () => {
 ### For Contributors
 
 1. **Never use string interpolation for shell commands**
-   ```typescript
-   // BAD
-   exec(`gh pr comment ${prNumber} --body "${body}"`)
-
-   // GOOD
-   safeExec('gh', ['pr', 'comment', prNumber.toString(), '--body', body])
-   ```
+   - Use argv arrays with `safeExec` (no shell interpolation).
 
 2. **Always validate external input**
-   ```typescript
-   if (!isValidNpmPackageName(name)) {
-     return { success: false, message: 'Invalid package name' }
-   }
-   ```
+   - Validate user input against strict patterns before executing commands.
 
 3. **Use Zod schemas for IPC validation**
-   ```typescript
-   const schema = z.object({
-     path: z.string().min(1),
-     branch: z.string().regex(/^[a-zA-Z0-9._/-]+$/)
-   })
-   ```
+   - Enforce input shapes at IPC boundaries with Zod.
 
 4. **Check permissions in plugin API methods**
-   ```typescript
-   if (!hasPermission(pluginId, 'git:write')) {
-     throw new Error('Permission denied: git:write required')
-   }
-   ```
+   - Require explicit permissions before any privileged action.
 
 ### Security Testing
 
 Run the validation test suite:
-
-```bash
-npm test -- tests/validation.spec.ts
-```
+`npm test -- tests/validation.spec.ts`
 
 Tests cover:
 - NPM package name validation

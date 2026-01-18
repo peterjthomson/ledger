@@ -11,6 +11,10 @@ import { StagingApi } from './staging-api'
 import { ThemeApi } from './theme-api'
 import { PluginApi } from './plugin-api'
 import { AIApi } from './ai-api'
+import { MailmapApi } from './mailmap-api'
+import { AnalyticsApi } from './analytics-api'
+import { CanvasApi } from './canvas-api'
+import { PreviewApi } from './preview-api'
 import { NotionApi } from './notion-api'
 
 export const conveyor = {
@@ -26,6 +30,10 @@ export const conveyor = {
   theme: new ThemeApi(electronAPI),
   plugin: new PluginApi(electronAPI),
   ai: new AIApi(electronAPI),
+  mailmap: new MailmapApi(electronAPI),
+  analytics: new AnalyticsApi(electronAPI),
+  canvas: new CanvasApi(electronAPI),
+  preview: new PreviewApi(electronAPI),
   notion: new NotionApi(electronAPI),
 }
 

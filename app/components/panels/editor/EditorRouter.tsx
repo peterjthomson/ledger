@@ -43,6 +43,7 @@ export interface EditorRouterProps {
   onNavigateToPR?: (pr: PullRequest) => void
   onOpenRepo?: (repo: RepoInfo) => void
   onOpenMailmap?: () => void
+  onBranchClick?: (branchName: string) => void
 }
 
 export function EditorRouter({
@@ -70,6 +71,7 @@ export function EditorRouter({
   onNavigateToPR,
   onOpenRepo,
   onOpenMailmap,
+  onBranchClick,
 }: EditorRouterProps) {
   switch (focus.type) {
     case 'pr': {
@@ -83,6 +85,7 @@ export function EditorRouter({
       return (
         <BranchDetailPanel
           branch={branch}
+          repoPath={repoPath}
           formatDate={formatDate}
           onStatusChange={onStatusChange}
           onCheckoutBranch={onCheckoutBranch}
@@ -158,12 +161,14 @@ export function EditorRouter({
         <WorktreeDetailPanel
           worktree={wt}
           currentBranch={currentBranch}
+          repoPath={repoPath}
           switching={switching}
           onStatusChange={onStatusChange}
           onRefresh={onRefresh}
           onClearFocus={onClearFocus}
           onCheckoutWorktree={onCheckoutWorktree}
           onOpenStaging={onOpenStaging}
+          onBranchClick={onBranchClick}
         />
       )
     }

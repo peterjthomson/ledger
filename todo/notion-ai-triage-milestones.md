@@ -21,13 +21,13 @@ Building AI-powered card triage for Notion databases in 4 layers:
 
 ## Layer 0: Core AI Infrastructure
 
-**Goal:** First-class support for Anthropic, OpenAI, and Gemini APIs
+**Goal:** First-class support for Anthropic, OpenAI, Gemini, and OpenRouter APIs
 
 ### Milestones
 
 - [x] **0.1** Add AI SDK dependencies
 - [x] **0.2** Create AI types and model registry
-- [x] **0.3** Implement provider classes (Anthropic, OpenAI, Gemini)
+- [x] **0.3** Implement provider classes (Anthropic, OpenAI, Gemini, OpenRouter)
 - [x] **0.4** Create AI service orchestrator
 - [x] **0.5** Add AI settings to settings service
 - [x] **0.6** Create IPC schemas and handlers
@@ -46,7 +46,8 @@ lib/main/ai/
     ├── index.ts          # Provider exports
     ├── anthropic.ts      # Claude provider
     ├── openai.ts         # GPT provider
-    └── gemini.ts         # Gemini provider
+    ├── gemini.ts         # Gemini provider
+    └── openrouter.ts     # OpenRouter/free tier provider
 
 lib/conveyor/schemas/ai-schema.ts
 lib/conveyor/handlers/ai-handler.ts
@@ -145,10 +146,11 @@ After each layer:
 - **Layer 0 Complete:**
   - Added AI SDK dependencies (@anthropic-ai/sdk, openai, @google/generative-ai)
   - Created core AI types (types.ts) with provider interfaces
-  - Built model registry (models.ts) with 9 models across 3 tiers
+  - Built model registry (models.ts) with 11 models across 3 tiers
   - Implemented Anthropic provider with complete/stream support
   - Implemented OpenAI provider with complete/stream support
   - Implemented Gemini provider with complete/stream support
+  - Implemented OpenRouter provider with free tier support
   - Created AI service orchestrator with usage tracking
   - Added AI settings to settings-service.ts
   - Created IPC schemas (ai-schema.ts) with Zod validation

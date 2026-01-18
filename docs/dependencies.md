@@ -8,6 +8,17 @@
 | `simple-git` | 3.x | Git operations (branch, checkout, worktree, etc.) |
 | `@electron-toolkit/preload` | 3.x | Preload script utilities |
 | `@electron-toolkit/utils` | 4.x | Electron app utilities |
+| `zustand` | 5.x | Lightweight shared UI state store |
+
+### AI (optional)
+
+These SDKs are only used when a user enables an AI provider. The core app does not require them for standard git workflows.
+
+| Package | Version | Purpose |
+|---------|---------|---------|
+| `openai` | 6.x | OpenAI and OpenRouter client |
+| `@anthropic-ai/sdk` | 0.50.x | Anthropic client |
+| `@google/generative-ai` | 0.21.x | Gemini client |
 
 ### UI (bundled into renderer)
 
@@ -15,14 +26,14 @@
 |---------|---------|---------|
 | `react` | 19.x | UI framework |
 | `react-dom` | 19.x | React DOM renderer |
-| `lucide-react` | 0.5x | Icons (currently unused, available) |
-| `framer-motion` | 12.x | Animations (currently unused, available) |
+| `lucide-react` | 0.5x | Icon set used in the UI and plugins |
+| `framer-motion` | 12.x | Animations (optional, light usage) |
 
 ### Styling
 
 | Package | Version | Purpose |
 |---------|---------|---------|
-| `tailwindcss` | 4.x | Utility CSS (available, app uses custom CSS) |
+| `tailwindcss` | 4.x | Utility classes in shared UI components (app is mostly custom CSS) |
 | `clsx` | 2.x | Conditional class names |
 | `tailwind-merge` | 3.x | Merge Tailwind classes |
 
@@ -105,8 +116,8 @@ npm install
 
 ## Security Notes
 
-- `simple-git` executes git commands via shell - only used with user-selected repos
-- `gh` CLI is called via `child_process.exec` - only used for PR data
-- No network requests except through `gh` CLI
+- `simple-git` executes git commands against user-selected repos
+- `gh` CLI is called via `child_process.exec` for PR data
+- Network access is limited to `gh` and optional AI providers (only when enabled)
 - Settings stored locally in `~/Library/Application Support/ledger/`
 

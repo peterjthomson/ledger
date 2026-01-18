@@ -6,12 +6,12 @@ Create a StarCraft-inspired "Tech Tree" visualization panel showing branches mer
 
 ## To-Do List
 
-- [ ] Add TechTreeNode and TechTreeData types to electron.d.ts
-- [ ] Add getMergedBranchTree() function to git-service.ts
-- [ ] Add IPC handler in main.ts and expose in preload.ts
-- [ ] Create TechTreeChart.tsx component with SVG rendering
-- [ ] Add StarCraft-inspired CSS styles for tech tree
-- [ ] Export from viz/index.ts and add to CanvasRenderer.tsx
+- [x] Add TechTreeNode and TechTreeData types to electron.d.ts
+- [x] Implement getMergedBranchTree() in analytics service
+- [x] Add conveyor analytics schema/handler/API wiring
+- [x] Create TechTreeChart.tsx component with SVG rendering
+- [x] Add StarCraft-inspired CSS styles for tech tree
+- [x] Export from viz/index.ts and add to CanvasRenderer.tsx
 
 ## Design
 
@@ -186,11 +186,11 @@ Based on size tier, show different amounts of info:
 
 ## Files to Modify
 
-### Backend (3 files)
+### Backend (analytics via conveyor)
 
-- `lib/main/git-service.ts` - Add `getMergedBranchTree()` with full stats
-- `lib/main/main.ts` - Add IPC handler for `get-merged-branch-tree`
-- `lib/preload/preload.ts` - Expose `getMergedBranchTree` to renderer
+- `lib/services/analytics/analytics-service.ts` - `getMergedBranchTree()` with full stats
+- `lib/conveyor/handlers/analytics-handler.ts` - IPC handler for `get-merged-branch-tree`
+- `lib/conveyor/schemas/analytics-schema.ts` / `lib/conveyor/api/analytics-api.ts` - schema + renderer API
 
 ### Types (1 file)
 

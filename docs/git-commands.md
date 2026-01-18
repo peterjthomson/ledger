@@ -201,9 +201,9 @@ Primary UI surface:
 
 - **Contributor chart**: `app/components/panels/viz/ContributorChart.tsx`
 
-| UI intent (where)                | IPC / API call          | Implementation            | Git backend          | Commands                                             |
-| -------------------------------- | ----------------------- | ------------------------- | -------------------- | ---------------------------------------------------- |
-| Contributor activity time series | `get-contributor-stats` | `lib/main/git-service.ts` | `simple-git` (`raw`) | `git log --use-mailmap --format=%aN\|%aE\|%ci --all` |
+| UI intent (where)                | IPC / API call          | Implementation                                | Git backend          | Commands                                             |
+| -------------------------------- | ----------------------- | --------------------------------------------- | -------------------- | ---------------------------------------------------- |
+| Contributor activity time series | `get-contributor-stats` | `lib/services/analytics/analytics-service.ts` | `simple-git` (`raw`) | `git log --use-mailmap --format=%aN\|%aE\|%ci --all` |
 
 ---
 
@@ -213,9 +213,9 @@ Primary UI surface:
 
 - **Tech tree chart**: `app/components/panels/viz/TechTreeChart.tsx`
 
-| UI intent (where)                           | IPC / API call           | Implementation            | Git backend          | Commands                                                                                                                                       |
-| ------------------------------------------- | ------------------------ | ------------------------- | -------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- |
-| Recent merge commits on main/master + stats | `get-merged-branch-tree` | `lib/main/git-service.ts` | `simple-git` (`raw`) | `git log <main\|master> --first-parent --merges --format=%H\|%ai\|%an\|%s -n <N>`<br>Per merge commit: `git show --stat --format= <mergeHash>` |
+| UI intent (where)                           | IPC / API call           | Implementation                                | Git backend          | Commands                                                                                                                                       |
+| ------------------------------------------- | ------------------------ | --------------------------------------------- | -------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- |
+| Recent merge commits on main/master + stats | `get-merged-branch-tree` | `lib/services/analytics/analytics-service.ts` | `simple-git` (`raw`) | `git log <main\|master> --first-parent --merges --format=%H\|%ai\|%an\|%s -n <N>`<br>Per merge commit: `git show --stat --format= <mergeHash>` |
 
 ---
 
