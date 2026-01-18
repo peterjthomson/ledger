@@ -5,7 +5,13 @@
  */
 
 import { useState, useEffect, useMemo, useCallback, useRef, useLayoutEffect } from 'react'
-import type { PullRequest, PRDetail, PRReviewComment, StagingFileDiff } from '../../../types/electron'
+import type {
+  PullRequest,
+  PRDetail,
+  PRReviewComment,
+  StagingFileDiff,
+  PreviewProviderInfo,
+} from '../../../types/electron'
 import { DiffViewer } from '../../ui/DiffViewer'
 
 export interface PRReviewPanelProps {
@@ -42,9 +48,8 @@ export function PRReviewPanel({ pr, repoPath, formatRelativeTime, onCheckout, on
   const [submittingComment, setSubmittingComment] = useState(false)
   const [commentStatus, setCommentStatus] = useState<{ type: 'success' | 'error'; message: string } | null>(null)
   const [mergingPR, setMergingPR] = useState(false)
-  // Herd preview state
-  const [herdInstalled, setHerdInstalled] = useState<boolean | null>(null)
-  const [isLaravel, setIsLaravel] = useState(false)
+  // Preview provider state
+  const [previewProviders, setPreviewProviders] = useState<PreviewProviderInfo[]>([])
   const [previewLoading, setPreviewLoading] = useState(false)
 
   // Ref to track status timeout for cleanup
@@ -83,24 +88,26 @@ export function PRReviewPanel({ pr, repoPath, formatRelativeTime, onCheckout, on
     loadPRDetail()
   }, [loadPRDetail])
 
-  // Check Herd availability when repoPath changes
+  const bestProvider = useMemo(
+    () => previewProviders.find((provider) => provider.compatible) || null,
+    [previewProviders]
+  )
+
+  // Check preview providers when repoPath changes
   useEffect(() => {
     if (!repoPath) {
-      setHerdInstalled(false)
-      setIsLaravel(false)
+      setPreviewProviders([])
       return
     }
-    const checkPreview = async () => {
+    const loadProviders = async () => {
       try {
-        const result = await window.conveyor.preview.checkAvailable(repoPath)
-        setHerdInstalled(result.herdInstalled)
-        setIsLaravel(result.isLaravel)
+        const providers = await window.conveyor.preview.getProviders(repoPath)
+        setPreviewProviders(providers)
       } catch {
-        setHerdInstalled(false)
-        setIsLaravel(false)
+        setPreviewProviders([])
       }
     }
-    checkPreview()
+    loadProviders()
   }, [repoPath])
 
   // Submit a comment
@@ -359,12 +366,16 @@ export function PRReviewPanel({ pr, repoPath, formatRelativeTime, onCheckout, on
         >
           View on GitHub
         </button>
-        {herdInstalled && (
+        {bestProvider && (
           <button
             className="btn btn-secondary"
             onClick={handlePreviewInBrowser}
-            disabled={!isLaravel || previewLoading}
-            title={!isLaravel ? 'Preview not available for this project type' : 'Open preview in browser'}
+            disabled={!bestProvider.available || previewLoading}
+            title={
+              !bestProvider.available
+                ? bestProvider.reason || 'Preview provider unavailable'
+                : `Open preview with ${bestProvider.name}`
+            }
           >
             {previewLoading ? 'Opening...' : 'Preview'}
           </button>

@@ -31,7 +31,6 @@ import { spawn, exec, ChildProcess } from 'child_process'
 import { promisify } from 'util'
 import * as fs from 'fs'
 import * as path from 'path'
-import { shell } from 'electron'
 import type { PreviewProvider, PreviewResult, ProviderAvailability, CreateWorktreeFn } from '../preview-types'
 
 const execAsync = promisify(exec)
@@ -555,7 +554,6 @@ export const railsProvider: PreviewProvider = {
     // Check if already running
     const existing = runningServers.get(worktreePath)
     if (existing) {
-      await shell.openExternal(existing.url)
       return {
         success: true,
         message: `Already running at ${existing.url}`,
@@ -593,8 +591,6 @@ export const railsProvider: PreviewProvider = {
           usePumaDev: true,
         })
 
-        await shell.openExternal(linkResult.url)
-
         return {
           success: true,
           message: `Linked with puma-dev`,
@@ -630,8 +626,6 @@ export const railsProvider: PreviewProvider = {
                 usePumaDev: false,
               })
 
-              shell.openExternal(url)
-
               resolve({
                 success: true,
                 message: `Rails server started (startup detection timed out)`,
@@ -662,8 +656,6 @@ export const railsProvider: PreviewProvider = {
                   startedAt: new Date(),
                   usePumaDev: false,
                 })
-
-                shell.openExternal(url)
 
                 resolve({
                   success: true,

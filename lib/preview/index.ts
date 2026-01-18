@@ -119,4 +119,3 @@ export function initializePreviewProviders(): void {
 // Re-export providers for direct use
 export { laravelProvider }
 export { railsProvider }
-export { nodeProvider }

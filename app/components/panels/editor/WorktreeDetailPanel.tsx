@@ -6,7 +6,13 @@
  */
 
 import { useState, useEffect, useRef } from 'react'
-import type { Worktree, UncommittedFile, StagingFileDiff, WorkingStatus } from '../../../types/electron'
+import type {
+  Worktree,
+  UncommittedFile,
+  StagingFileDiff,
+  WorkingStatus,
+  PreviewProviderInfo,
+} from '../../../types/electron'
 import type { StatusMessage } from '../../../types/app-types'
 import { formatRelativeTime } from '@/app/utils/time'
 
@@ -38,9 +44,8 @@ export function WorktreeDetailPanel({
   onBranchClick,
 }: WorktreeDetailPanelProps) {
   const [actionInProgress, setActionInProgress] = useState(false)
-  // Herd preview state
-  const [herdInstalled, setHerdInstalled] = useState<boolean | null>(null)
-  const [isLaravel, setIsLaravel] = useState(false)
+  // Preview provider state
+  const [previewProviders, setPreviewProviders] = useState<PreviewProviderInfo[]>([])
   const [previewLoading, setPreviewLoading] = useState(false)
   // Staging/commit state
   const [showCommitUI, setShowCommitUI] = useState(false)
@@ -114,20 +119,24 @@ export function WorktreeDetailPanel({
     }
   }, [fileContextMenu])
 
-  // Check preview availability when worktree changes
+  const bestProvider = previewProviders.find((provider) => provider.compatible) || null
+
+  // Check preview providers when worktree/repo changes
   useEffect(() => {
-    const checkPreview = async () => {
+    if (!repoPath) {
+      setPreviewProviders([])
+      return
+    }
+    const loadProviders = async () => {
       try {
-        const result = await window.conveyor.preview.checkAvailable(worktree.path)
-        setHerdInstalled(result.herdInstalled)
-        setIsLaravel(result.isLaravel)
+        const providers = await window.conveyor.preview.getProviders(repoPath, worktree.path)
+        setPreviewProviders(providers)
       } catch {
-        setHerdInstalled(false)
-        setIsLaravel(false)
+        setPreviewProviders([])
       }
     }
-    checkPreview()
-  }, [worktree.path])
+    loadProviders()
+  }, [repoPath, worktree.path])
 
   const loadWorkingStatus = async () => {
     setLoadingStatus(true)
@@ -446,12 +455,16 @@ export function WorktreeDetailPanel({
               Open Staging
             </button>
           )}
-          {herdInstalled && (
+          {bestProvider && (
             <button
               className="btn btn-secondary"
               onClick={handlePreviewInBrowser}
-              disabled={!isLaravel || previewLoading}
-              title={!isLaravel ? 'Preview not available for this project type' : 'Open preview in browser'}
+              disabled={!bestProvider.available || previewLoading}
+              title={
+                !bestProvider.available
+                  ? bestProvider.reason || 'Preview provider unavailable'
+                  : `Open preview with ${bestProvider.name}`
+              }
             >
               {previewLoading ? 'Opening...' : 'Preview'}
             </button>
@@ -856,12 +869,16 @@ export function WorktreeDetailPanel({
           Open in Finder
         </button>
 
-        {herdInstalled && (
+        {bestProvider && (
           <button
             className="btn btn-secondary"
             onClick={handlePreviewInBrowser}
-            disabled={!isLaravel || previewLoading || actionInProgress}
-            title={!isLaravel ? 'Preview not available for this project type' : 'Open preview in browser'}
+            disabled={!bestProvider.available || previewLoading || actionInProgress}
+            title={
+              !bestProvider.available
+                ? bestProvider.reason || 'Preview provider unavailable'
+                : `Open preview with ${bestProvider.name}`
+            }
           >
             {previewLoading ? 'Opening...' : 'Preview'}
           </button>

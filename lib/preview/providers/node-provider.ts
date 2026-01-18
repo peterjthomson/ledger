@@ -28,7 +28,6 @@
 import { spawn, ChildProcess } from 'child_process'
 import * as fs from 'fs'
 import * as path from 'path'
-import { shell } from 'electron'
 
 // ============================================================================
 // Types
@@ -233,8 +232,6 @@ export async function previewWorktree(
   // Check if already running
   const existing = runningServers.get(worktreePath)
   if (existing) {
-    // Server already running - just open the URL
-    await shell.openExternal(existing.url)
     return {
       success: true,
       message: `Already running at ${existing.url}`,
@@ -320,8 +317,6 @@ export async function previewWorktree(
           startedAt: new Date(),
         })
 
-        shell.openExternal(fallbackUrl)
-
         resolve({
           success: true,
           message: `${framework} dev server started (port detection timed out)`,
@@ -350,9 +345,6 @@ export async function previewWorktree(
             port,
             startedAt: new Date(),
           })
-
-          // Open in browser
-          shell.openExternal(detectedUrl)
 
           resolve({
             success: true,
@@ -383,8 +375,6 @@ export async function previewWorktree(
             port,
             startedAt: new Date(),
           })
-
-          shell.openExternal(detectedUrl)
 
           resolve({
             success: true,

@@ -7,8 +7,14 @@
 import { shell } from 'electron'
 import { handle } from '@/lib/main/shared'
 import { previewRegistry, initializePreviewProviders } from '@/lib/preview'
-import { isHerdInstalled, isLaravelProject, setupWorktreeForPreview } from '@/lib/main/herd-service'
-import { createWorktree, ensurePreviewsDirectory, getPreviewWorktreePath } from '@/lib/main/git-service'
+import {
+  isHerdInstalled,
+  isLaravelProject,
+  setupWorktreeForPreview,
+  ensurePreviewsDirectory,
+  getPreviewWorktreePath,
+} from '@/lib/main/herd-service'
+import { createWorktree } from '@/lib/main/git-service'
 import { existsSync } from 'fs'
 import type { CreateWorktreeFn } from '@/lib/preview/preview-types'
 

@@ -5,7 +5,7 @@
  */
 
 import { useState, useEffect, useMemo, useRef } from 'react'
-import type { Branch, BranchDiff, BranchDiffType, PullRequest } from '../../../types/electron'
+import type { Branch, BranchDiff, BranchDiffType, PullRequest, PreviewProviderInfo } from '../../../types/electron'
 import type { StatusMessage } from '../../../types/app-types'
 import { DiffViewer } from '../../ui/DiffViewer'
 
@@ -42,9 +42,8 @@ export function BranchDetailPanel({
 }: BranchDetailPanelProps) {
   const [creatingPR, setCreatingPR] = useState(false)
   const [pushing, setPushing] = useState(false)
-  // Herd preview state
-  const [herdInstalled, setHerdInstalled] = useState<boolean | null>(null)
-  const [isLaravel, setIsLaravel] = useState(false)
+  // Preview provider state
+  const [previewProviders, setPreviewProviders] = useState<PreviewProviderInfo[]>([])
   const [previewLoading, setPreviewLoading] = useState(false)
   const [branchDiff, setBranchDiff] = useState<BranchDiff | null>(null)
   const [loadingDiff, setLoadingDiff] = useState(false)
@@ -107,24 +106,26 @@ export function BranchDetailPanel({
     }
   }, [branch.name, isMainOrMaster, diffType])
 
-  // Check preview availability when repoPath changes
+  const bestProvider = useMemo(
+    () => previewProviders.find((provider) => provider.compatible) || null,
+    [previewProviders]
+  )
+
+  // Check preview providers when repoPath changes
   useEffect(() => {
     if (!repoPath) {
-      setHerdInstalled(false)
-      setIsLaravel(false)
+      setPreviewProviders([])
       return
     }
-    const checkPreview = async () => {
+    const loadProviders = async () => {
       try {
-        const result = await window.conveyor.preview.checkAvailable(repoPath)
-        setHerdInstalled(result.herdInstalled)
-        setIsLaravel(result.isLaravel)
+        const providers = await window.conveyor.preview.getProviders(repoPath)
+        setPreviewProviders(providers)
       } catch {
-        setHerdInstalled(false)
-        setIsLaravel(false)
+        setPreviewProviders([])
       }
     }
-    checkPreview()
+    loadProviders()
   }, [repoPath])
 
   const handleStartPRCreation = () => {
@@ -487,12 +488,16 @@ export function BranchDetailPanel({
           <button className="btn btn-secondary" onClick={() => window.electronAPI.openBranchInGitHub(branch.name)} disabled={deleting || renaming}>
             View on GitHub
           </button>
-          {herdInstalled && (
+          {bestProvider && (
             <button
               className="btn btn-secondary"
               onClick={handlePreviewInBrowser}
-              disabled={!isLaravel || previewLoading || deleting}
-              title={!isLaravel ? 'Preview not available for this project type' : 'Open preview in browser'}
+              disabled={!bestProvider.available || previewLoading || deleting}
+              title={
+                !bestProvider.available
+                  ? bestProvider.reason || 'Preview provider unavailable'
+                  : `Open preview with ${bestProvider.name}`
+              }
             >
               {previewLoading ? 'Opening...' : 'Preview'}
             </button>

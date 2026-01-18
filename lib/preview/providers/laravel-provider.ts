@@ -17,7 +17,6 @@ import { spawn, exec, ChildProcess } from 'child_process'
 import { promisify } from 'util'
 import * as fs from 'fs'
 import * as path from 'path'
-import { shell } from 'electron'
 import type { PreviewProvider, PreviewResult, ProviderAvailability, CreateWorktreeFn } from '../preview-types'
 
 const execAsync = promisify(exec)
@@ -453,7 +452,6 @@ export const laravelProvider: PreviewProvider = {
     // Check if already running
     const existing = runningServers.get(worktreePath)
     if (existing) {
-      await shell.openExternal(existing.url)
       return {
         success: true,
         message: `Already running at ${existing.url}`,
@@ -502,8 +500,6 @@ export const laravelProvider: PreviewProvider = {
           useHerd: true,
         })
 
-        await shell.openExternal(linkResult.url!)
-
         return {
           success: true,
           message: 'Linked with Herd',
@@ -532,8 +528,6 @@ export const laravelProvider: PreviewProvider = {
             useHerd: false,
           })
 
-          shell.openExternal(url)
-
           resolve({
             success: true,
             message: 'Laravel server started (startup detection timed out)',
@@ -558,8 +552,6 @@ export const laravelProvider: PreviewProvider = {
               startedAt: new Date(),
               useHerd: false,
             })
-
-            shell.openExternal(url)
 
             resolve({
               success: true,

@@ -2483,6 +2483,7 @@ export async function createWorktree(
     // Check if branch already exists (for new branches)
     const branches = await git.branchLocal()
     const branchExists = branches.all.includes(branchName!)
+    let remoteBranchName: string | null = null
 
     if (isNewBranch && branchExists) {
       return { success: false, message: `Branch '${branchName}' already exists` }
@@ -2491,19 +2492,23 @@ export async function createWorktree(
     if (!isNewBranch && !branchExists) {
       // Check if it's a remote branch we can track
       const remoteBranches = await git.branch(['-r'])
-      const remoteBranchName = `origin/${branchName}`
-      if (!remoteBranches.all.includes(remoteBranchName)) {
+      const candidate = `origin/${branchName}`
+      if (!remoteBranches.all.includes(candidate)) {
         return { success: false, message: `Branch '${branchName}' does not exist` }
       }
+      remoteBranchName = candidate
     }
 
     // Create the worktree
     if (isNewBranch) {
       // Create worktree with new branch: git worktree add -b <branch> <path>
       await git.raw(['worktree', 'add', '-b', branchName!, folderPath])
-    } else {
-      // Create worktree with existing branch: git worktree add <path> <branch>
+    } else if (branchExists) {
+      // Create worktree with existing local branch: git worktree add <path> <branch>
       await git.raw(['worktree', 'add', folderPath, branchName!])
+    } else {
+      // Create local tracking branch from remote
+      await git.raw(['worktree', 'add', '-b', branchName!, folderPath, remoteBranchName!])
     }
 
     return {
