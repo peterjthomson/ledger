@@ -9,6 +9,5 @@ export { TldrawRenderer, default as TldrawRendererDefault } from './TldrawRender
 export { ReactFlowRenderer, default as ReactFlowRendererDefault } from './ReactFlowRenderer'
 export { JsonRenderer, default as JsonRendererDefault } from './JsonRenderer'
 
-// Node and Edge components for React Flow
+// Node component for React Flow (edge uses default smoothstep)
 export { EntityNode, type EntityNodeData } from './EntityNode'
-export { RelationshipEdge, type RelationshipEdgeData } from './RelationshipEdge'

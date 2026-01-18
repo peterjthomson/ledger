@@ -74,6 +74,9 @@ export function createRelationshipArrows(
   schema: ERDSchema,
   entityShapeIds: Map<string, TLShapeId>
 ): void {
+  // Build a set of valid entity IDs from the schema
+  const validEntityIds = new Set(schema.entities.map((e) => e.id))
+
   const arrows: Array<{
     id: TLShapeId
     type: 'arrow'
@@ -88,6 +91,11 @@ export function createRelationshipArrows(
   }> = []
 
   for (const rel of schema.relationships) {
+    // Skip relationships where either entity doesn't exist in the current schema
+    if (!validEntityIds.has(rel.from.entity) || !validEntityIds.has(rel.to.entity)) {
+      continue
+    }
+
     const fromShapeId = entityShapeIds.get(rel.from.entity)
     const toShapeId = entityShapeIds.get(rel.to.entity)
 

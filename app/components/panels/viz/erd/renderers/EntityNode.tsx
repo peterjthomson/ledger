@@ -51,11 +51,55 @@ function EntityNodeComponent({ data, selected }: NodeProps<EntityNodeData>) {
 
   return (
     <div className={`erd-entity-node ${selected ? 'selected' : ''}`}>
-      {/* Connection handles */}
-      <Handle type="target" position={Position.Top} className="erd-handle erd-handle-top" />
-      <Handle type="source" position={Position.Bottom} className="erd-handle erd-handle-bottom" />
-      <Handle type="target" position={Position.Left} className="erd-handle erd-handle-left" />
-      <Handle type="source" position={Position.Right} className="erd-handle erd-handle-right" />
+      {/* Connection handles - each position can be both source and target */}
+      <Handle
+        type="target"
+        position={Position.Top}
+        id="top-target"
+        className="erd-handle erd-handle-top"
+      />
+      <Handle
+        type="source"
+        position={Position.Top}
+        id="top-source"
+        className="erd-handle erd-handle-top"
+      />
+      <Handle
+        type="target"
+        position={Position.Bottom}
+        id="bottom-target"
+        className="erd-handle erd-handle-bottom"
+      />
+      <Handle
+        type="source"
+        position={Position.Bottom}
+        id="bottom-source"
+        className="erd-handle erd-handle-bottom"
+      />
+      <Handle
+        type="target"
+        position={Position.Left}
+        id="left-target"
+        className="erd-handle erd-handle-left"
+      />
+      <Handle
+        type="source"
+        position={Position.Left}
+        id="left-source"
+        className="erd-handle erd-handle-left"
+      />
+      <Handle
+        type="target"
+        position={Position.Right}
+        id="right-target"
+        className="erd-handle erd-handle-right"
+      />
+      <Handle
+        type="source"
+        position={Position.Right}
+        id="right-source"
+        className="erd-handle erd-handle-right"
+      />
 
       {/* Entity content */}
       <div className="erd-entity-header">{entity.displayName || entity.name}</div>

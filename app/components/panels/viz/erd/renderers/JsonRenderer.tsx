@@ -8,7 +8,7 @@
 import { useCallback, useMemo } from 'react'
 import { JsonView, darkStyles, defaultStyles } from 'react-json-view-lite'
 import 'react-json-view-lite/dist/index.css'
-import type { ERDSchema } from '@/lib/services/erd/erd-types'
+import type { ERDSchema, ERDEntity, ERDRelationship } from '@/lib/services/erd/erd-types'
 
 interface JsonRendererProps {
   schema: ERDSchema | null
@@ -27,6 +27,33 @@ const customLightStyles = {
   container: 'erd-json-container erd-json-light',
 }
 
+/**
+ * Transform schema data to show names in collapsed previews
+ * by restructuring as an object keyed by name/id
+ */
+function transformForDisplay(schema: ERDSchema): object {
+  // Transform entities array to object keyed by name
+  const entitiesByName: Record<string, ERDEntity> = {}
+  for (const entity of schema.entities) {
+    entitiesByName[entity.name] = entity
+  }
+
+  // Transform relationships to show from->to in key
+  const relationshipsByKey: Record<string, ERDRelationship> = {}
+  for (const rel of schema.relationships) {
+    const key = `${rel.from.entity} → ${rel.to.entity}`
+    relationshipsByKey[key] = rel
+  }
+
+  return {
+    framework: schema.framework,
+    source: schema.source,
+    parsedAt: schema.parsedAt,
+    entities: entitiesByName,
+    relationships: relationshipsByKey,
+  }
+}
+
 export function JsonRenderer({ schema }: JsonRendererProps) {
   // Detect dark mode from media query
   const isDarkMode = useMemo(() => {
@@ -34,10 +61,16 @@ export function JsonRenderer({ schema }: JsonRendererProps) {
     return window.matchMedia('(prefers-color-scheme: dark)').matches
   }, [])
 
+  // Transform schema for better display
+  const displayData = useMemo(() => {
+    if (!schema) return null
+    return transformForDisplay(schema)
+  }, [schema])
+
   // Control which nodes are expanded by default
   const shouldExpandNode = useCallback((level: number, _value: unknown, _field?: string) => {
-    // Expand first two levels by default
-    return level < 2
+    // Only expand top level by default
+    return level < 1
   }, [])
 
   // Copy schema to clipboard
@@ -47,7 +80,7 @@ export function JsonRenderer({ schema }: JsonRendererProps) {
     }
   }, [schema])
 
-  if (!schema) {
+  if (!schema || !displayData) {
     return (
       <div className="erd-renderer erd-json-renderer erd-empty">
         <p>No schema data to display</p>
@@ -67,7 +100,7 @@ export function JsonRenderer({ schema }: JsonRendererProps) {
       </div>
       <div className="erd-json-content">
         <JsonView
-          data={schema}
+          data={displayData}
           shouldExpandNode={shouldExpandNode}
           style={isDarkMode ? customDarkStyles : customLightStyles}
         />

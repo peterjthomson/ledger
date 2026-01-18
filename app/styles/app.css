@@ -9236,6 +9236,27 @@ body,
   border-radius: 6px;
 }
 
+/* React Flow edges - ensure visibility */
+.erd-reactflow-renderer .react-flow__edge-path {
+  stroke: #888 !important;
+  stroke-width: 2px !important;
+}
+
+.erd-reactflow-renderer .react-flow__edge.selected .react-flow__edge-path {
+  stroke: var(--accent) !important;
+  stroke-width: 3px !important;
+}
+
+.erd-reactflow-renderer .react-flow__edge-interaction {
+  stroke-width: 20px;
+}
+
+/* Edge markers */
+.erd-reactflow-renderer .react-flow__arrowhead polyline {
+  fill: #888;
+  stroke: #888;
+}
+
 /* Entity Node Styles (React Flow) */
 .erd-entity-node {
   background: var(--bg-primary);
