@@ -448,6 +448,67 @@ export interface TechTreeData {
   }
 }
 
+// ERD (Entity Relationship Diagram) types
+export type ERDFramework = 'laravel' | 'rails' | 'generic'
+export type ERDConstraint = 'PK' | 'FK' | 'UK' | 'nullable' | 'indexed'
+export type ERDCardinality = 'one' | 'zero-or-one' | 'many' | 'one-or-more'
+
+export interface ERDForeignKey {
+  table: string
+  column: string
+}
+
+export interface ERDAttribute {
+  name: string
+  type: string
+  constraints: ERDConstraint[]
+  foreignKey?: ERDForeignKey
+  defaultValue?: string
+  comment?: string
+}
+
+export interface ERDEntity {
+  id: string
+  name: string
+  displayName: string
+  attributes: ERDAttribute[]
+  position?: { x: number; y: number }
+}
+
+export interface ERDRelationshipEndpoint {
+  entity: string
+  attribute?: string
+  cardinality: ERDCardinality
+}
+
+export interface ERDRelationship {
+  id: string
+  from: ERDRelationshipEndpoint
+  to: ERDRelationshipEndpoint
+  label?: string
+  type: 'identifying' | 'non-identifying'
+}
+
+export interface ERDSchema {
+  entities: ERDEntity[]
+  relationships: ERDRelationship[]
+  framework: ERDFramework
+  source: string
+  parsedAt: string
+}
+
+export interface ERDParseResult {
+  success: boolean
+  data?: ERDSchema
+  message?: string
+}
+
+export interface ERDFrameworkResult {
+  success: boolean
+  data?: ERDFramework
+  message?: string
+}
+
 export interface ElectronAPI {
   selectRepo: () => Promise<string | null>
   getRepoPath: () => Promise<string | null>
@@ -621,6 +682,10 @@ export interface ElectronAPI {
   updateCanvas: (canvasId: string, updates: Partial<CanvasConfig>) => Promise<{ success: boolean }>
   // Repo operations
   getSiblingRepos: () => Promise<RepoInfo[]>
+  // ERD operations
+  getERDSchema: (repoPath?: string) => Promise<ERDParseResult>
+  detectERDFramework: (repoPath?: string) => Promise<ERDFrameworkResult>
+  parseMermaidERD: (content: string) => Promise<ERDParseResult>
 }
 
 // Canvas configuration types for persistence

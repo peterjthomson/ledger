@@ -8745,3 +8745,726 @@ body,
   height: 100%;
   pointer-events: none;
 }
+
+/* ========================================
+ * ERD Canvas Panel Styles
+ * Entity Relationship Diagram visualization
+ * ======================================== */
+
+.erd-canvas-panel {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  overflow: hidden;
+}
+
+.erd-canvas-content {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.erd-canvas-container {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  background: var(--bg-primary);
+  overflow: hidden;
+}
+
+/* ERD Canvas Header */
+.erd-canvas-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--border-primary);
+  background: var(--bg-secondary);
+}
+
+.erd-canvas-title {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.erd-framework-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-size: 11px;
+  font-weight: 500;
+}
+
+.erd-framework-laravel {
+  background: rgba(255, 45, 32, 0.15);
+  color: #ff5e57;
+  border: 1px solid rgba(255, 45, 32, 0.3);
+}
+
+.erd-framework-rails {
+  background: rgba(204, 0, 0, 0.15);
+  color: #ff4444;
+  border: 1px solid rgba(204, 0, 0, 0.3);
+}
+
+.erd-entity-count {
+  font-size: 11px;
+  color: var(--text-secondary);
+}
+
+.erd-canvas-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.erd-action-button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border-primary);
+  border-radius: 4px;
+  color: var(--text-secondary);
+  cursor: pointer;
+  font-size: 14px;
+  transition: all 0.15s ease;
+}
+
+.erd-action-button:hover {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+}
+
+/* tldraw Canvas Wrapper */
+.erd-canvas-wrapper {
+  flex: 1;
+  position: relative;
+  min-height: 0;
+}
+
+.erd-canvas-wrapper > div {
+  position: absolute !important;
+  inset: 0;
+}
+
+/* Empty/Loading/Error States */
+.erd-empty-state,
+.erd-loading-state,
+.erd-error-state {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+}
+
+.erd-empty-content,
+.erd-loading-content,
+.erd-error-content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  text-align: center;
+  padding: 32px;
+  max-width: 300px;
+}
+
+.erd-empty-icon,
+.erd-error-icon {
+  font-size: 48px;
+  opacity: 0.5;
+}
+
+.erd-empty-content p,
+.erd-loading-content p,
+.erd-error-content p {
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: 14px;
+}
+
+.erd-empty-hint,
+.erd-error-message {
+  font-size: 12px !important;
+  color: var(--text-tertiary) !important;
+}
+
+.erd-loading-spinner {
+  width: 32px;
+  height: 32px;
+  border: 3px solid var(--border-primary);
+  border-top-color: var(--accent-primary);
+  border-radius: 50%;
+  animation: erd-spin 0.8s linear infinite;
+}
+
+@keyframes erd-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.erd-retry-button {
+  margin-top: 8px;
+  padding: 8px 16px;
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border-primary);
+  border-radius: 6px;
+  color: var(--text-primary);
+  font-size: 13px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.erd-retry-button:hover {
+  background: var(--bg-hover);
+  border-color: var(--accent-primary);
+}
+
+/* ========================================
+ * ERD Entity Shape Styles (tldraw custom shape)
+ * ======================================== */
+
+.erd-entity-shape {
+  display: flex;
+  flex-direction: column;
+  background: var(--bg-secondary, #1a1d21);
+  border: 1px solid var(--border-primary, #2d3139);
+  border-radius: 6px;
+  font-family: 'SF Mono', 'Fira Code', 'Consolas', monospace;
+  font-size: 12px;
+  overflow: hidden;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+}
+
+.erd-entity-header {
+  background: var(--accent-primary, #3b82f6);
+  color: white;
+  padding: 8px 12px;
+  font-weight: 600;
+  font-size: 13px;
+  text-align: center;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.1);
+}
+
+.erd-entity-attributes {
+  display: flex;
+  flex-direction: column;
+}
+
+.erd-attribute {
+  display: flex;
+  align-items: center;
+  padding: 4px 8px;
+  border-bottom: 1px solid var(--border-secondary, #23272e);
+  gap: 8px;
+}
+
+.erd-attribute:last-child {
+  border-bottom: none;
+}
+
+.erd-attribute:hover {
+  background: var(--bg-hover, rgba(255, 255, 255, 0.05));
+}
+
+.erd-attribute-empty {
+  justify-content: center;
+  color: var(--text-tertiary, #6b7280);
+  font-style: italic;
+}
+
+.erd-attr-key {
+  width: 24px;
+  text-align: center;
+  font-size: 10px;
+  flex-shrink: 0;
+}
+
+.erd-attr-name {
+  flex: 1;
+  color: var(--text-primary, #e0e4e8);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.erd-attr-name.erd-attr-nullable {
+  color: var(--text-secondary, #9ca3af);
+}
+
+.erd-attr-type {
+  color: var(--text-tertiary, #6b7280);
+  font-size: 11px;
+  flex-shrink: 0;
+}
+
+/* tldraw Theme Overrides for ERD */
+/* Uses Ledger's CSS variables for consistent theming */
+
+/* Light mode - map tldraw variables to Ledger theme */
+.erd-canvas-wrapper .tl-container.tl-theme__light,
+.erd-canvas-wrapper .tl-theme__light {
+  --tl-color-background: var(--bg-primary);
+  --tl-color-panel: var(--bg-secondary);
+  --tl-color-panel-contrast: var(--bg-primary);
+  --tl-color-panel-overlay: rgba(255, 255, 255, 0.82);
+  --tl-color-panel-transparent: rgba(255, 255, 255, 0);
+  --tl-color-low: var(--bg-tertiary);
+  --tl-color-low-border: var(--border-subtle);
+  --tl-color-divider: var(--border-subtle);
+  --tl-color-culled: var(--bg-hover);
+  --tl-color-muted-none: rgba(0, 0, 0, 0);
+  --tl-color-muted-0: rgba(0, 0, 0, 0.02);
+  --tl-color-muted-1: rgba(0, 0, 0, 0.1);
+  --tl-color-muted-2: rgba(0, 0, 0, 0.05);
+  --tl-color-hint: rgba(0, 0, 0, 0.06);
+  --tl-color-overlay: rgba(0, 0, 0, 0.2);
+  --tl-color-text: var(--text-primary);
+  --tl-color-text-0: var(--text-primary);
+  --tl-color-text-1: var(--text-secondary);
+  --tl-color-text-3: var(--text-muted);
+  --tl-color-text-shadow: rgba(255, 255, 255, 1);
+  --tl-color-selected: var(--accent);
+  --tl-color-selected-contrast: #ffffff;
+  --tl-color-focus: var(--accent);
+  --tl-color-primary: var(--accent);
+  --tl-color-success: var(--success);
+  --tl-color-warning: var(--warning);
+  --tl-color-danger: var(--error);
+  --tl-color-info: var(--info);
+  --tl-color-grid: var(--border);
+}
+
+/* Dark mode - map tldraw variables to Ledger dark theme */
+.erd-canvas-wrapper .tl-container.tl-theme__dark,
+.erd-canvas-wrapper .tl-theme__dark {
+  --tl-color-background: var(--bg-primary);
+  --tl-color-panel: var(--bg-secondary);
+  --tl-color-panel-contrast: var(--bg-hover);
+  --tl-color-panel-overlay: rgba(37, 37, 38, 0.82);
+  --tl-color-panel-transparent: rgba(37, 37, 38, 0);
+  --tl-color-low: var(--bg-tertiary);
+  --tl-color-low-border: var(--bg-hover);
+  --tl-color-divider: var(--bg-hover);
+  --tl-color-culled: var(--bg-tertiary);
+  --tl-color-muted-none: rgba(255, 255, 255, 0);
+  --tl-color-muted-0: rgba(255, 255, 255, 0.02);
+  --tl-color-muted-1: rgba(255, 255, 255, 0.1);
+  --tl-color-muted-2: rgba(255, 255, 255, 0.05);
+  --tl-color-hint: rgba(255, 255, 255, 0.06);
+  --tl-color-overlay: rgba(0, 0, 0, 0.35);
+  --tl-color-text: var(--text-primary);
+  --tl-color-text-0: var(--text-primary);
+  --tl-color-text-1: var(--text-secondary);
+  --tl-color-text-3: var(--text-muted);
+  --tl-color-text-shadow: rgba(0, 0, 0, 1);
+  --tl-color-selected: var(--accent);
+  --tl-color-selected-contrast: #ffffff;
+  --tl-color-focus: var(--accent);
+  --tl-color-primary: var(--accent);
+  --tl-color-success: var(--success);
+  --tl-color-warning: var(--warning);
+  --tl-color-danger: var(--error);
+  --tl-color-info: var(--info);
+  --tl-color-grid: var(--border);
+}
+
+/* Force text/icon colors using Ledger theme variables */
+.erd-canvas-wrapper .tl-container.tl-theme__light {
+  color: var(--text-primary) !important;
+}
+
+.erd-canvas-wrapper .tl-container.tl-theme__light .tlui-button,
+.erd-canvas-wrapper .tl-container.tl-theme__light .tlui-button__label {
+  color: var(--text-secondary) !important;
+}
+
+.erd-canvas-wrapper .tl-container.tl-theme__light .tlui-icon {
+  color: var(--text-secondary) !important;
+}
+
+.erd-canvas-wrapper .tl-container.tl-theme__light .tlui-kbd {
+  color: var(--text-muted) !important;
+}
+
+/* Dark mode text/icon colors */
+.erd-canvas-wrapper .tl-container.tl-theme__dark {
+  color: var(--text-primary) !important;
+}
+
+.erd-canvas-wrapper .tl-container.tl-theme__dark .tlui-button,
+.erd-canvas-wrapper .tl-container.tl-theme__dark .tlui-button__label {
+  color: var(--text-secondary) !important;
+}
+
+.erd-canvas-wrapper .tl-container.tl-theme__dark .tlui-icon {
+  color: var(--text-secondary) !important;
+}
+
+.erd-canvas-wrapper .tl-container.tl-theme__dark .tlui-kbd {
+  color: var(--text-muted) !important;
+}
+
+/* ========================================
+ * ERD RENDERER TOGGLE
+ * ======================================== */
+
+.erd-renderer-toggle {
+  display: flex;
+  background: var(--bg-secondary);
+  border-radius: 6px;
+  padding: 2px;
+  gap: 2px;
+}
+
+.erd-renderer-btn {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 10px;
+  border: none;
+  background: transparent;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 12px;
+  color: var(--text-secondary);
+  transition: all 0.15s ease;
+}
+
+.erd-renderer-btn:hover {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+}
+
+.erd-renderer-btn.active {
+  background: var(--bg-primary);
+  color: var(--accent);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.erd-renderer-icon {
+  font-family: monospace;
+  font-size: 11px;
+}
+
+.erd-renderer-label {
+  font-weight: 500;
+}
+
+/* ========================================
+ * ERD RENDERERS - COMMON
+ * ======================================== */
+
+.erd-renderer {
+  width: 100%;
+  height: 100%;
+  position: absolute;
+  inset: 0;
+}
+
+.erd-renderer.erd-empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-muted);
+}
+
+/* ========================================
+ * TLDRAW RENDERER
+ * ======================================== */
+
+.erd-tldraw-renderer {
+  /* tldraw fills the container naturally */
+}
+
+.erd-tldraw-renderer > div {
+  position: absolute !important;
+  inset: 0;
+}
+
+/* ========================================
+ * REACT FLOW RENDERER
+ * ======================================== */
+
+.erd-reactflow-renderer {
+  background: var(--bg-primary);
+}
+
+/* React Flow theme overrides */
+.erd-reactflow-renderer .react-flow {
+  background: var(--bg-primary);
+}
+
+.erd-reactflow-renderer .react-flow__background {
+  background: var(--bg-primary);
+}
+
+.erd-reactflow-renderer .react-flow__background-pattern {
+  fill: var(--border-secondary);
+}
+
+/* React Flow controls */
+.erd-reactflow-renderer .react-flow__controls {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-primary);
+  border-radius: 6px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.erd-reactflow-renderer .react-flow__controls-button {
+  background: var(--bg-secondary);
+  border-color: var(--border-primary);
+  fill: var(--text-secondary);
+}
+
+.erd-reactflow-renderer .react-flow__controls-button:hover {
+  background: var(--bg-hover);
+}
+
+/* React Flow minimap */
+.erd-reactflow-renderer .react-flow__minimap {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-primary);
+  border-radius: 6px;
+}
+
+/* React Flow edges - ensure visibility */
+.erd-reactflow-renderer .react-flow__edge-path {
+  stroke: #888 !important;
+  stroke-width: 2px !important;
+}
+
+.erd-reactflow-renderer .react-flow__edge.selected .react-flow__edge-path {
+  stroke: var(--accent) !important;
+  stroke-width: 3px !important;
+}
+
+.erd-reactflow-renderer .react-flow__edge-interaction {
+  stroke-width: 20px;
+}
+
+/* Edge markers */
+.erd-reactflow-renderer .react-flow__arrowhead polyline {
+  fill: #888;
+  stroke: #888;
+}
+
+/* Entity Node Styles (React Flow) */
+.erd-entity-node {
+  background: var(--bg-primary);
+  border: 1px solid var(--border-primary);
+  border-radius: 6px;
+  font-size: 12px;
+  min-width: 180px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+  overflow: hidden;
+}
+
+.erd-entity-node.selected {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px var(--accent-subtle), 0 2px 8px rgba(0, 0, 0, 0.12);
+}
+
+.erd-entity-node .erd-entity-header {
+  padding: 8px 12px;
+  background: var(--accent);
+  color: white;
+  font-weight: 600;
+  text-align: center;
+}
+
+.erd-entity-node .erd-entity-attributes {
+  padding: 4px 0;
+}
+
+.erd-entity-node .erd-attribute {
+  display: flex;
+  padding: 4px 12px;
+  gap: 8px;
+  align-items: baseline;
+}
+
+.erd-entity-node .erd-attribute:hover {
+  background: var(--bg-hover);
+}
+
+.erd-entity-node .erd-attr-key {
+  width: 24px;
+  font-size: 10px;
+  flex-shrink: 0;
+}
+
+.erd-entity-node .erd-attr-name {
+  flex: 1;
+  font-weight: 500;
+  color: var(--text-primary);
+}
+
+.erd-entity-node .erd-attr-name.erd-attr-nullable {
+  font-style: italic;
+  color: var(--text-secondary);
+}
+
+.erd-entity-node .erd-attr-type {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--text-muted);
+}
+
+.erd-entity-node .erd-attribute-empty {
+  color: var(--text-muted);
+  font-style: italic;
+}
+
+/* React Flow handles */
+.erd-handle {
+  width: 8px !important;
+  height: 8px !important;
+  background: var(--border-primary) !important;
+  border: 2px solid var(--bg-primary) !important;
+}
+
+.erd-handle:hover {
+  background: var(--accent) !important;
+}
+
+/* Relationship Edge Styles (React Flow) */
+.erd-relationship-edge {
+  stroke: var(--border-primary);
+}
+
+.erd-relationship-edge.selected {
+  stroke: var(--accent);
+}
+
+.erd-edge-label {
+  background: var(--bg-secondary);
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-size: 10px;
+  color: var(--text-secondary);
+  border: 1px solid var(--border-primary);
+}
+
+.erd-edge-cardinality {
+  background: var(--bg-primary);
+  padding: 1px 4px;
+  border-radius: 3px;
+  font-size: 9px;
+  font-weight: 600;
+  color: var(--text-muted);
+  font-family: var(--font-mono);
+}
+
+/* ========================================
+ * JSON RENDERER
+ * ======================================== */
+
+.erd-json-renderer {
+  display: flex;
+  flex-direction: column;
+  background: var(--bg-primary);
+  overflow: hidden;
+}
+
+.erd-json-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--border-primary);
+  background: var(--bg-secondary);
+}
+
+.erd-json-stats {
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.erd-json-copy-btn {
+  padding: 4px 10px;
+  border: 1px solid var(--border-primary);
+  border-radius: 4px;
+  background: var(--bg-primary);
+  color: var(--text-secondary);
+  font-size: 12px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.erd-json-copy-btn:hover {
+  background: var(--bg-hover);
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.erd-json-content {
+  flex: 1;
+  overflow: auto;
+  padding: 12px;
+}
+
+/* JSON view container overrides */
+.erd-json-container {
+  font-family: var(--font-mono) !important;
+  font-size: 12px !important;
+  line-height: 1.5 !important;
+}
+
+.erd-json-light {
+  background: var(--bg-primary) !important;
+  color: var(--text-primary) !important;
+}
+
+.erd-json-dark {
+  background: var(--bg-primary) !important;
+  color: var(--text-primary) !important;
+}
+
+/* JSON view nested styles */
+.erd-json-container [class*="basicChildStyle"] {
+  padding-left: 16px !important;
+}
+
+.erd-json-container [class*="label"] {
+  color: var(--accent) !important;
+}
+
+.erd-json-container [class*="valueString"] {
+  color: #098658 !important;
+}
+
+.erd-json-container [class*="valueNumber"] {
+  color: #0451a5 !important;
+}
+
+.erd-json-container [class*="valueBoolean"] {
+  color: #0451a5 !important;
+}
+
+.erd-json-container [class*="valueNull"] {
+  color: var(--text-muted) !important;
+}
+
+/* Dark mode JSON colors */
+@media (prefers-color-scheme: dark) {
+  .erd-json-container [class*="valueString"] {
+    color: #4ec9b0 !important;
+  }
+
+  .erd-json-container [class*="valueNumber"] {
+    color: #b5cea8 !important;
+  }
+
+  .erd-json-container [class*="valueBoolean"] {
+    color: #569cd6 !important;
+  }
+}

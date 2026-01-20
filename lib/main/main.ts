@@ -32,6 +32,7 @@ import { registerMailmapHandlers } from '@/lib/conveyor/handlers/mailmap-handler
 import { registerAnalyticsHandlers } from '@/lib/conveyor/handlers/analytics-handler'
 import { registerCanvasHandlers } from '@/lib/conveyor/handlers/canvas-handler'
 import { registerPreviewHandlers, cleanupPreviewHandlers } from '@/lib/conveyor/handlers/preview-handler'
+import { registerERDHandlers } from '@/lib/conveyor/handlers/erd-handler'
 import { markChannelRegistered } from '@/lib/main/shared'
 
 // IPC channels registered in this file (for documentation/debugging)
@@ -196,6 +197,7 @@ app.whenReady().then(() => {
   registerAnalyticsHandlers()
   registerCanvasHandlers()
   registerPreviewHandlers()
+  registerERDHandlers()
 
   // Register git IPC handlers
   ipcMain.handle('select-repo', async () => {

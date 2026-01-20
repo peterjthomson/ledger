@@ -110,16 +110,20 @@ export function Column({
       data-column-id={column.id}
       data-width-mode={column.width === 'flex' ? 'flex' : 'fixed'}
       style={style}
-      draggable={canDrag}
-      onDragStart={canDrag ? handleDragStart : undefined}
       onDragOver={canDrag ? handleDragOver : undefined}
       onDrop={canDrag ? handleDrop : undefined}
       onDragEnd={canDrag ? handleDragEnd : undefined}
       onDragLeave={canDrag ? onDragLeave : undefined}
     >
-      {/* Drag handle - only show if dragging is enabled */}
+      {/* Drag handle - only the handle is draggable, not the entire column */}
+      {/* This allows canvas content (like tldraw) to handle its own pointer events */}
       {canDrag && (
-        <div className="canvas-column-drag-handle" title="Drag to reorder">
+        <div
+          className="canvas-column-drag-handle"
+          title="Drag to reorder"
+          draggable
+          onDragStart={handleDragStart}
+        >
           ⋮⋮
         </div>
       )}

@@ -31,6 +31,7 @@ import { EditorSlot } from './EditorSlot'
 // Import panels
 import { PRList, BranchList, WorktreeList, StashList, CommitList, Sidebar, RepoList } from '../panels/list'
 import { GitGraph, ContributorChart, TechTreeChart } from '../panels/viz'
+import { ERDCanvasPanel } from '../panels/viz/erd'
 
 // ========================================
 // Data Interface
@@ -398,6 +399,7 @@ export function CanvasRenderer({
           { id: 'git-graph', label: 'Git Graph', icon: '◉' },
           { id: 'timeline', label: 'Timeline', icon: '◔' },
           { id: 'tech-tree', label: 'Tech Tree', icon: '⬡' },
+          { id: 'erd-canvas', label: 'ERD', icon: '◫' },
         ]
         
         return (
@@ -490,10 +492,10 @@ export function CanvasRenderer({
         case 'tech-tree':
           return (
             <div className="viz-panel tech-tree-panel">
-              <VizHeader 
+              <VizHeader
                 panel={column.panel}
-                label={column.label || 'Tech Tree'} 
-                icon={column.icon || '⬡'} 
+                label={column.label || 'Tech Tree'}
+                icon={column.icon || '⬡'}
               />
               <div className="viz-panel-content">
                 <TechTreeChart
@@ -507,6 +509,20 @@ export function CanvasRenderer({
             </div>
           )
 
+        case 'erd-canvas':
+          return (
+            <div className="viz-panel erd-canvas-panel">
+              <VizHeader
+                panel={column.panel}
+                label={column.label || 'ERD'}
+                icon={column.icon || '◫'}
+              />
+              <div className="viz-panel-content erd-canvas-content">
+                <ERDCanvasPanel repoPath={data.repoPath} />
+              </div>
+            </div>
+          )
+
         default:
           return (
             <div className="empty-column">
@@ -515,7 +531,18 @@ export function CanvasRenderer({
           )
       }
     },
-    [data.commits, selection.selectedCommit, handlers, activeCanvas, setColumnPanel, columnWidths, handleStartColumnResize, handleResetColumnWidth, resizingColumn]
+    [
+      data.commits,
+      data.repoPath,
+      selection.selectedCommit,
+      handlers,
+      activeCanvas,
+      setColumnPanel,
+      columnWidths,
+      handleStartColumnResize,
+      handleResetColumnWidth,
+      resizingColumn,
+    ]
   )
 
   // Render an editor panel based on column config
