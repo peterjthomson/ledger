@@ -40,6 +40,7 @@ type LoadingState = 'idle' | 'loading' | 'success' | 'error' | 'no-schema'
 
 export function ERDCanvasPanel({ repoPath }: ERDCanvasPanelProps) {
   const initialFilterApplied = useRef(false)
+  const loadVersionRef = useRef(0) // Track load version to prevent stale updates
   const [schema, setSchema] = useState<ERDSchema | null>(null)
   const [framework, setFramework] = useState<ERDFramework | null>(null)
   const [loadingState, setLoadingState] = useState<LoadingState>('idle')
@@ -59,18 +60,28 @@ export function ERDCanvasPanel({ repoPath }: ERDCanvasPanelProps) {
       return
     }
 
+    // Increment version to invalidate any in-flight requests
+    const currentVersion = ++loadVersionRef.current
+
     setLoadingState('loading')
     setErrorMessage(null)
 
     try {
       // Detect framework first
       const frameworkResult = await window.electronAPI.detectERDFramework(repoPath)
+      
+      // Check if this request is still current (user may have switched repos)
+      if (loadVersionRef.current !== currentVersion) return
+      
       if (frameworkResult.success && frameworkResult.data) {
         setFramework(frameworkResult.data as ERDFramework)
       }
 
       // Parse schema
       const result = await window.electronAPI.getERDSchema(repoPath)
+
+      // Check again after async operation
+      if (loadVersionRef.current !== currentVersion) return
 
       if (result.success && result.data) {
         const parsedSchema = result.data as ERDSchema
@@ -96,6 +107,8 @@ export function ERDCanvasPanel({ repoPath }: ERDCanvasPanelProps) {
         setLoadingState('error')
       }
     } catch (err) {
+      // Only update error state if this request is still current
+      if (loadVersionRef.current !== currentVersion) return
       setErrorMessage(err instanceof Error ? err.message : 'Unknown error')
       setLoadingState('error')
     }

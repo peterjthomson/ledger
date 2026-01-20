@@ -48,7 +48,9 @@ export function TldrawRenderer({ schema }: TldrawRendererProps) {
   // Render schema when editor is ready and schema changes
   useEffect(() => {
     if (editorRef.current && isEditorReady && schema) {
-      renderERDSchema(editorRef.current, schema)
+      // renderERDSchema returns a cleanup function to cancel pending RAFs
+      const cleanup = renderERDSchema(editorRef.current, schema)
+      return cleanup
     }
   }, [schema, isEditorReady])
 

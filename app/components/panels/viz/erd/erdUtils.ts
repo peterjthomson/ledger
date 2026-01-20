@@ -216,8 +216,10 @@ export function clearERDShapes(editor: Editor): void {
 
 /**
  * Render full ERD schema on tldraw canvas
+ *
+ * @returns Cleanup function to cancel pending animations (call in useEffect cleanup)
  */
-export function renderERDSchema(editor: Editor, schema: ERDSchema): void {
+export function renderERDSchema(editor: Editor, schema: ERDSchema): () => void {
   // Clear existing ERD shapes
   clearERDShapes(editor)
 
@@ -228,13 +230,26 @@ export function renderERDSchema(editor: Editor, schema: ERDSchema): void {
   createRelationshipArrows(editor, schema, shapeIds)
 
   // Zoom to fit ERD shapes with extra padding and a max zoom
-  requestAnimationFrame(() => {
-    zoomToERDShapes(editor, { inset: 160, maxZoom: 0.8 })
+  const rafId = requestAnimationFrame(() => {
+    // Guard against disposed editor (component may have unmounted)
+    try {
+      zoomToERDShapes(editor, { inset: 160, maxZoom: 0.8 })
+    } catch (_e) {
+      // Editor may be disposed, ignore
+    }
   })
+
+  // Return cleanup function to cancel pending RAF
+  return () => {
+    cancelAnimationFrame(rafId)
+  }
 }
 
 /**
  * Zoom to fit ERD entity shapes with padding and max zoom limit
+ *
+ * @param options.inset - Padding around the bounds
+ * @param options.maxZoom - Maximum zoom level (ceiling, not exact target)
  */
 export function zoomToERDShapes(editor: Editor, options: { inset?: number; maxZoom?: number } = {}): void {
   const shapes = editor.getCurrentPageShapes().filter((shape) => shape.type === 'erd-entity')
@@ -247,9 +262,25 @@ export function zoomToERDShapes(editor: Editor, options: { inset?: number; maxZo
   if (boundsList.length === 0) return
 
   const bounds = TLBox.Common(boundsList)
+  const inset = options.inset ?? 0
+  const maxZoom = options.maxZoom ?? 1
+
+  // Get viewport dimensions
+  const viewportBounds = editor.getViewportScreenBounds()
+  const viewportWidth = viewportBounds.width - inset * 2
+  const viewportHeight = viewportBounds.height - inset * 2
+
+  // Calculate zoom to fit bounds in viewport
+  const zoomX = viewportWidth / bounds.width
+  const zoomY = viewportHeight / bounds.height
+  const fitZoom = Math.min(zoomX, zoomY)
+
+  // Apply maxZoom as a ceiling, not an exact target
+  const targetZoom = Math.min(fitZoom, maxZoom)
+
   editor.zoomToBounds(bounds, {
     animation: { duration: 300 },
-    inset: options.inset,
-    targetZoom: options.maxZoom,
+    inset,
+    targetZoom,
   })
 }

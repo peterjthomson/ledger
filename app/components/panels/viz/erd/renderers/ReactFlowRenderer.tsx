@@ -114,10 +114,6 @@ export function ReactFlowRenderer({ schema }: ReactFlowRendererProps) {
   useEffect(() => {
     if (schema) {
       const { nodes: newNodes, edges: newEdges } = schemaToFlow(schema)
-      console.log('[ReactFlowRenderer] Updating with', newNodes.length, 'nodes and', newEdges.length, 'edges')
-      if (newEdges.length > 0) {
-        console.log('[ReactFlowRenderer] Sample edge:', newEdges[0])
-      }
       setNodes(newNodes)
       setEdges(newEdges)
     }

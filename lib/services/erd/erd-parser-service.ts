@@ -410,11 +410,13 @@ function parseRailsSchemaFile(content: string): { entities: ERDEntity[]; relatio
  */
 function parseRailsColumns(tableBody: string): ERDAttribute[] {
   const attributes: ERDAttribute[] = []
+  const seenColumns = new Set<string>() // Track seen column names to avoid duplicates
 
   // Rails column patterns
+  // Note: t.references patterns are ordered so more specific pattern comes first
+  // and we use seenColumns to prevent duplicates
   const patterns = [
     { regex: /t\.primary_key\s+"(\w+)"/g, type: 'bigint', pk: true },
-    { regex: /t\.references\s+"(\w+)".*?foreign_key:\s*true/g, type: 'bigint', fk: true },
     { regex: /t\.references\s+"(\w+)"/g, type: 'bigint', fk: true },
     { regex: /t\.bigint\s+"(\w+)"/g, type: 'bigint' },
     { regex: /t\.integer\s+"(\w+)"/g, type: 'int' },
@@ -453,14 +455,22 @@ function parseRailsColumns(tableBody: string): ERDAttribute[] {
         if (pattern.pk) constraints.push('PK')
         if (pattern.fk) {
           constraints.push('FK')
+          const colName = name + '_id'
+          // Skip if we've already seen this column (prevents duplicates from overlapping patterns)
+          if (seenColumns.has(colName)) continue
+          seenColumns.add(colName)
           attributes.push({
-            name: name + '_id',
+            name: colName,
             type: pattern.type,
             constraints,
             foreignKey: { table: name + 's', column: 'id' },
           })
           continue
         }
+
+        // Skip if we've already seen this column
+        if (seenColumns.has(name)) continue
+        seenColumns.add(name)
 
         // Check for modifiers
         const lineStart = tableBody.lastIndexOf('\n', match.index) + 1
@@ -512,8 +522,10 @@ function parseRailsModel(content: string, _entities: ERDEntity[]): ERDRelationsh
 
     while ((match = regex.exec(content)) !== null) {
       const relatedName = match[1]
-      // Rails convention: association name is singular for belongs_to, plural for has_many
-      const relatedTable = pattern.type === 'belongsTo' ? relatedName + 's' : relatedName
+      // Rails convention: association name is singular for belongs_to/has_one, plural for has_many/habtm
+      // Table names are always plural, so we pluralize singular association names
+      const relatedTable =
+        pattern.type === 'belongsTo' || pattern.type === 'hasOne' ? relatedName + 's' : relatedName
 
       let from: { entity: string; cardinality: ERDCardinality }
       let to: { entity: string; cardinality: ERDCardinality }
@@ -602,7 +614,13 @@ export function parseMermaidERD(content: string): ERDSchema {
 
   // Parse relationships
   // Syntax: ENTITY1 cardinality--cardinality ENTITY2 : label
-  const relationRegex = /(\w+)\s+(\|[|o]|[{}]o?)--(\|[|o]|[{}]o?|[|o][|{])\s+(\w+)\s*(?::\s*"?([^"\n]*)"?)?/g
+  // Cardinality patterns: || (one), |o/o| (zero-or-one), |{/}| (one-or-more), o{/}o (zero-or-more)
+  // Use symmetric pattern for both sides to handle all valid Mermaid notations
+  const cardinalityPattern = '(?:\\|[|o]|o[|{]|[{}][|o]?)'
+  const relationRegex = new RegExp(
+    `(\\w+)\\s+(${cardinalityPattern})--(${cardinalityPattern})\\s+(\\w+)\\s*(?::\\s*"?([^"\\n]*)"?)?`,
+    'g'
+  )
 
   while ((match = relationRegex.exec(body)) !== null) {
     const fromEntity = match[1]
@@ -738,8 +756,11 @@ function deduplicateRelationships(relationships: ERDRelationship[]): ERDRelation
   const result: ERDRelationship[] = []
 
   for (const rel of relationships) {
-    const key = `${rel.from.entity}-${rel.to.entity}`
-    const reverseKey = `${rel.to.entity}-${rel.from.entity}`
+    // Include attribute or label in key to preserve multiple FKs between same tables
+    // e.g., orders.customer_id -> users and orders.salesperson_id -> users are distinct
+    const discriminator = rel.from.attribute || rel.label || ''
+    const key = `${rel.from.entity}-${rel.to.entity}-${discriminator}`
+    const reverseKey = `${rel.to.entity}-${rel.from.entity}-${discriminator}`
 
     if (!seen.has(key) && !seen.has(reverseKey)) {
       seen.add(key)
