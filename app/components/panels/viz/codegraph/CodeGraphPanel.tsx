@@ -101,14 +101,6 @@ export function CodeGraphPanel({ repoPath }: CodeGraphPanelProps) {
     loadGraph()
   }, [loadGraph])
 
-  // Refresh handler
-  const handleRefresh = useCallback(() => {
-    loadGraph()
-    if (showDiff) {
-      loadDiffStatus()
-    }
-  }, [loadGraph, showDiff, loadDiffStatus])
-
   // Load diff status when toggle is enabled
   const loadDiffStatus = useCallback(async () => {
     if (!repoPath) return
@@ -121,6 +113,14 @@ export function CodeGraphPanel({ repoPath }: CodeGraphPanelProps) {
       // Silently fail - diff overlay is optional
     }
   }, [repoPath])
+
+  // Refresh handler
+  const handleRefresh = useCallback(() => {
+    loadGraph()
+    if (showDiff) {
+      loadDiffStatus()
+    }
+  }, [loadGraph, showDiff, loadDiffStatus])
 
   // Fetch diff status when showDiff changes
   useEffect(() => {
