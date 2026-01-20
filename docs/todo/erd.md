@@ -47,9 +47,9 @@ Work in progress notes, known issues, and planned improvements for the Entity Re
 ### React Flow Renderer
 
 1. **Edges Not Rendering**: Relationship lines don't appear in Graph view
-   - Debug logging added: check console for `[ReactFlowRenderer] Updating with X nodes and Y edges`
    - Handles have explicit IDs, edges use `smoothstep` type
    - CSS explicitly styles `.react-flow__edge-path` with `!important`
+   - Debug logging was removed for production cleanliness
 
 ### Parser Edge Cases
 
@@ -202,7 +202,7 @@ lib/conveyor/
 - [ ] Dark mode / light mode toggle
 - [ ] Window resize during render
 - [ ] Switch between Canvas/Graph/JSON renderers
-- [ ] Check console for edge count in Graph view
+- [ ] Rapid repo switching (tests race condition fix)
 
 ### Test Repos
 
@@ -242,8 +242,13 @@ echo 'erDiagram
 
 ### Short Term (Bug Fixes)
 
-1. **Fix React Flow Edges**: Debug why relationship lines don't render
-   - Check if edges array is populated (console logs added)
+1. ~~**Rails References Duplicate Columns**~~: Fixed - added seenColumns tracking
+2. ~~**Relationship Deduplication**~~: Fixed - key now includes attribute/label
+3. ~~**Rails has_one Pluralization**~~: Fixed - now pluralizes like belongs_to
+4. ~~**Race Condition on Repo Switch**~~: Fixed - added version counter pattern
+5. ~~**Mermaid Cardinality Patterns**~~: Fixed - symmetric regex for all notations
+6. ~~**Zoom Max as Ceiling**~~: Fixed - calculates fit then clamps to max
+7. **Fix React Flow Edges**: Debug why relationship lines don't render
    - Verify handle IDs match source/target
    - Test with simpler edge configuration
 

@@ -55,14 +55,6 @@ Best for: Debugging, inspecting parsed data, copying schema
 - **Copy**: Button to copy full JSON to clipboard
 - **Entity Names**: Collapsed nodes show entity/relationship names
 
-## Supported Frameworks
-
-| Framework | Detection | Schema Sources |
-|-----------|-----------|----------------|
-| **Laravel** | `artisan` file present | `database/migrations/*.php`, `app/Models/*.php` |
-| **Rails** | `Rakefile` + `config/application.rb` | `db/schema.rb`, `app/models/*.rb` |
-| **Generic** | Fallback | `.mmd`, `.mermaid`, `.erd.md` files with Mermaid ERD syntax |
-
 ## Header Bar
 
 - **Framework Badge**: Shows detected framework (🐘 Laravel / 💎 Rails)
