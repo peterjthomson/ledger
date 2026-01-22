@@ -391,3 +391,119 @@ export type CustomTheme = z.infer<typeof CustomThemeSchema>
 export type ThemeData = z.infer<typeof ThemeDataSchema>
 export type MergeMethod = z.infer<typeof MergeMethodSchema>
 export type ResetMode = z.infer<typeof ResetModeSchema>
+
+// Issue schemas
+export const IssueLabelSchema = z.object({
+  name: z.string(),
+  color: z.string(),
+  description: z.string().nullable(),
+})
+
+export const IssueSchema = z.object({
+  number: z.number(),
+  title: z.string(),
+  state: z.enum(['OPEN', 'CLOSED']),
+  stateReason: z.enum(['completed', 'not_planned', 'reopened']).nullable(),
+  author: z.string(),
+  assignees: z.array(z.string()),
+  labels: z.array(IssueLabelSchema),
+  milestone: z.string().nullable(),
+  milestoneNumber: z.number().nullable(),
+  comments: z.number(),
+  createdAt: z.string(),
+  updatedAt: z.string(),
+  closedAt: z.string().nullable(),
+  url: z.string(),
+  isPinned: z.boolean(),
+  locked: z.boolean(),
+})
+
+export const IssueCommentSchema = z.object({
+  id: z.number(),
+  author: z.string(),
+  authorAssociation: z.string(),
+  body: z.string(),
+  createdAt: z.string(),
+  updatedAt: z.string(),
+  isEdited: z.boolean(),
+  url: z.string(),
+})
+
+export const LinkedPRSchema = z.object({
+  number: z.number(),
+  title: z.string(),
+  state: z.enum(['OPEN', 'CLOSED', 'MERGED']),
+  url: z.string(),
+})
+
+export const IssueDetailSchema = IssueSchema.extend({
+  body: z.string(),
+  commentsData: z.array(IssueCommentSchema),
+  linkedPRs: z.array(LinkedPRSchema),
+  linkedBranches: z.array(z.string()),
+})
+
+export const IssueListResultSchema = z.object({
+  issues: z.array(IssueSchema),
+  error: z.string().optional(),
+})
+
+export const IssueOperationResultSchema = z.object({
+  success: z.boolean(),
+  message: z.string(),
+  number: z.number().optional(),
+  url: z.string().optional(),
+})
+
+export const ListIssuesOptionsSchema = z.object({
+  state: z.enum(['open', 'closed', 'all']).optional(),
+  assignee: z.string().optional(),
+  labels: z.array(z.string()).optional(),
+  milestone: z.string().optional(),
+  search: z.string().optional(),
+  limit: z.number().optional(),
+  sort: z.enum(['updated', 'created', 'created-asc', 'comments']).optional(),
+})
+
+export const CreateIssueOptionsSchema = z.object({
+  title: z.string(),
+  body: z.string().optional(),
+  labels: z.array(z.string()).optional(),
+  assignees: z.array(z.string()).optional(),
+  milestone: z.number().optional(),
+})
+
+export const EditIssueOptionsSchema = z.object({
+  title: z.string().optional(),
+  body: z.string().optional(),
+  labels: z.array(z.string()).optional(),
+  assignees: z.array(z.string()).optional(),
+  milestone: z.number().nullable().optional(),
+})
+
+export const CloseIssueOptionsSchema = z.object({
+  reason: z.enum(['completed', 'not_planned']).optional(),
+  comment: z.string().optional(),
+})
+
+export const IssueMilestoneSchema = z.object({
+  number: z.number(),
+  title: z.string(),
+  state: z.enum(['OPEN', 'CLOSED']),
+  dueOn: z.string().nullable(),
+})
+
+export const CreateIssueBranchResultSchema = z.object({
+  success: z.boolean(),
+  message: z.string(),
+  branchName: z.string().optional(),
+})
+
+// Issue type exports
+export type IssueLabel = z.infer<typeof IssueLabelSchema>
+export type Issue = z.infer<typeof IssueSchema>
+export type IssueComment = z.infer<typeof IssueCommentSchema>
+export type IssueDetail = z.infer<typeof IssueDetailSchema>
+export type IssueListResult = z.infer<typeof IssueListResultSchema>
+export type IssueOperationResult = z.infer<typeof IssueOperationResultSchema>
+export type IssueMilestone = z.infer<typeof IssueMilestoneSchema>

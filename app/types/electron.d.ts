@@ -87,6 +87,73 @@ export interface PullRequestsResult {
   error?: string
 }
 
+// GitHub Issues
+export interface IssueLabel {
+  name: string
+  color: string
+  description: string | null
+}
+
+export interface Issue {
+  number: number
+  title: string
+  state: 'OPEN' | 'CLOSED'
+  stateReason: 'completed' | 'not_planned' | 'reopened' | null
+  author: string
+  assignees: string[]
+  labels: IssueLabel[]
+  milestone: string | null
+  milestoneNumber: number | null
+  comments: number
+  createdAt: string
+  updatedAt: string
+  closedAt: string | null
+  url: string
+  isPinned: boolean
+  locked: boolean
+}
+
+export interface IssueComment {
+  id: number
+  author: string
+  authorAssociation: string
+  body: string
+  createdAt: string
+  updatedAt: string
+  isEdited: boolean
+  url: string
+}
+
+export interface LinkedPR {
+  number: number
+  title: string
+  state: 'OPEN' | 'CLOSED' | 'MERGED'
+  url: string
+}
+
+export interface IssueDetail extends Issue {
+  body: string
+  commentsData: IssueComment[]
+  linkedPRs: LinkedPR[]
+  linkedBranches: string[]
+}
+
+export interface IssueMilestone {
+  number: number
+  title: string
+  state: 'OPEN' | 'CLOSED'
+  dueOn: string | null
+}
+
+export interface IssuesResult {
+  issues: Issue[]
+  error?: string
+}
+
+export type IssueFilter = 'open' | 'closed' | 'all'
+export type IssueSort = 'updated' | 'created' | 'created-asc' | 'comments'
+export type IssueGroupBy = 'none' | 'milestone' | 'label' | 'assignee'
+
 export interface Commit {
   hash: string
   shortHash: string

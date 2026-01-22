@@ -5588,3 +5588,606 @@ export async function getSiblingRepos(): Promise<RepoInfo[]> {
     return []
   }
 }
+
+// ============================================================================
+// GitHub Issues
+// ============================================================================
+
+export interface IssueLabel {
+  name: string
+  color: string
+  description: string | null
+}
+
+export interface Issue {
+  number: number
+  title: string
+  state: 'OPEN' | 'CLOSED'
+  stateReason: 'completed' | 'not_planned' | 'reopened' | null
+  author: string
+  assignees: string[]
+  labels: IssueLabel[]
+  milestone: string | null
+  milestoneNumber: number | null
+  comments: number
+  createdAt: string
+  updatedAt: string
+  closedAt: string | null
+  url: string
+  isPinned: boolean
+  locked: boolean
+}
+
+export interface IssueComment {
+  id: number
+  author: string
+  authorAssociation: string
+  body: string
+  createdAt: string
+  updatedAt: string
+  isEdited: boolean
+  url: string
+}
+
+export interface LinkedPR {
+  number: number
+  title: string
+  state: 'OPEN' | 'CLOSED' | 'MERGED'
+  url: string
+}
+
+export interface IssueDetail extends Issue {
+  body: string
+  commentsData: IssueComment[]
+  linkedPRs: LinkedPR[]
+  linkedBranches: string[]
+}
+
+export interface IssueMilestone {
+  number: number
+  title: string
+  state: 'OPEN' | 'CLOSED'
+  dueOn: string | null
+}
+
+export interface IssueListResult {
+  issues: Issue[]
+  error?: string
+}
+
+export interface IssueOperationResult {
+  success: boolean
+  message: string
+  number?: number
+  url?: string
+}
+
+export interface ListIssuesOptions {
+  state?: 'open' | 'closed' | 'all'
+  assignee?: string
+  labels?: string[]
+  milestone?: string
+  search?: string
+  limit?: number
+  sort?: 'updated' | 'created' | 'created-asc' | 'comments'
+}
+
+export interface CreateIssueOptions {
+  title: string
+  body?: string
+  labels?: string[]
+  assignees?: string[]
+  milestone?: number
+}
+
+export interface EditIssueOptions {
+  title?: string
+  body?: string
+  labels?: string[]
+  assignees?: string[]
+  milestone?: number | null
+}
+
+export interface CloseIssueOptions {
+  reason?: 'completed' | 'not_planned'
+  comment?: string
+}
+
+/**
+ * Map common gh CLI errors to user-friendly messages
+ */
+function mapGhIssueError(stderr: string): string {
+  if (stderr.includes('gh: command not found') || stderr.includes('not recognized')) {
+    return 'GitHub CLI (gh) not installed. Install from https://cli.github.com'
+  }
+  if (stderr.includes('not logged in') || stderr.includes('authentication')) {
+    return 'Not logged in to GitHub CLI. Run: gh auth login'
+  }
+  if (stderr.includes('not a git repository') || stderr.includes('no git remotes')) {
+    return 'Not a GitHub repository'
+  }
+  if (stderr.includes('Could not resolve')) {
+    return 'Issue not found'
+  }
+  return stderr || 'Unknown error'
+}
+
+/**
+ * Fetch issues using GitHub CLI
+ */
+export async function getIssues(options: ListIssuesOptions = {}): Promise<IssueListResult> {
+  if (!repoPath) {
+    return { issues: [], error: 'No repository selected' }
+  }
+
+  const { state = 'open', assignee, labels, milestone, search, limit = 50, sort = 'updated' } = options
+
+  try {
+    let cmd = `gh issue list --state ${state} --limit ${limit} --json number,title,state,stateReason,author,assignees,labels,milestone,comments,createdAt,updatedAt,closedAt,url,isPinned,locked`
+
+    if (assignee) {
+      cmd += ` --assignee "${assignee}"`
+    }
+
+    if (labels && labels.length > 0) {
+      for (const label of labels) {
+        cmd += ` --label "${label}"`
+      }
+    }
+
+    if (milestone) {
+      cmd += ` --milestone "${milestone}"`
+    }
+
+    if (search) {
+      cmd += ` --search "${search}"`
+    }
+
+    const { stdout } = await execAsync(cmd, { cwd: repoPath })
+
+    const rawIssues = JSON.parse(stdout)
+
+    const issues: Issue[] = rawIssues.map((issue: any) => ({
+      number: issue.number,
+      title: issue.title,
+      state: issue.state,
+      stateReason: issue.stateReason || null,
+      author: issue.author?.login || 'unknown',
+      assignees: (issue.assignees || []).map((a: any) => a.login),
+      labels: (issue.labels || []).map((l: any) => ({
+        name: l.name,
+        color: l.color || 'cccccc',
+        description: l.description || null,
+      })),
+      milestone: issue.milestone?.title || null,
+      milestoneNumber: issue.milestone?.number || null,
+      comments: issue.comments || 0,
+      createdAt: issue.createdAt,
+      updatedAt: issue.updatedAt,
+      closedAt: issue.closedAt || null,
+      url: issue.url,
+      isPinned: issue.isPinned || false,
+      locked: issue.locked || false,
+    }))
+
+    // Sort issues
+    if (sort === 'updated') {
+      issues.sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime())
+    } else if (sort === 'created') {
+      issues.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+    } else if (sort === 'created-asc') {
+      issues.sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime())
+    } else if (sort === 'comments') {
+      issues.sort((a, b) => b.comments - a.comments)
+    }
+
+    // Sort pinned to top
+    issues.sort((a, b) => {
+      if (a.isPinned && !b.isPinned) return -1
+      if (!a.isPinned && b.isPinned) return 1
+      return 0
+    })
+
+    return { issues }
+  } catch (error) {
+    return { issues: [], error: mapGhIssueError((error as Error).message) }
+  }
+}
+
+/**
+ * Get detailed issue information including body and comments
+ */
+export async function getIssueDetail(issueNumber: number): Promise<IssueDetail | null> {
+  if (!repoPath) return null
+
+  try {
+    const { stdout } = await execAsync(
+      `gh issue view ${issueNumber} --json number,title,body,state,stateReason,author,assignees,labels,milestone,comments,createdAt,updatedAt,closedAt,url,isPinned,locked`,
+      { cwd: repoPath }
+    )
+
+    const issue = JSON.parse(stdout)
+
+    // Fetch comments separately
+    const commentsData = await getIssueComments(issueNumber)
+
+    // Try to get linked PRs
+    const linkedPRs = await getLinkedPRs(issueNumber)
+
+    return {
+      number: issue.number,
+      title: issue.title,
+      state: issue.state,
+      stateReason: issue.stateReason || null,
+      author: issue.author?.login || 'unknown',
+      assignees: (issue.assignees || []).map((a: any) => a.login),
+      labels: (issue.labels || []).map((l: any) => ({
+        name: l.name,
+        color: l.color || 'cccccc',
+        description: l.description || null,
+      })),
+      milestone: issue.milestone?.title || null,
+      milestoneNumber: issue.milestone?.number || null,
+      comments: issue.comments || 0,
+      createdAt: issue.createdAt,
+      updatedAt: issue.updatedAt,
+      closedAt: issue.closedAt || null,
+      url: issue.url,
+      isPinned: issue.isPinned || false,
+      locked: issue.locked || false,
+      body: issue.body || '',
+      commentsData,
+      linkedPRs,
+      linkedBranches: [],
+    }
+  } catch {
+    return null
+  }
+}
+
+/**
+ * Get comments for an issue
+ */
+export async function getIssueComments(issueNumber: number): Promise<IssueComment[]> {
+  if (!repoPath) return []
+
+  try {
+    const { stdout } = await execAsync(
+      `gh issue view ${issueNumber} --json comments --jq '.comments'`,
+      { cwd: repoPath }
+    )
+
+    const comments = JSON.parse(stdout)
+
+    return comments.map((c: any) => ({
+      id: c.id || 0,
+      author: c.author?.login || 'unknown',
+      authorAssociation: c.authorAssociation || 'NONE',
+      body: c.body || '',
+      createdAt: c.createdAt,
+      updatedAt: c.updatedAt || c.createdAt,
+      isEdited: c.updatedAt && c.updatedAt !== c.createdAt,
+      url: c.url || '',
+    }))
+  } catch {
+    return []
+  }
+}
+
+/**
+ * Get linked PRs for an issue
+ */
+async function getLinkedPRs(issueNumber: number): Promise<LinkedPR[]> {
+  if (!repoPath) return []
+
+  try {
+    const { stdout } = await execAsync(
+      `gh api repos/{owner}/{repo}/issues/${issueNumber}/timeline --jq '[.[] | select(.event == "cross-referenced" and .source.issue.pull_request) | {number: .source.issue.number, title: .source.issue.title, state: .source.issue.state, url: .source.issue.html_url}]'`,
+      { cwd: repoPath }
+    )
+
+    if (!stdout.trim()) return []
+
+    const prs = JSON.parse(stdout)
+    return prs.map((pr: any) => ({
+      number: pr.number,
+      title: pr.title,
+      state: pr.state?.toUpperCase() || 'OPEN',
+      url: pr.url,
+    }))
+  } catch {
+    return []
+  }
+}
+
+/**
+ * Open an issue in the browser
+ */
+export async function openIssue(issueNumber: number): Promise<IssueOperationResult> {
+  if (!repoPath) {
+    return { success: false, message: 'No repository selected' }
+  }
+
+  try {
+    await execAsync(`gh issue view ${issueNumber} --web`, { cwd: repoPath })
+    return { success: true, message: 'Opened issue in browser' }
+  } catch (error) {
+    return { success: false, message: (error as Error).message }
+  }
+}
+
+/**
+ * Create a new issue
+ */
+export async function createIssue(options: CreateIssueOptions): Promise<IssueOperationResult> {
+  if (!repoPath) {
+    return { success: false, message: 'No repository selected' }
+  }
+
+  try {
+    let cmd = `gh issue create --title "${options.title.replace(/"/g, '\\"')}"`
+
+    if (options.body) {
+      cmd += ` --body "${options.body.replace(/"/g, '\\"')}"`
+    }
+
+    if (options.labels && options.labels.length > 0) {
+      for (const label of options.labels) {
+        cmd += ` --label "${label}"`
+      }
+    }
+
+    if (options.assignees && options.assignees.length > 0) {
+      for (const assignee of options.assignees) {
+        cmd += ` --assignee "${assignee}"`
+      }
+    }
+
+    if (options.milestone) {
+      cmd += ` --milestone ${options.milestone}`
+    }
+
+    const { stdout } = await execAsync(cmd, { cwd: repoPath })
+
+    // Parse URL from stdout to extract issue number
+    const url = stdout.trim()
+    const match = url.match(/\/issues\/(\d+)/)
+    const number = match ? parseInt(match[1]) : undefined
+
+    return { success: true, message: 'Issue created', number, url }
+  } catch (error) {
+    return { success: false, message: mapGhIssueError((error as Error).message) }
+  }
+}
+
+/**
+ * Edit an existing issue
+ */
+export async function editIssue(
+  issueNumber: number,
+  options: EditIssueOptions
+): Promise<IssueOperationResult> {
+  if (!repoPath) {
+    return { success: false, message: 'No repository selected' }
+  }
+
+  try {
+    let cmd = `gh issue edit ${issueNumber}`
+
+    if (options.title) {
+      cmd += ` --title "${options.title.replace(/"/g, '\\"')}"`
+    }
+
+    if (options.body !== undefined) {
+      cmd += ` --body "${options.body.replace(/"/g, '\\"')}"`
+    }
+
+    if (options.labels !== undefined) {
+      // Note: gh issue edit --add-label and --remove-label
+      // For simplicity, we'll clear and re-add
+      cmd += ` --remove-label ""`
+      for (const label of options.labels) {
+        cmd += ` --add-label "${label}"`
+      }
+    }
+
+    if (options.assignees !== undefined) {
+      cmd += ` --remove-assignee ""`
+      for (const assignee of options.assignees) {
+        cmd += ` --add-assignee "${assignee}"`
+      }
+    }
+
+    if (options.milestone !== undefined) {
+      if (options.milestone === null) {
+        cmd += ` --milestone ""`
+      } else {
+        cmd += ` --milestone ${options.milestone}`
+      }
+    }
+
+    await execAsync(cmd, { cwd: repoPath })
+
+    return { success: true, message: 'Issue updated', number: issueNumber }
+  } catch (error) {
+    return { success: false, message: mapGhIssueError((error as Error).message) }
+  }
+}
+
+/**
+ * Close an issue
+ */
+export async function closeIssue(
+  issueNumber: number,
+  options: CloseIssueOptions = {}
+): Promise<IssueOperationResult> {
+  if (!repoPath) {
+    return { success: false, message: 'No repository selected' }
+  }
+
+  try {
+    let cmd = `gh issue close ${issueNumber}`
+
+    if (options.reason) {
+      cmd += ` --reason ${options.reason}`
+    }
+
+    if (options.comment) {
+      cmd += ` --comment "${options.comment.replace(/"/g, '\\"')}"`
+    }
+
+    await execAsync(cmd, { cwd: repoPath })
+
+    return { success: true, message: 'Issue closed', number: issueNumber }
+  } catch (error) {
+    return { success: false, message: mapGhIssueError((error as Error).message) }
+  }
+}
+
+/**
+ * Reopen a closed issue
+ */
+export async function reopenIssue(
+  issueNumber: number,
+  comment?: string
+): Promise<IssueOperationResult> {
+  if (!repoPath) {
+    return { success: false, message: 'No repository selected' }
+  }
+
+  try {
+    let cmd = `gh issue reopen ${issueNumber}`
+
+    if (comment) {
+      cmd += ` --comment "${comment.replace(/"/g, '\\"')}"`
+    }
+
+    await execAsync(cmd, { cwd: repoPath })
+
+    return { success: true, message: 'Issue reopened', number: issueNumber }
+  } catch (error) {
+    return { success: false, message: mapGhIssueError((error as Error).message) }
+  }
+}
+
+/**
+ * Add a comment to an issue
+ */
+export async function commentOnIssue(
+  issueNumber: number,
+  body: string
+): Promise<IssueOperationResult> {
+  if (!repoPath) {
+    return { success: false, message: 'No repository selected' }
+  }
+
+  try {
+    await execAsync(
+      `gh issue comment ${issueNumber} --body "${body.replace(/"/g, '\\"')}"`,
+      { cwd: repoPath }
+    )
+
+    return { success: true, message: 'Comment added', number: issueNumber }
+  } catch (error) {
+    return { success: false, message: mapGhIssueError((error as Error).message) }
+  }
+}
+
+/**
+ * Create a branch linked to an issue
+ */
+export async function createIssueBranch(
+  issueNumber: number,
+  branchName?: string
+): Promise<{ success: boolean; message: string; branchName?: string }> {
+  if (!repoPath) {
+    return { success: false, message: 'No repository selected' }
+  }
+
+  try {
+    let cmd = `gh issue develop ${issueNumber} --checkout`
+
+    if (branchName) {
+      cmd += ` --name "${branchName}"`
+    }
+
+    const { stdout, stderr } = await execAsync(cmd, { cwd: repoPath })
+
+    // Try to extract branch name from output
+    const match = stdout.match(/branch '([^']+)'/) || stderr.match(/branch '([^']+)'/)
+    const createdBranchName = match?.[1] || branchName
+
+    return {
+      success: true,
+      message: 'Branch created and checked out',
+      branchName: createdBranchName,
+    }
+  } catch (error) {
+    return { success: false, message: mapGhIssueError((error as Error).message) }
+  }
+}
+
+/**
+ * Get repository labels
+ */
+export async function getRepoLabels(): Promise<IssueLabel[]> {
+  if (!repoPath) return []
+
+  try {
+    const { stdout } = await execAsync(
+      `gh label list --json name,color,description --limit 100`,
+      { cwd: repoPath }
+    )
+
+    const labels = JSON.parse(stdout)
+    return labels.map((l: any) => ({
+      name: l.name,
+      color: l.color || 'cccccc',
+      description: l.description || null,
+    }))
+  } catch {
+    return []
+  }
+}
+
+/**
+ * Get repository milestones
+ */
+export async function getRepoMilestones(): Promise<IssueMilestone[]> {
+  if (!repoPath) return []
+
+  try {
+    const { stdout } = await execAsync(
+      `gh api repos/{owner}/{repo}/milestones --jq '[.[] | {number: .number, title: .title, state: .state, dueOn: .due_on}]'`,
+      { cwd: repoPath }
+    )
+
+    const milestones = JSON.parse(stdout)
+    return milestones.map((m: any) => ({
+      number: m.number,
+      title: m.title,
+      state: m.state?.toUpperCase() || 'OPEN',
+      dueOn: m.dueOn || null,
+    }))
+  } catch {
+    return []
+  }
+}
+
+/**
+ * Get open issue count for the repository
+ */
+export async function getOpenIssueCount(): Promise<number> {
+  if (!repoPath) return 0
+
+  try {
+    const { stdout } = await execAsync(
+      `gh issue list --state open --json number --jq 'length'`,
+      { cwd: repoPath }
+    )
+
+    return parseInt(stdout.trim()) || 0
+  } catch {
+    return 0
+  }
+}

@@ -7,6 +7,7 @@ import type {
   Branch,
   Worktree,
   PullRequest,
+  Issue,
   Commit,
   WorkingStatus,
   StashEntry,
@@ -41,11 +42,11 @@ export interface MenuItem {
 }
 
 // Sidebar focus state (what's selected in Focus mode)
-export type SidebarFocusType = 'pr' | 'branch' | 'remote' | 'worktree' | 'stash' | 'uncommitted' | 'create-worktree' | 'mailmap' | 'repo'
+export type SidebarFocusType = 'pr' | 'issue' | 'branch' | 'remote' | 'worktree' | 'stash' | 'uncommitted' | 'create-worktree' | 'mailmap' | 'repo'
 
 export interface SidebarFocus {
   type: SidebarFocusType
-  data: PullRequest | Branch | Worktree | StashEntry | WorkingStatus | RepoInfo | null
+  data: PullRequest | Issue | Branch | Worktree | StashEntry | WorkingStatus | RepoInfo | null
 }
 
 // ========================================
@@ -62,6 +63,7 @@ export type SlotType = 'list' | 'editor' | 'viz'
  */
 export type ListPanelType =
   | 'pr-list'
+  | 'issue-list'
   | 'branch-list'
   | 'remote-list'
   | 'worktree-list'
@@ -72,6 +74,7 @@ export type ListPanelType =
 
 export type EditorPanelType =
   | 'pr-detail'
+  | 'issue-detail'
   | 'branch-detail'
   | 'remote-detail'
   | 'worktree-detail'

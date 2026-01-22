@@ -22,6 +22,7 @@ import { registerRepoHandlers } from '@/lib/conveyor/handlers/repo-handler'
 import { registerBranchHandlers } from '@/lib/conveyor/handlers/branch-handler'
 import { registerWorktreeHandlers } from '@/lib/conveyor/handlers/worktree-handler'
 import { registerPRHandlers } from '@/lib/conveyor/handlers/pr-handler'
+import { registerIssueHandlers } from '@/lib/conveyor/handlers/issue-handler'
 import { registerCommitHandlers } from '@/lib/conveyor/handlers/commit-handler'
 import { registerStashHandlers } from '@/lib/conveyor/handlers/stash-handler'
 import { registerStagingHandlers } from '@/lib/conveyor/handlers/staging-handler'
@@ -43,6 +44,10 @@ const IPC_CHANNELS = [
   // Pull requests
   'get-pull-requests', 'open-pull-request', 'create-pull-request', 'checkout-pr-branch',
   'get-pr-detail', 'get-pr-review-comments', 'get-pr-file-diff', 'comment-on-pr', 'merge-pr', 'get-github-url',
+  // Issues
+  'get-issues', 'get-issue-detail', 'get-issue-comments', 'open-issue',
+  'create-issue', 'edit-issue', 'close-issue', 'reopen-issue', 'comment-on-issue',
+  'create-issue-branch', 'get-repo-labels', 'get-repo-milestones', 'get-open-issue-count',
   // Commits
   'get-commit-history', 'get-commit-diff', 'get-branch-diff', 'get-commit-graph-history', 'get-contributor-stats',
   'get-merged-branch-tree', 'reset-to-commit',
@@ -195,6 +200,7 @@ app.whenReady().then(() => {
   registerBranchHandlers()
   registerWorktreeHandlers()
   registerPRHandlers()
+  registerIssueHandlers()
   registerCommitHandlers()
   registerStashHandlers()
   registerStagingHandlers()

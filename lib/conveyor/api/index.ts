@@ -5,6 +5,7 @@ import { RepoApi } from './repo-api'
 import { BranchApi } from './branch-api'
 import { WorktreeApi } from './worktree-api'
 import { PRApi } from './pr-api'
+import { IssueApi } from './issue-api'
 import { CommitApi } from './commit-api'
 import { StashApi } from './stash-api'
 import { StagingApi } from './staging-api'
@@ -18,6 +19,7 @@ export const conveyor = {
   branch: new BranchApi(electronAPI),
   worktree: new WorktreeApi(electronAPI),
   pr: new PRApi(electronAPI),
+  issue: new IssueApi(electronAPI),
   commit: new CommitApi(electronAPI),
   stash: new StashApi(electronAPI),
   staging: new StagingApi(electronAPI),

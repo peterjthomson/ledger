@@ -15,6 +15,7 @@ import React, { useCallback, useState, useEffect, useRef, type ReactNode } from 
 import type { Column } from '../../types/app-types'
 import type {
   PullRequest,
+  Issue,
   Branch,
   Worktree,
   StashEntry,
@@ -47,7 +48,11 @@ export interface CanvasData {
   // Pull requests
   prs: PullRequest[]
   prError: string | null
-  
+
+  // Issues
+  issues: Issue[]
+  issueError: string | null
+
   // Branches
   branches: Branch[]
   currentBranch: string | null
@@ -75,6 +80,7 @@ export interface CanvasData {
 export interface CanvasSelection {
   // Selected item (for highlighting in lists)
   selectedPR: PullRequest | null
+  selectedIssue: Issue | null
   selectedBranch: Branch | null
   selectedWorktree: Worktree | null
   selectedStash: StashEntry | null
@@ -95,7 +101,12 @@ export interface CanvasHandlers {
   onSelectPR: (pr: PullRequest) => void
   onDoubleClickPR: (pr: PullRequest) => void
   onContextMenuPR: (e: React.MouseEvent, pr: PullRequest) => void
-  
+
+  // Issue handlers
+  onSelectIssue?: (issue: Issue) => void
+  onDoubleClickIssue?: (issue: Issue) => void
+  onContextMenuIssue?: (e: React.MouseEvent, issue: Issue) => void
+
   // Branch handlers
   onSelectBranch: (branch: Branch) => void
   onDoubleClickBranch: (branch: Branch) => void

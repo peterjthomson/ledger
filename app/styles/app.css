@@ -1078,6 +1078,496 @@ body,
   color: var(--error);
 }
 
+/* Issue Styles */
+.issue-item {
+  padding: 10px 12px;
+}
+
+.issue-item.closed {
+  opacity: 0.6;
+}
+
+.issue-item.closed .item-name {
+  text-decoration: line-through;
+  text-decoration-color: var(--text-muted);
+}
+
+.issue-item-row {
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+}
+
+.issue-checkbox {
+  flex-shrink: 0;
+  width: 18px;
+  height: 18px;
+  border: 2px solid var(--border);
+  border-radius: 50%;
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 10px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  margin-top: 2px;
+}
+
+.issue-checkbox:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.issue-checkbox.checked {
+  background: var(--success);
+  border-color: var(--success);
+  color: white;
+}
+
+.issue-item-content {
+  flex: 1;
+  min-width: 0;
+}
+
+.issue-pinned {
+  margin-right: 4px;
+  font-size: 11px;
+}
+
+.issue-priority-badge {
+  margin-left: 8px;
+  padding: 1px 6px;
+  border-radius: 10px;
+  font-size: 9px;
+  font-weight: 600;
+  color: white;
+  text-transform: uppercase;
+}
+
+.issue-labels {
+  margin-top: 4px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.issue-label-badge {
+  padding: 1px 6px;
+  border-radius: 10px;
+  font-size: 10px;
+  font-weight: 500;
+  border: 1px solid;
+}
+
+.issue-labels-more {
+  font-size: 10px;
+  color: var(--text-muted);
+}
+
+.issue-author {
+  font-size: 10px;
+  color: var(--text-secondary);
+}
+
+.issue-time {
+  font-size: 10px;
+  color: var(--text-muted);
+}
+
+.issue-comments {
+  font-size: 10px;
+  color: var(--text-secondary);
+}
+
+.issue-assignees {
+  font-size: 10px;
+  color: var(--text-secondary);
+}
+
+.issue-milestone {
+  font-size: 10px;
+  color: var(--accent);
+}
+
+.issue-error {
+  color: var(--warning);
+}
+
+.issue-error-icon {
+  margin-right: 8px;
+}
+
+/* Issue Detail Panel */
+.issue-detail-panel {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  padding: 16px;
+  overflow-y: auto;
+}
+
+.issue-detail-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+.issue-detail-type {
+  font-size: 11px;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.issue-detail-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.issue-action-btn {
+  padding: 4px 12px;
+  font-size: 11px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: var(--bg-tertiary);
+  color: var(--text-primary);
+  cursor: pointer;
+}
+
+.issue-action-btn:hover {
+  background: var(--bg-hover);
+  border-color: var(--accent);
+}
+
+.issue-close-btn {
+  background: var(--error);
+  border-color: var(--error);
+  color: white;
+}
+
+.issue-close-btn:hover {
+  opacity: 0.9;
+}
+
+.issue-detail-title {
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin-bottom: 16px;
+  line-height: 1.3;
+}
+
+.issue-detail-meta-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.meta-item {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.meta-label {
+  font-size: 9px;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.meta-value {
+  font-size: 12px;
+  color: var(--text-primary);
+}
+
+.issue-state-open {
+  color: var(--success);
+}
+
+.issue-state-closed {
+  color: var(--text-muted);
+}
+
+.issue-detail-labels {
+  margin-bottom: 16px;
+}
+
+.issue-labels-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 4px;
+}
+
+.issue-detail-tabs {
+  display: flex;
+  gap: 4px;
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 16px;
+}
+
+.issue-tab {
+  padding: 8px 16px;
+  font-size: 12px;
+  color: var(--text-secondary);
+  background: transparent;
+  border: none;
+  border-bottom: 2px solid transparent;
+  cursor: pointer;
+  margin-bottom: -1px;
+}
+
+.issue-tab:hover {
+  color: var(--text-primary);
+}
+
+.issue-tab.active {
+  color: var(--accent);
+  border-bottom-color: var(--accent);
+}
+
+.issue-detail-content {
+  flex: 1;
+  overflow-y: auto;
+}
+
+.issue-loading {
+  text-align: center;
+  color: var(--text-muted);
+  padding: 24px;
+}
+
+.issue-description {
+  font-size: 13px;
+  line-height: 1.6;
+  color: var(--text-primary);
+}
+
+.issue-no-description {
+  color: var(--text-muted);
+  font-style: italic;
+}
+
+.issue-markdown h2,
+.issue-markdown h3,
+.issue-markdown h4 {
+  margin: 16px 0 8px 0;
+  color: var(--text-primary);
+}
+
+.issue-markdown h2 { font-size: 16px; }
+.issue-markdown h3 { font-size: 14px; }
+.issue-markdown h4 { font-size: 13px; }
+
+.issue-markdown p {
+  margin: 8px 0;
+}
+
+.issue-markdown code {
+  background: var(--bg-tertiary);
+  padding: 2px 6px;
+  border-radius: 3px;
+  font-family: 'JetBrains Mono', 'SF Mono', Monaco, monospace;
+  font-size: 12px;
+}
+
+.issue-code-block {
+  background: var(--bg-tertiary);
+  padding: 12px;
+  border-radius: 6px;
+  overflow-x: auto;
+  margin: 12px 0;
+}
+
+.issue-code-block code {
+  background: none;
+  padding: 0;
+}
+
+.issue-comment-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.issue-comment {
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  margin-bottom: 12px;
+}
+
+.issue-comment-header {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+
+.issue-comment-author {
+  font-weight: 500;
+  font-size: 12px;
+  color: var(--text-primary);
+}
+
+.issue-comment-time {
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+.issue-comment-body {
+  font-size: 13px;
+  color: var(--text-primary);
+}
+
+.issue-no-comments {
+  color: var(--text-muted);
+  font-style: italic;
+  text-align: center;
+  padding: 24px;
+}
+
+.issue-comment-input {
+  margin-top: 16px;
+  border-top: 1px solid var(--border);
+  padding-top: 16px;
+}
+
+.issue-comment-input textarea {
+  width: 100%;
+  min-height: 80px;
+  padding: 10px;
+  font-size: 13px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  resize: vertical;
+}
+
+.issue-comment-input textarea:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+
+.issue-comment-actions {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 12px;
+  margin-top: 8px;
+}
+
+.comment-status {
+  font-size: 11px;
+}
+
+.comment-status.success {
+  color: var(--success);
+}
+
+.comment-status.error {
+  color: var(--error);
+}
+
+.issue-comment-submit {
+  padding: 6px 14px;
+  font-size: 12px;
+  background: var(--accent);
+  color: white;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.issue-comment-submit:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.issue-linked-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.issue-linked-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px;
+  border-bottom: 1px solid var(--border);
+}
+
+.issue-linked-item:last-child {
+  border-bottom: none;
+}
+
+.issue-linked-title {
+  font-size: 12px;
+  color: var(--text-primary);
+}
+
+.issue-no-linked {
+  color: var(--text-muted);
+  font-style: italic;
+  text-align: center;
+  padding: 24px;
+}
+
+.issue-detail-footer {
+  display: flex;
+  gap: 8px;
+  padding-top: 16px;
+  border-top: 1px solid var(--border);
+  margin-top: auto;
+}
+
+.issue-close-dropdown {
+  position: relative;
+}
+
+.issue-close-menu {
+  position: absolute;
+  bottom: 100%;
+  left: 0;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+  margin-bottom: 4px;
+  z-index: 100;
+}
+
+.issue-close-menu button {
+  display: block;
+  width: 100%;
+  padding: 8px 16px;
+  font-size: 12px;
+  text-align: left;
+  background: transparent;
+  border: none;
+  color: var(--text-primary);
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.issue-close-menu button:hover {
+  background: var(--bg-hover);
+}
+
+.issue-close-menu button:first-child {
+  border-radius: 6px 6px 0 0;
+}
+
+.issue-close-menu button:last-child {
+  border-radius: 0 0 6px 6px;
+}
+
 /* Stash Styles */
 .stash-item {
   padding: 10px 12px;

@@ -4,6 +4,7 @@ import type {
   Worktree,
   CheckoutResult,
   PullRequest,
+  Issue,
   Commit,
   WorkingStatus,
   GraphCommit,
@@ -32,6 +33,7 @@ import {
   PRDetailPanel,
   SidebarDetailPanel,
 } from './components/panels/editor'
+import { IssueDetailPanel } from './components/panels/editor/IssueDetailPanel'
 import { SettingsPanel } from './components/SettingsPanel'
 import { initializeTheme, setThemeMode as applyThemeMode, getCurrentThemeMode, type ThemeMode } from './theme'
 import { RepoSwitcher } from './components/RepoSwitcher'
@@ -64,6 +66,8 @@ export default function App() {
   const [worktrees, setWorktrees] = useState<Worktree[]>([])
   const [pullRequests, setPullRequests] = useState<PullRequest[]>([])
   const [prError, setPrError] = useState<string | null>(null)
+  const [issues, setIssues] = useState<Issue[]>([])
+  const [issueError, setIssueError] = useState<string | null>(null)
   const [_commits, setCommits] = useState<Commit[]>([])
   const [workingStatus, setWorkingStatus] = useState<WorkingStatus | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -369,16 +373,18 @@ export default function App() {
     setLoading(true)
     setError(null)
     setPrError(null)
+    setIssueError(null)
 
     try {
       // Phase 1: Fast initial load - basic data without expensive per-item metadata
       // Uses getBranchesBasic() instead of getBranchesWithMetadata() (saves 600+ git commands)
       // Uses getCommitGraphHistory with skipStats=true (saves 100 git commands)
-      const [branchResult, worktreeResult, prResult, commitResult, statusResult, ghUrl, graphResult, stashResult] =
+      const [branchResult, worktreeResult, prResult, issueResult, commitResult, statusResult, ghUrl, graphResult, stashResult] =
         await Promise.all([
           window.electronAPI.getBranchesBasic(),
           window.electronAPI.getWorktrees(),
           window.electronAPI.getPullRequests(),
+          window.conveyor.issue.getIssues(),
           window.electronAPI.getCommitHistory(15),
           window.electronAPI.getWorkingStatus(),
           window.electronAPI.getGitHubUrl(),
@@ -414,6 +420,13 @@ export default function App() {
         setPullRequests([])
       } else {
         setPullRequests(prResult.prs)
+      }
+
+      if (issueResult.error) {
+        setIssueError(issueResult.error)
+        setIssues([])
+      } else {
+        setIssues(issueResult.issues)
       }
 
       setCommits(commitResult)
@@ -570,6 +583,7 @@ export default function App() {
   const sidebarToEditorPanel = useCallback((type: SidebarFocusType): EditorPanelType => {
     switch (type) {
       case 'pr': return 'pr-detail'
+      case 'issue': return 'issue-detail'
       case 'branch': return 'branch-detail'
       case 'remote': return 'remote-detail'
       case 'worktree': return 'worktree-detail'
@@ -583,7 +597,7 @@ export default function App() {
 
   // Handle sidebar item focus (single click)
   const handleSidebarFocus = useCallback(
-    (type: SidebarFocusType, data: PullRequest | Branch | Worktree | StashEntry | WorkingStatus | RepoInfo) => {
+    (type: SidebarFocusType, data: PullRequest | Issue | Branch | Worktree | StashEntry | WorkingStatus | RepoInfo) => {
       setSelectedCommit(null) // Clear commit selection when focusing sidebar item
       setCommitDiff(null)
       setSidebarFocus({ type, data })
@@ -595,7 +609,7 @@ export default function App() {
 
   // Radar single-click handlers - soft select item (always works, drives editor when visible)
   const handleRadarItemClick = useCallback(
-    (type: SidebarFocusType, data: PullRequest | Branch | Worktree | StashEntry | WorkingStatus | RepoInfo) => {
+    (type: SidebarFocusType, data: PullRequest | Issue | Branch | Worktree | StashEntry | WorkingStatus | RepoInfo) => {
       // Always select the item - makes UI feel interactive and coherent
       // When editor is visible, this also shows the item in the editor
       handleSidebarFocus(type, data)
@@ -608,6 +622,14 @@ export default function App() {
     (pr: PullRequest) => {
       setActiveCanvas('focus')
       handleSidebarFocus('pr', pr)
+    },
+    [setActiveCanvas, handleSidebarFocus]
+  )
+
+  const handleRadarIssueClick = useCallback(
+    (issue: Issue) => {
+      setActiveCanvas('focus')
+      handleSidebarFocus('issue', issue)
     },
     [setActiveCanvas, handleSidebarFocus]
   )
@@ -1330,6 +1352,8 @@ export default function App() {
     repoPath,
     prs: pullRequests,
     prError,
+    issues,
+    issueError,
     branches,
     currentBranch,
     worktrees,
@@ -1338,10 +1362,11 @@ export default function App() {
     workingStatus,
     commitDiff,
     loadingDiff,
-  }), [repoPath, pullRequests, prError, branches, currentBranch, worktrees, stashes, graphCommits, workingStatus, commitDiff, loadingDiff])
+  }), [repoPath, pullRequests, prError, issues, issueError, branches, currentBranch, worktrees, stashes, graphCommits, workingStatus, commitDiff, loadingDiff])
 
   const canvasSelection: CanvasSelection = useMemo(() => ({
     selectedPR: sidebarFocus?.type === 'pr' ? (sidebarFocus.data as PullRequest) : null,
+    selectedIssue: sidebarFocus?.type === 'issue' ? (sidebarFocus.data as Issue) : null,
     selectedBranch: sidebarFocus?.type === 'branch' || sidebarFocus?.type === 'remote' ? (sidebarFocus.data as Branch) : null,
     selectedWorktree: sidebarFocus?.type === 'worktree' ? (sidebarFocus.data as Worktree) : null,
     selectedStash: sidebarFocus?.type === 'stash' ? (sidebarFocus.data as StashEntry) : null,
@@ -1393,7 +1418,61 @@ export default function App() {
         />
       )
     }
-    
+
+    // Issue Detail panel
+    if (sidebarFocus?.type === 'issue') {
+      return (
+        <IssueDetailPanel
+          issue={sidebarFocus.data as Issue}
+          formatRelativeTime={formatRelativeTime}
+          onCreateBranch={async (issue) => {
+            setStatus({ type: 'info', message: 'Creating branch...' })
+            try {
+              const result = await window.conveyor.issue.createIssueBranch(issue.number)
+              if (result.success) {
+                setStatus({ type: 'success', message: `Branch ${result.branchName} created` })
+                await refresh()
+              } else {
+                setStatus({ type: 'error', message: result.message })
+              }
+            } catch (err) {
+              setStatus({ type: 'error', message: (err as Error).message })
+            }
+          }}
+          onClose={async (issue, reason) => {
+            setStatus({ type: 'info', message: 'Closing issue...' })
+            try {
+              const result = await window.conveyor.issue.closeIssue(issue.number, { reason })
+              if (result.success) {
+                setStatus({ type: 'success', message: 'Issue closed' })
+                await refresh()
+              } else {
+                setStatus({ type: 'error', message: result.message })
+              }
+            } catch (err) {
+              setStatus({ type: 'error', message: (err as Error).message })
+            }
+          }}
+          onReopen={async (issue) => {
+            setStatus({ type: 'info', message: 'Reopening issue...' })
+            try {
+              const result = await window.conveyor.issue.reopenIssue(issue.number)
+              if (result.success) {
+                setStatus({ type: 'success', message: 'Issue reopened' })
+                await refresh()
+              } else {
+                setStatus({ type: 'error', message: result.message })
+              }
+            } catch (err) {
+              setStatus({ type: 'error', message: (err as Error).message })
+            }
+          }}
+          onIssueUpdated={refresh}
+          switching={switching}
+        />
+      )
+    }
+
     // Sidebar detail panel for branches, worktrees, stashes
     if (sidebarFocus) {
       return (
@@ -1489,6 +1568,9 @@ export default function App() {
     onSelectPR: (pr) => handleRadarItemClick('pr', pr),
     onDoubleClickPR: handleRadarPRClick,
     onContextMenuPR: (e, pr) => handleContextMenu(e, 'pr', pr),
+    // Issue handlers
+    onSelectIssue: (issue) => handleRadarItemClick('issue', issue),
+    onDoubleClickIssue: handleRadarIssueClick,
     // Branch handlers
     onSelectBranch: (branch) => handleRadarItemClick(branch.isRemote ? 'remote' : 'branch', branch),
     onDoubleClickBranch: handleRadarBranchClick,
@@ -1558,7 +1640,7 @@ export default function App() {
       navigateToEditor('mailmap-detail', null)
     },
   }), [
-    formatRelativeTime, formatDate, handleRadarItemClick, handleRadarPRClick, handleRadarBranchClick,
+    formatRelativeTime, formatDate, handleRadarItemClick, handleRadarPRClick, handleRadarIssueClick, handleRadarBranchClick,
     handleRadarWorktreeClick, handleRadarStashClick, handleContextMenu, handleSelectCommit, navigateToEditor,
     renderEditorContent, setActiveCanvas, workingStatus, handleRadarUncommittedClick, setStatus, refresh, branches, handleSidebarFocus
   ])

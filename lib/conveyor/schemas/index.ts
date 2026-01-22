@@ -5,6 +5,7 @@ import { repoIpcSchema } from './repo-schema'
 import { branchIpcSchema } from './branch-schema'
 import { worktreeIpcSchema } from './worktree-schema'
 import { prIpcSchema } from './pr-schema'
+import { issueIpcSchema } from './issue-schema'
 import { commitIpcSchema } from './commit-schema'
 import { stashIpcSchema } from './stash-schema'
 import { stagingIpcSchema } from './staging-schema'
@@ -19,6 +20,7 @@ export const ipcSchemas = {
   ...branchIpcSchema,
   ...worktreeIpcSchema,
   ...prIpcSchema,
+  ...issueIpcSchema,
   ...commitIpcSchema,
   ...stashIpcSchema,
   ...stagingIpcSchema,
