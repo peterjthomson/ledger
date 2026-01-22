@@ -30,15 +30,16 @@ export default defineConfig({
       rollupOptions: {
         input: {
           preload: resolve(__dirname, 'lib/preload/preload.ts'),
+          'quick-capture-preload': resolve(__dirname, 'lib/preload/quick-capture-preload.ts'),
         },
       },
     },
     resolve: {
       alias: aliases,
     },
-    // Exclude @electron-toolkit/preload from externalization so it gets bundled                                                                                                                  
-    // This is required for ASAR packaging where node_modules aren't directly accessible                                                                                                          
-    plugins: [externalizeDepsPlugin({ exclude: ['@electron-toolkit/preload'] })], 
+    // Exclude @electron-toolkit/preload from externalization so it gets bundled
+    // This is required for ASAR packaging where node_modules aren't directly accessible
+    plugins: [externalizeDepsPlugin({ exclude: ['@electron-toolkit/preload'] })],
   },
   renderer: {
     root: './app',
@@ -46,6 +47,7 @@ export default defineConfig({
       rollupOptions: {
         input: {
           index: resolve(__dirname, 'app/index.html'),
+          'quick-capture': resolve(__dirname, 'app/quick-capture.html'),
         },
       },
     },

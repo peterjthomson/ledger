@@ -28,7 +28,9 @@ import { registerStashHandlers } from '@/lib/conveyor/handlers/stash-handler'
 import { registerStagingHandlers } from '@/lib/conveyor/handlers/staging-handler'
 import { registerThemeHandlers } from '@/lib/conveyor/handlers/theme-handler'
 import { registerPluginHandlers } from '@/lib/conveyor/handlers/plugin-handler'
+import { registerQuickCaptureHandlers } from '@/lib/conveyor/handlers/quick-capture-handler'
 import { markChannelRegistered } from '@/lib/main/shared'
+import { createTray, destroyTray } from './tray'
 
 // IPC channels registered below via ipcMain.handle
 const IPC_CHANNELS = [
@@ -48,6 +50,10 @@ const IPC_CHANNELS = [
   'get-issues', 'get-issue-detail', 'get-issue-comments', 'open-issue',
   'create-issue', 'edit-issue', 'close-issue', 'reopen-issue', 'comment-on-issue',
   'create-issue-branch', 'get-repo-labels', 'get-repo-milestones', 'get-open-issue-count',
+  // Quick Capture
+  'quick-capture:create-issue', 'quick-capture:screenshot', 'quick-capture:recent-repos',
+  'quick-capture:current-repo', 'quick-capture:labels', 'quick-capture:priority-labels',
+  'quick-capture:settings',
   // Commits
   'get-commit-history', 'get-commit-diff', 'get-branch-diff', 'get-commit-graph-history', 'get-contributor-stats',
   'get-merged-branch-tree', 'reset-to-commit',
@@ -206,6 +212,7 @@ app.whenReady().then(() => {
   registerStagingHandlers()
   registerThemeHandlers()
   registerPluginHandlers()
+  registerQuickCaptureHandlers()
 
   // Register git IPC handlers
   ipcMain.handle('select-repo', async () => {
@@ -960,6 +967,11 @@ app.whenReady().then(() => {
   // Create app window
   createAppWindow()
 
+  // Create menu bar tray (macOS only for now)
+  if (process.platform === 'darwin') {
+    createTray()
+  }
+
   // Default open or close DevTools by F12 in development
   // and ignore CommandOrControl + R in production.
   // see https://github.com/alex8088/electron-toolkit/tree/master/packages/utils
@@ -985,8 +997,9 @@ app.on('window-all-closed', () => {
   }
 })
 
-// Clean up database on quit
+// Clean up database and tray on quit
 app.on('will-quit', () => {
+  destroyTray()
   closeAllCustomDatabases()
   closeDatabase()
 })
