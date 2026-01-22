@@ -731,6 +731,288 @@ New collapsible section in sidebar.
 
 ---
 
+## Quick Capture Mode (Menu Bar Widget)
+
+A lightweight, always-available issue reporter for non-developers. Lives in the macOS menu bar for instant access without opening the full app.
+
+### Use Cases
+
+- **QA testers**: Quickly report bugs during testing sessions
+- **Product managers**: Capture feedback without context-switching
+- **Designers**: Report UI issues with automatic screenshots
+- **Support**: Log customer-reported issues instantly
+- **Future**: Extend to Notion pages, Linear tickets, etc.
+
+### Menu Bar Icon
+
+```
+┌──────────────────────────────────────────────────┐
+│ [Other Apps]  🎫③  [Wi-Fi] [Battery] [Clock]     │  ← macOS menu bar
+└──────────────────────────────────────────────────┘
+                 ↑
+           Issue count badge (3 open)
+```
+
+**Icon States:**
+| State | Display | Meaning |
+|-------|---------|---------|
+| Normal | 🎫 | No pending issues |
+| With count | 🎫③ | 3 open issues |
+| Syncing | 🎫↻ | Creating/fetching |
+| Error | 🎫⚠ | Auth or network issue |
+
+**Click Actions:**
+| Action | Result |
+|--------|--------|
+| Left-click | Open Quick Capture popover |
+| Right-click | Context menu (Open Ledger, Settings, Quit) |
+| ⌥+click | Open main Ledger app directly |
+
+### Quick Capture Popover
+
+```
+┌─────────────────────────────────────────┐
+│ 🎫 New Issue           [peterjthomson/ledger ▾]
+├─────────────────────────────────────────┤
+│ ┌─────────────────────────────────────┐ │
+│ │                                     │ │
+│ │    📸 Screenshot attached           │ │
+│ │    (click to retake or remove)     │ │
+│ │                                     │ │
+│ └─────────────────────────────────────┘ │
+│                                         │
+│ ┌─────────────────────────────────────┐ │
+│ │ Describe the issue...               │ │
+│ │                                     │ │
+│ │                                     │ │
+│ └─────────────────────────────────────┘ │
+│                                         │
+│ [bug ▾]  [P2 ▾]           [Cancel] [⌘↵]│
+└─────────────────────────────────────────┘
+```
+
+**Features:**
+- **Auto-screenshot**: Captures screen when popover opens (configurable)
+- **Single text field**: Title/description combined (AI can split later)
+- **Quick labels**: Optional preset label picker (bug/feature/question)
+- **Quick priority**: Optional priority selector
+- **Repo selector**: Switch between recent repos
+- **Keyboard submit**: ⌘+Enter to create and dismiss
+
+### Workflow
+
+```
+User clicks menu bar icon
+    │
+    ├─► Auto-capture screenshot (if enabled)
+    │
+    ├─► Show minimal popover
+    │
+    ├─► User types description
+    │
+    ├─► User clicks Submit (or ⌘+Enter)
+    │       │
+    │       ├─► gh issue create --title "..." --body "..."
+    │       │   (with screenshot uploaded to GitHub)
+    │       │
+    │       ├─► Popover dismisses
+    │       │
+    │       ├─► Badge count increments
+    │       │
+    │       └─► macOS notification: "Issue #47 created"
+    │
+    └─► User clicks elsewhere → Popover dismisses (no action)
+```
+
+### Screenshot Handling
+
+```typescript
+// Electron screen capture
+const { desktopCapturer, screen } = require('electron')
+
+// Capture current screen
+const sources = await desktopCapturer.getSources({
+  types: ['screen'],
+  thumbnailSize: screen.getPrimaryDisplay().workAreaSize
+})
+
+// Upload to GitHub via gh CLI (creates gist or attaches to issue body)
+// Or: Upload to imgur/cloudinary for simpler hosting
+```
+
+**Options:**
+- Auto-capture on open (default: on)
+- Capture delay (for dismissing other windows)
+- Annotate before submit (arrows, highlights) — future
+- Screen selection for multi-monitor setups
+
+### Data Model Additions
+
+```typescript
+interface QuickIssue {
+  description: string        // User input (becomes title + body)
+  screenshot?: string        // Base64 or URL
+  labels?: string[]          // Quick-selected labels
+  priority?: string          // Quick-selected priority
+  repo: string               // Target repository
+}
+
+interface QuickCaptureSettings {
+  enabled: boolean           // Show menu bar icon
+  autoScreenshot: boolean    // Capture on open
+  defaultLabels: string[]    // Pre-selected labels
+  defaultRepo: string        // Last used repo
+  globalShortcut?: string    // e.g., "⌘+Shift+I"
+}
+```
+
+### IPC Channels (New)
+
+| Channel | Parameters | Returns | Description |
+|---------|------------|---------|-------------|
+| `quick-create-issue` | `QuickIssue` | `{ success, number, url }` | Create from quick capture |
+| `upload-screenshot` | `base64: string` | `{ url }` | Upload image, return URL |
+| `get-quick-capture-settings` | - | `QuickCaptureSettings` | Get settings |
+| `set-quick-capture-settings` | `settings` | `{ success }` | Update settings |
+| `get-open-issue-count` | `repo?: string` | `number` | For badge display |
+
+### Service Implementation
+
+```typescript
+// quick-capture-service.ts
+
+export async function createQuickIssue(
+  ctx: RepositoryContext,
+  issue: QuickIssue
+): Promise<{ success: boolean; number?: number; url?: string; message: string }> {
+  // Format description into title + body
+  const lines = issue.description.trim().split('\n')
+  const title = lines[0].slice(0, 100)  // First line as title (max 100 chars)
+
+  let body = lines.slice(1).join('\n').trim()
+
+  // Append screenshot if provided
+  if (issue.screenshot) {
+    const imgUrl = await uploadScreenshot(issue.screenshot)
+    body += `\n\n### Screenshot\n![Screenshot](${imgUrl})`
+  }
+
+  // Add metadata footer
+  body += `\n\n---\n_Created via Ledger Quick Capture_`
+
+  const args = ['issue', 'create', '--title', title, '--body', body]
+
+  if (issue.labels?.length) {
+    issue.labels.forEach(l => args.push('--label', l))
+  }
+
+  const result = await safeExec('gh', args, { cwd: ctx.path })
+  // ... handle result
+}
+```
+
+### Electron Tray Setup
+
+```typescript
+// lib/main/tray.ts
+
+import { Tray, Menu, nativeImage, BrowserWindow } from 'electron'
+
+let tray: Tray | null = null
+let quickCaptureWindow: BrowserWindow | null = null
+
+export function createTray() {
+  const icon = nativeImage.createFromPath('resources/tray-icon.png')
+  tray = new Tray(icon)
+
+  tray.setToolTip('Ledger - Quick Issue Capture')
+
+  // Update badge count
+  updateTrayTitle(openIssueCount)
+
+  tray.on('click', () => {
+    showQuickCapturePopover()
+  })
+
+  tray.on('right-click', () => {
+    const contextMenu = Menu.buildFromTemplate([
+      { label: 'New Issue', click: showQuickCapturePopover },
+      { label: 'Open Ledger', click: showMainWindow },
+      { type: 'separator' },
+      { label: 'Settings...', click: showSettings },
+      { label: 'Quit', click: app.quit }
+    ])
+    tray.popUpContextMenu(contextMenu)
+  })
+}
+
+function updateTrayTitle(count: number) {
+  // macOS: Shows as badge next to icon
+  tray?.setTitle(count > 0 ? `${count}` : '')
+}
+```
+
+### Global Shortcut (Optional)
+
+```typescript
+// Register global shortcut to open quick capture from anywhere
+import { globalShortcut } from 'electron'
+
+globalShortcut.register('CommandOrControl+Shift+I', () => {
+  showQuickCapturePopover()
+})
+```
+
+### UI Locations
+
+**Menu Bar (always visible when enabled):**
+- Icon with badge count
+- Click → Quick capture popover
+- Right-click → Context menu
+
+**Main App Settings:**
+```
+┌─────────────────────────────────────────┐
+│ Quick Capture                           │
+├─────────────────────────────────────────┤
+│ ☑ Show in menu bar                      │
+│ ☑ Auto-capture screenshot               │
+│ ☐ Capture delay (2 seconds)             │
+│                                         │
+│ Global shortcut: [⌘+Shift+I]            │
+│                                         │
+│ Default labels: [bug ▾] [+ Add]         │
+│ Default repo:   [peterjthomson/ledger ▾]│
+└─────────────────────────────────────────┘
+```
+
+### Future Extensions
+
+| Platform | CLI/API | Notes |
+|----------|---------|-------|
+| **GitHub Issues** | `gh issue create` | Primary target |
+| **Linear** | `linear` CLI or REST API | Workspace + team selection |
+| **Notion** | Notion API | Database/page selection |
+| **Jira** | `jira` CLI or REST API | Project + issue type |
+| **Slack** | Slack API | Post to channel as fallback |
+
+**Abstraction layer:**
+```typescript
+interface TicketProvider {
+  name: string
+  icon: string
+  createTicket(issue: QuickIssue): Promise<{ url: string }>
+  getOpenCount(): Promise<number>
+}
+
+// Implementations
+class GitHubProvider implements TicketProvider { ... }
+class LinearProvider implements TicketProvider { ... }
+class NotionProvider implements TicketProvider { ... }
+```
+
+---
+
 ## Implementation Plan
 
 ### Phase 1: Core List & View (MVP)
@@ -808,6 +1090,36 @@ New collapsible section in sidebar.
     - Cache labels/milestones at repo level
     - Virtualized list for 100+ issues
 
+### Phase 6: Quick Capture (Menu Bar Widget)
+
+14. **Tray Infrastructure**
+    - Create `lib/main/tray.ts` with Electron Tray
+    - Menu bar icon with badge count
+    - Right-click context menu
+
+15. **Quick Capture Window**
+    - Minimal BrowserWindow popover
+    - Auto-screenshot on open (desktopCapturer)
+    - Single text field + submit
+
+16. **Screenshot Upload**
+    - Capture screen via Electron API
+    - Upload to GitHub (embed in issue body)
+    - Preview/retake UI
+
+17. **Settings & Polish**
+    - Quick Capture settings panel
+    - Global shortcut registration
+    - macOS notification on create
+
+### Phase 7: Multi-Provider Support (Future)
+
+18. **Provider Abstraction**
+    - `TicketProvider` interface
+    - GitHub Issues provider (primary)
+    - Linear provider (optional)
+    - Notion provider (optional)
+
 ---
 
 ## Error Handling
@@ -868,6 +1180,8 @@ New collapsible section in sidebar.
 
 ## Files to Create
 
+### Core Issues Feature
+
 ```
 lib/
 ├── services/
@@ -892,6 +1206,39 @@ app/
 │           └── IssueDetailPanel.tsx  # ~400 LOC
 ├── types/
 │   └── electron.d.ts             # Add Issue types
+```
+
+### Quick Capture (Menu Bar Widget)
+
+```
+lib/
+├── main/
+│   ├── tray.ts                   # ~150 LOC - Electron Tray setup
+│   └── quick-capture-window.ts   # ~100 LOC - Popover window
+├── services/
+│   └── quick-capture/
+│       ├── quick-capture-service.ts  # ~200 LOC
+│       ├── screenshot-service.ts     # ~100 LOC
+│       └── index.ts
+├── conveyor/
+│   ├── handlers/
+│   │   └── quick-capture-handler.ts  # ~80 LOC
+│   └── schemas/
+│       └── quick-capture-schema.ts   # ~50 LOC
+
+app/
+├── quick-capture/
+│   ├── QuickCaptureApp.tsx       # ~200 LOC - Separate React root
+│   ├── quick-capture.html        # Entry HTML for popover
+│   └── quick-capture.css         # Minimal styles
+├── components/
+│   └── settings/
+│       └── QuickCaptureSettings.tsx  # ~150 LOC
+
+resources/
+├── tray-icon.png                 # 22x22 menu bar icon
+├── tray-icon@2x.png              # 44x44 retina
+└── tray-icon-Template.png        # macOS template icon
 ```
 
 ---
