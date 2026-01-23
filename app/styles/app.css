@@ -9470,6 +9470,556 @@ body,
 }
 
 /* ========================================
+ * CODE GRAPH VISUALIZATION
+ * ======================================== */
+
+.codegraph-content {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.codegraph-container {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  background: var(--bg-primary);
+  overflow: hidden;
+}
+
+/* Code Graph Header */
+.codegraph-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--border-primary);
+  background: var(--bg-secondary);
+}
+
+.codegraph-title {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.codegraph-language-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-size: 11px;
+  font-weight: 500;
+}
+
+.codegraph-language-typescript {
+  background: rgba(49, 120, 198, 0.15);
+  color: #3178c6;
+  border: 1px solid rgba(49, 120, 198, 0.3);
+}
+
+.codegraph-language-javascript {
+  background: rgba(247, 223, 30, 0.15);
+  color: #f0db4f;
+  border: 1px solid rgba(247, 223, 30, 0.3);
+}
+
+.codegraph-language-php {
+  background: rgba(119, 123, 180, 0.15);
+  color: #777bb4;
+  border: 1px solid rgba(119, 123, 180, 0.3);
+}
+
+.codegraph-language-ruby {
+  background: rgba(204, 52, 45, 0.15);
+  color: #cc342d;
+  border: 1px solid rgba(204, 52, 45, 0.3);
+}
+
+.codegraph-stats {
+  font-size: 11px;
+  color: var(--text-secondary);
+}
+
+.codegraph-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.codegraph-toggle {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  color: var(--text-secondary);
+  cursor: pointer;
+}
+
+.codegraph-toggle input {
+  cursor: pointer;
+}
+
+/* Node limit slider */
+.codegraph-slider-group {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 8px;
+  border-right: 1px solid var(--border-primary);
+}
+
+.codegraph-slider-label {
+  font-size: 11px;
+  color: var(--text-secondary);
+  white-space: nowrap;
+  min-width: 90px;
+}
+
+.codegraph-slider {
+  width: 180px;
+  height: 4px;
+  appearance: none;
+  -webkit-appearance: none;
+  background: var(--bg-tertiary);
+  border-radius: 2px;
+  cursor: pointer;
+}
+
+.codegraph-slider::-webkit-slider-thumb {
+  appearance: none;
+  -webkit-appearance: none;
+  width: 12px;
+  height: 12px;
+  background: var(--accent);
+  border-radius: 50%;
+  cursor: pointer;
+  border: none;
+}
+
+.codegraph-slider::-moz-range-thumb {
+  width: 12px;
+  height: 12px;
+  background: var(--accent);
+  border-radius: 50%;
+  cursor: pointer;
+  border: none;
+}
+
+.codegraph-slider:hover::-webkit-slider-thumb {
+  transform: scale(1.1);
+}
+
+.codegraph-action-button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border-primary);
+  border-radius: 4px;
+  color: var(--text-secondary);
+  cursor: pointer;
+  font-size: 14px;
+  transition: all 0.15s ease;
+}
+
+.codegraph-action-button:hover {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+}
+
+/* Code Graph Wrapper */
+.codegraph-wrapper {
+  flex: 1;
+  position: relative;
+  min-height: 0;
+}
+
+.codegraph-wrapper > div {
+  position: absolute !important;
+  inset: 0;
+}
+
+/* Empty/Loading/Error States */
+.codegraph-empty-state,
+.codegraph-loading-state,
+.codegraph-error-state {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+}
+
+.codegraph-empty-content,
+.codegraph-loading-content,
+.codegraph-error-content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  text-align: center;
+  padding: 32px;
+  max-width: 300px;
+}
+
+.codegraph-empty-icon,
+.codegraph-error-icon {
+  font-size: 48px;
+  opacity: 0.5;
+}
+
+.codegraph-empty-content p,
+.codegraph-loading-content p,
+.codegraph-error-content p {
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: 14px;
+}
+
+.codegraph-empty-hint,
+.codegraph-loading-hint,
+.codegraph-error-message {
+  font-size: 12px !important;
+  color: var(--text-tertiary) !important;
+}
+
+.codegraph-loading-spinner {
+  width: 32px;
+  height: 32px;
+  border: 3px solid var(--border-primary);
+  border-top-color: var(--accent-primary);
+  border-radius: 50%;
+  animation: codegraph-spin 0.8s linear infinite;
+}
+
+@keyframes codegraph-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.codegraph-retry-button {
+  margin-top: 8px;
+  padding: 8px 16px;
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border-primary);
+  border-radius: 6px;
+  color: var(--text-primary);
+  font-size: 13px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.codegraph-retry-button:hover {
+  background: var(--bg-hover);
+  border-color: var(--accent-primary);
+}
+
+/* Renderer Toggle */
+.codegraph-renderer-toggle {
+  display: flex;
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border-primary);
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+.codegraph-renderer-btn {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 10px;
+  background: transparent;
+  border: none;
+  border-right: 1px solid var(--border-primary);
+  color: var(--text-secondary);
+  font-size: 11px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.codegraph-renderer-btn:last-child {
+  border-right: none;
+}
+
+.codegraph-renderer-btn:hover {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+}
+
+.codegraph-renderer-btn.active {
+  background: var(--accent);
+  color: white;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.codegraph-renderer-icon {
+  font-family: monospace;
+  font-size: 11px;
+}
+
+.codegraph-renderer-label {
+  font-weight: 500;
+}
+
+/* ========================================
+ * CODE GRAPH RENDERERS - COMMON
+ * ======================================== */
+
+.codegraph-renderer {
+  width: 100%;
+  height: 100%;
+  position: absolute;
+  inset: 0;
+}
+
+.codegraph-renderer.codegraph-empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-muted);
+}
+
+/* ========================================
+ * REACT FLOW RENDERER
+ * ======================================== */
+
+.codegraph-reactflow-renderer {
+  background: var(--bg-primary);
+}
+
+.codegraph-reactflow-renderer .react-flow {
+  background: var(--bg-primary);
+}
+
+.codegraph-reactflow-renderer .react-flow__background {
+  background: var(--bg-primary);
+}
+
+.codegraph-reactflow-renderer .react-flow__background-pattern {
+  fill: var(--border-secondary);
+}
+
+/* React Flow controls */
+.codegraph-reactflow-renderer .react-flow__controls {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-primary);
+  border-radius: 6px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.codegraph-reactflow-renderer .react-flow__controls-button {
+  background: var(--bg-secondary);
+  border-color: var(--border-primary);
+  fill: var(--text-secondary);
+}
+
+.codegraph-reactflow-renderer .react-flow__controls-button:hover {
+  background: var(--bg-hover);
+}
+
+/* React Flow minimap */
+.codegraph-reactflow-renderer .react-flow__minimap {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-primary);
+  border-radius: 6px;
+}
+
+/* Code Node Styles (React Flow) */
+.codegraph-node {
+  background: var(--bg-primary);
+  border: 1px solid var(--border-primary);
+  border-radius: 6px;
+  font-size: 11px;
+  min-width: 140px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+  overflow: hidden;
+}
+
+.codegraph-node.selected {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px var(--accent-subtle), 0 2px 8px rgba(0, 0, 0, 0.12);
+}
+
+.codegraph-node-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  background: var(--bg-secondary);
+  border-bottom: 1px solid var(--border-primary);
+}
+
+.codegraph-node-icon {
+  font-size: 12px;
+}
+
+.codegraph-node-name {
+  font-weight: 500;
+  color: var(--text-primary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  flex: 1;
+}
+
+.codegraph-node-exported {
+  font-size: 10px;
+  color: var(--text-tertiary);
+}
+
+.codegraph-node-path {
+  padding: 4px 10px;
+  font-size: 10px;
+  color: var(--text-tertiary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Node type colors */
+.codegraph-node-file .codegraph-node-header {
+  border-left: 3px solid #6b7280;
+}
+
+.codegraph-node-class .codegraph-node-header {
+  border-left: 3px solid #3b82f6;
+}
+
+.codegraph-node-interface .codegraph-node-header {
+  border-left: 3px solid #8b5cf6;
+}
+
+.codegraph-node-function .codegraph-node-header {
+  border-left: 3px solid #10b981;
+}
+
+.codegraph-node-module .codegraph-node-header {
+  border-left: 3px solid #f59e0b;
+}
+
+.codegraph-node-trait .codegraph-node-header {
+  border-left: 3px solid #ec4899;
+}
+
+.codegraph-node-enum .codegraph-node-header {
+  border-left: 3px solid #06b6d4;
+}
+
+/* Category-based colors (Laravel/Rails) */
+.codegraph-node-model .codegraph-node-header {
+  border-left: 3px solid #10b981;
+  background: rgba(16, 185, 129, 0.1);
+}
+
+.codegraph-node-controller .codegraph-node-header {
+  border-left: 3px solid #3b82f6;
+  background: rgba(59, 130, 246, 0.1);
+}
+
+.codegraph-node-service .codegraph-node-header {
+  border-left: 3px solid #f59e0b;
+  background: rgba(245, 158, 11, 0.1);
+}
+
+/* Connection handles */
+.codegraph-handle {
+  width: 8px !important;
+  height: 8px !important;
+  background: var(--border-primary) !important;
+  border: 2px solid var(--bg-primary) !important;
+}
+
+.codegraph-handle:hover {
+  background: var(--accent) !important;
+}
+
+/* ========================================
+ * D3 FORCE RENDERER
+ * ======================================== */
+
+.codegraph-d3-renderer {
+  background: var(--bg-primary);
+}
+
+.codegraph-d3-svg {
+  width: 100%;
+  height: 100%;
+}
+
+.codegraph-d3-label {
+  font-family: var(--font-sans);
+  pointer-events: none;
+}
+
+/* ========================================
+ * JSON RENDERER
+ * ======================================== */
+
+.codegraph-json-renderer {
+  display: flex;
+  flex-direction: column;
+  background: var(--bg-primary);
+}
+
+.codegraph-json-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--border-primary);
+  background: var(--bg-secondary);
+}
+
+.codegraph-json-stats {
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.codegraph-json-copy-btn {
+  padding: 4px 10px;
+  border: 1px solid var(--border-primary);
+  border-radius: 4px;
+  background: var(--bg-primary);
+  color: var(--text-secondary);
+  font-size: 12px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.codegraph-json-copy-btn:hover {
+  background: var(--bg-hover);
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.codegraph-json-content {
+  flex: 1;
+  overflow: auto;
+  padding: 12px;
+}
+
+.codegraph-json-container {
+  font-family: var(--font-mono) !important;
+  font-size: 12px !important;
+  line-height: 1.5 !important;
+}
+
+.codegraph-json-light {
+  background: var(--bg-primary) !important;
+  color: var(--text-primary) !important;
+}
+
+.codegraph-json-dark {
+  background: var(--bg-primary) !important;
+  color: var(--text-primary) !important;
+}
+
+/* ========================================
    FileGraph - Code Treemap Visualization
    ======================================== */
 

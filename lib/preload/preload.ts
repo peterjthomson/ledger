@@ -222,6 +222,11 @@ const electronAPI = {
   getERDSchema: (repoPath?: string) => ipcRenderer.invoke('get-erd-schema', repoPath),
   detectERDFramework: (repoPath?: string) => ipcRenderer.invoke('detect-erd-framework', repoPath),
   parseMermaidERD: (content: string) => ipcRenderer.invoke('parse-mermaid-erd', content),
+  // Code Graph operations
+  getCodeGraphSchema: (repoPath?: string, options?: unknown) =>
+    ipcRenderer.invoke('get-codegraph-schema', repoPath, options),
+  detectCodeGraphLanguage: (repoPath?: string) => ipcRenderer.invoke('detect-codegraph-language', repoPath),
+  getCodeGraphDiffStatus: (repoPath?: string) => ipcRenderer.invoke('get-codegraph-diff-status', repoPath),
 }
 
 // Security verification (from kaurifund's bug fix)

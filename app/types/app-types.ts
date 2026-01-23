@@ -85,7 +85,7 @@ export type EditorPanelType =
   | 'mailmap-detail'
   | 'empty'
 
-export type VizPanelType = 'git-graph' | 'timeline' | 'tech-tree' | 'erd-canvas' | 'file-graph'
+export type VizPanelType = 'git-graph' | 'timeline' | 'tech-tree' | 'erd-canvas' | 'codegraph' | 'file-graph'
 
 export type PanelType = ListPanelType | EditorPanelType | VizPanelType
 

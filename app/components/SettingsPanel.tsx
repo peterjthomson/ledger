@@ -25,6 +25,7 @@ const PANEL_OPTIONS: Record<SlotType, { value: PanelType; label: string }[]> = {
     { value: 'timeline', label: 'Timeline' },
     { value: 'tech-tree', label: 'Tech Tree' },
     { value: 'erd-canvas', label: 'ERD' },
+    { value: 'codegraph', label: 'Code Graph' },
     { value: 'file-graph', label: 'Code Map' },
   ],
 }

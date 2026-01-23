@@ -32,6 +32,7 @@ import { EditorSlot } from './EditorSlot'
 import { PRList, BranchList, WorktreeList, StashList, CommitList, Sidebar, RepoList } from '../panels/list'
 import { GitGraph, ContributorChart, TechTreeChart, FileGraph } from '../panels/viz'
 import { ERDCanvasPanel } from '../panels/viz/erd'
+import { CodeGraphPanel } from '../panels/viz/codegraph'
 
 // ========================================
 // Data Interface
@@ -404,6 +405,7 @@ export function CanvasRenderer({
           { id: 'timeline', label: 'Timeline', icon: '◔' },
           { id: 'tech-tree', label: 'Tech Tree', icon: '⬡' },
           { id: 'erd-canvas', label: 'ERD', icon: '◫' },
+          { id: 'codegraph', label: 'Code Graph', icon: '⬢' },
           { id: 'file-graph', label: 'Code Map', icon: '▦' },
         ]
         
@@ -524,6 +526,20 @@ export function CanvasRenderer({
               />
               <div className="viz-panel-content erd-canvas-content">
                 <ERDCanvasPanel repoPath={data.repoPath} />
+              </div>
+            </div>
+          )
+
+        case 'codegraph':
+          return (
+            <div className="viz-panel codegraph-panel">
+              <VizHeader
+                panel={column.panel}
+                label={column.label || 'Code Graph'}
+                icon={column.icon || '⬢'}
+              />
+              <div className="viz-panel-content codegraph-content">
+                <CodeGraphPanel repoPath={data.repoPath} />
               </div>
             </div>
           )

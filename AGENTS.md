@@ -24,12 +24,14 @@ Ledger is a macOS desktop app for viewing git branches, worktrees, and pull requ
 ```
 lib/main/main.ts         # IPC handlers, app lifecycle
 lib/services/            # Git operations as pure functions (branch, commit, stash, etc.)
+lib/services/codegraph/  # Code dependency graph parsing (PHP, Ruby, TypeScript)
 lib/conveyor/            # Typed IPC with Zod validation (schemas, handlers, APIs)
 lib/preload/preload.ts   # API exposed to renderer
 app/app.tsx              # Main React component (large)
 app/styles/app.css       # All styling (large)
 app/types/electron.d.ts  # TypeScript types for IPC
 app/components/          # UI components (panels, canvas, window)
+resources/scripts/       # External parser scripts (PHP, Ruby)
 ```
 
 ## Common Tasks
@@ -46,7 +48,8 @@ app/components/          # UI components (panels, canvas, window)
 
 Main UI is in `app/app.tsx`. Components are in `app/components/`:
 - `panels/editor/` - Editor panels (BranchDetail, PRReview, Staging, etc.)
-- `panels/viz/` - Visualization panels (GitGraph)
+- `panels/viz/` - Visualization panels (GitGraph, ERD, CodeGraph)
+- `panels/viz/codegraph/` - Code dependency graph visualization
 - `canvas/` - Canvas layout system
 - `window/` - Window chrome (Titlebar, menus)
 
@@ -133,6 +136,24 @@ The canonical sources are:
 - `app/types/electron.d.ts` - Renderer-facing API types
 - `lib/services/` - Git operations as pure functions
 - `lib/conveyor/schemas/` - IPC channel definitions with Zod validation
+
+## Code Graph (AST Parsing)
+
+Visualizes code dependencies as a force-directed network graph. Supports:
+
+| Language | Parser | Notes |
+|----------|--------|-------|
+| PHP | `nikic/php-parser` (bundled) | Laravel-optimized (Models/Controllers/Services) |
+| Ruby | Regex-based | Rails-optimized (Models/Controllers) |
+| TypeScript | `ts-morph` | Full AST with tsconfig resolution |
+
+Key files:
+- `lib/services/codegraph/` - Parser service and type definitions
+- `resources/scripts/php-ast-parser.php` - PHP parser (bundled with nikic/php-parser)
+- `resources/scripts/ruby-ast-parser.rb` - Ruby parser (no gem dependencies)
+- `app/components/panels/viz/codegraph/` - React components and D3 renderer
+
+The parsers run zero-touch (no modifications needed to target repo). For Laravel/Rails projects, only key directories are scanned for performance. Nodes with fewer than 2 connections are filtered out.
 
 ## Error Handling
 
