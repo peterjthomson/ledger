@@ -285,8 +285,8 @@ export function ContributorChart({
         <defs>
           {/* Gradient for the glow effect */}
           <linearGradient id="ridge-glow" x1="0%" y1="0%" x2="0%" y2="100%">
-            <stop offset="0%" stopColor={invertedTheme ? '#fff' : 'var(--accent)'} stopOpacity="0.8" />
-            <stop offset="100%" stopColor={invertedTheme ? '#fff' : 'var(--accent)'} stopOpacity="0" />
+            <stop offset="0%" stopColor={invertedTheme ? 'var(--text-primary)' : 'var(--accent)'} stopOpacity="0.8" />
+            <stop offset="100%" stopColor={invertedTheme ? 'var(--text-primary)' : 'var(--accent)'} stopOpacity="0" />
           </linearGradient>
           
           {/* Clip path for clean edges */}
@@ -301,7 +301,7 @@ export function ContributorChart({
           y="0"
           width={chartWidth}
           height={height}
-          fill={invertedTheme ? '#0a0a0a' : 'var(--bg-secondary)'}
+          fill={invertedTheme ? 'var(--bg-primary)' : 'var(--bg-secondary)'}
         />
 
         {/* Ridgelines - render back to front for proper overlap */}
@@ -325,7 +325,7 @@ export function ContributorChart({
                 {/* Fill area - solid background to occlude lines behind */}
                 <path
                   d={fillPath}
-                  fill={invertedTheme ? '#0a0a0a' : 'var(--bg-secondary)'}
+                  fill={invertedTheme ? 'var(--bg-primary)' : 'var(--bg-secondary)'}
                   className="ridge-fill-bg"
                 />
                 
@@ -341,7 +341,7 @@ export function ContributorChart({
                 <path
                   d={linePath}
                   fill="none"
-                  stroke={invertedTheme ? '#ffffff' : 'var(--accent)'}
+                  stroke={invertedTheme ? 'var(--text-primary)' : 'var(--accent)'}
                   strokeWidth={isHovered ? 2.5 : 1.5}
                   opacity={isHovered ? 1 : 0.85}
                   className="ridge-line"
@@ -368,7 +368,7 @@ export function ContributorChart({
                   y={baseY + 4}
                   textAnchor="end"
                   className={`author-label ${isHovered ? 'hovered' : ''}`}
-                  fill={invertedTheme ? '#ffffff' : 'var(--text-primary)'}
+                  fill="var(--text-primary)"
                   opacity={isHovered ? 1 : 0.7}
                   fontSize="12"
                   fontFamily="var(--font-sans, system-ui)"
@@ -382,7 +382,7 @@ export function ContributorChart({
                   y={baseY + 18}
                   textAnchor="end"
                   className="commit-count"
-                  fill={invertedTheme ? '#666' : 'var(--text-muted)'}
+                  fill="var(--text-muted)"
                   fontSize="10"
                   fontFamily="var(--font-mono, monospace)"
                 >
@@ -400,7 +400,7 @@ export function ContributorChart({
             y1={height - bottomPadding + 10}
             x2={chartWidth - 20}
             y2={height - bottomPadding + 10}
-            stroke={invertedTheme ? '#333' : 'var(--border)'}
+            stroke="var(--border)"
             strokeWidth="1"
           />
           {timeLabels.map((label, i) => (
@@ -409,7 +409,7 @@ export function ContributorChart({
               x={label.x}
               y={height - bottomPadding + 28}
               textAnchor="middle"
-              fill={invertedTheme ? '#666' : 'var(--text-muted)'}
+              fill="var(--text-muted)"
               fontSize="11"
               fontFamily="var(--font-sans, system-ui)"
             >

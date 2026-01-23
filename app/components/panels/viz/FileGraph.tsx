@@ -7,149 +7,20 @@
 
 import { useState, useMemo, useCallback, useRef, useEffect } from 'react'
 import type { FileGraphData, FileNode } from '../../../types/electron'
+import { squarify } from './file-graph/layout/treemap-layout'
 
 export interface FileGraphProps {
   data: FileGraphData | null
   loading?: boolean
 }
 
-// Language colors
-const LANGUAGE_COLORS: Record<string, string> = {
-  TypeScript: '#3178C6',
-  JavaScript: '#F7DF1E',
-  CSS: '#563D7C',
-  SCSS: '#CC6699',
-  HTML: '#E34C26',
-  JSON: '#F5D800',
-  Markdown: '#083FA1',
-  Python: '#3776AB',
-  Go: '#00ADD8',
-  Rust: '#DEA584',
-  Java: '#B07219',
-  Ruby: '#CC342D',
-  PHP: '#4F5D95',
-  C: '#555555',
-  'C++': '#F34B7D',
-  'C#': '#178600',
-  Swift: '#F05138',
-  Kotlin: '#A97BFF',
-  Shell: '#89E051',
-  YAML: '#CB171E',
-  TOML: '#9C4221',
-  XML: '#0060AC',
-  SQL: '#E38C00',
-  GraphQL: '#E535AB',
-  Vue: '#41B883',
-  Svelte: '#FF3E00',
-  Other: '#6B7280',
-}
-
-interface TreemapRect {
-  node: FileNode
-  x: number
-  y: number
-  width: number
-  height: number
-}
-
-/** Squarified treemap layout */
-function squarify(
-  nodes: FileNode[],
-  x: number,
-  y: number,
-  width: number,
-  height: number,
-  totalValue: number
-): TreemapRect[] {
-  if (nodes.length === 0 || totalValue === 0) return []
-
-  const rects: TreemapRect[] = []
-  const sorted = [...nodes].sort((a, b) => b.lines - a.lines)
-
-  let currentX = x
-  let currentY = y
-  let remainingWidth = width
-  let remainingHeight = height
-  let remainingValue = totalValue
-
-  let row: FileNode[] = []
-  let rowValue = 0
-
-  function aspectRatio(areas: number[], length: number): number {
-    if (areas.length === 0 || length === 0) return Infinity
-    const sum = areas.reduce((a, b) => a + b, 0)
-    const min = Math.min(...areas)
-    const max = Math.max(...areas)
-    const s2 = sum * sum
-    const l2 = length * length
-    return Math.max((l2 * max) / s2, s2 / (l2 * min))
-  }
-
-  function layoutRow(row: FileNode[], rowValue: number, isHorizontal: boolean) {
-    if (row.length === 0) return
-    const rowLength = isHorizontal
-      ? (rowValue / remainingValue) * remainingHeight
-      : (rowValue / remainingValue) * remainingWidth
-    let offset = 0
-    for (const node of row) {
-      const nodeRatio = node.lines / rowValue
-      const nodeLength = isHorizontal ? nodeRatio * remainingWidth : nodeRatio * remainingHeight
-      rects.push({
-        node,
-        x: isHorizontal ? currentX + offset : currentX,
-        y: isHorizontal ? currentY : currentY + offset,
-        width: isHorizontal ? nodeLength : rowLength,
-        height: isHorizontal ? rowLength : nodeLength,
-      })
-      offset += nodeLength
-    }
-    if (isHorizontal) {
-      currentY += rowLength
-      remainingHeight -= rowLength
-    } else {
-      currentX += rowLength
-      remainingWidth -= rowLength
-    }
-    remainingValue -= rowValue
-  }
-
-  for (const node of sorted) {
-    const isHorizontal = remainingWidth >= remainingHeight
-    const length = isHorizontal ? remainingWidth : remainingHeight
-    const rowAreas = row.map((n) => (n.lines / remainingValue) * length * (isHorizontal ? remainingHeight : remainingWidth))
-    const newAreas = [...rowAreas, (node.lines / remainingValue) * length * (isHorizontal ? remainingHeight : remainingWidth)]
-    const currentAspect = aspectRatio(rowAreas, length)
-    const newAspect = aspectRatio(newAreas, length)
-
-    if (row.length === 0 || newAspect <= currentAspect) {
-      row.push(node)
-      rowValue += node.lines
-    } else {
-      layoutRow(row, rowValue, isHorizontal)
-      row = [node]
-      rowValue = node.lines
-    }
-  }
-
-  if (row.length > 0) {
-    layoutRow(row, rowValue, remainingWidth >= remainingHeight)
-  }
-
-  return rects
-}
+const DEFAULT_LANGUAGE_COLOR = 'var(--chart-1)'
+const FALLBACK_LANGUAGE_COLOR = 'var(--chart-8)'
 
 function formatLines(lines: number): string {
   if (lines >= 1000000) return `${(lines / 1000000).toFixed(1)}M`
   if (lines >= 1000) return `${(lines / 1000).toFixed(1)}K`
   return lines.toString()
-}
-
-function getContrastColor(hex: string): string {
-  const r = parseInt(hex.slice(1, 3), 16)
-  const g = parseInt(hex.slice(3, 5), 16)
-  const b = parseInt(hex.slice(5, 7), 16)
-  const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255
-  return luminance > 0.5 ? '#000000' : '#FFFFFF'
 }
 
 function truncateLabel(label: string, width: number): string {
@@ -196,6 +67,26 @@ export function FileGraph({ data, loading }: FileGraphProps) {
     return node
   }, [data, currentPath])
 
+  const languageColorMap = useMemo(() => {
+    const map = new Map<string, string>()
+    if (!data) return map
+    for (const language of data.languages) {
+      map.set(language.language, language.color || DEFAULT_LANGUAGE_COLOR)
+    }
+    if (!map.has('Other')) {
+      map.set('Other', FALLBACK_LANGUAGE_COLOR)
+    }
+    return map
+  }, [data])
+
+  const legendLanguages = useMemo(() => {
+    if (!data) return []
+    return data.languages.slice(0, 8).map((lang) => ({
+      ...lang,
+      color: languageColorMap.get(lang.language) || lang.color || DEFAULT_LANGUAGE_COLOR,
+    }))
+  }, [data, languageColorMap])
+
   // Calculate treemap layout
   const treemapRects = useMemo(() => {
     if (!currentNode?.children) return []
@@ -221,9 +112,10 @@ export function FileGraph({ data, loading }: FileGraphProps) {
   }, [])
 
   const getNodeColor = useCallback((node: FileNode): string => {
-    if (node.isDirectory) return 'var(--bg-tertiary)'
-    return LANGUAGE_COLORS[node.language || 'Other'] || LANGUAGE_COLORS.Other
-  }, [])
+    if (node.isDirectory) return 'var(--bg-hover)'
+    const language = node.language || 'Other'
+    return languageColorMap.get(language) || DEFAULT_LANGUAGE_COLOR
+  }, [languageColorMap])
 
   if (loading) {
     return (
@@ -297,7 +189,6 @@ export function FileGraph({ data, loading }: FileGraphProps) {
                     className="file-graph-label"
                     style={{
                       fontSize: Math.min(12, minDim / 4),
-                      fill: rect.node.isDirectory ? 'var(--text-primary)' : getContrastColor(getNodeColor(rect.node)),
                     }}
                   >
                     {truncateLabel(rect.node.name, rect.width)}
@@ -311,7 +202,7 @@ export function FileGraph({ data, loading }: FileGraphProps) {
 
       {/* Legend */}
       <div className="file-graph-legend">
-        {data.languages.slice(0, 8).map((lang) => (
+        {legendLanguages.map((lang) => (
           <div key={lang.language} className="legend-item">
             <span className="legend-color" style={{ backgroundColor: lang.color }} />
             <span className="legend-label">{lang.language}</span>

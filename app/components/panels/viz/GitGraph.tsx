@@ -37,14 +37,14 @@ export interface GitGraphProps {
 
 // Lane colors for branches
 const LANE_COLORS = [
-  '#5B9BD5', // blue
-  '#70AD47', // green
-  '#ED7D31', // orange
-  '#7030A0', // purple
-  '#FFC000', // yellow
-  '#C00000', // red
-  '#00B0F0', // cyan
-  '#FF6699', // pink
+  'var(--chart-1)',
+  'var(--chart-2)',
+  'var(--chart-3)',
+  'var(--chart-4)',
+  'var(--chart-5)',
+  'var(--chart-6)',
+  'var(--chart-7)',
+  'var(--chart-8)',
 ]
 
 export function GitGraph({

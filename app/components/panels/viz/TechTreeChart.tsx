@@ -17,14 +17,14 @@ export interface TechTreeChartProps {
 
 // Color palette by branch type
 const BRANCH_COLORS: Record<TechTreeBranchType, string> = {
-  feature: '#56c8ff',   // Cyan
-  fix: '#ff9640',       // Orange
-  chore: '#a080ff',     // Purple
-  refactor: '#40d9c0',  // Teal
-  docs: '#6080ff',      // Blue
-  test: '#60d060',      // Green
-  release: '#ffc040',   // Gold
-  unknown: '#c0c8d0',   // White/gray
+  feature: 'var(--chart-1)',
+  fix: 'var(--chart-4)',
+  chore: 'var(--chart-6)',
+  refactor: 'var(--chart-7)',
+  docs: 'var(--chart-2)',
+  test: 'var(--chart-3)',
+  release: 'var(--chart-8)',
+  unknown: 'var(--text-muted)',
 }
 
 // Icons by branch type
@@ -515,8 +515,8 @@ export function TechTreeChart({ limit = 25, formatRelativeTime, onSelectNode }: 
               height={100}
               rx={16}
               ry={16}
-              fill="#1a1410"
-              stroke="#ffc040"
+              fill="var(--bg-secondary)"
+              stroke="var(--accent)"
               strokeWidth={4}
               filter="url(#glow-master)"
               className="tech-tree-master-node"
@@ -542,7 +542,6 @@ export function TechTreeChart({ limit = 25, formatRelativeTime, onSelectNode }: 
                   height: size.height,
                   fontSize: size.fontSize,
                   '--node-color': color,
-                  '--node-glow': `${color}40`,
                 } as React.CSSProperties}
                 onClick={() => handleNodeClick(node)}
               >

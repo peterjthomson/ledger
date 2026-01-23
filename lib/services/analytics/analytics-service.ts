@@ -655,35 +655,25 @@ export async function getSiblingRepos(ctx: RepositoryContext): Promise<RepoInfo[
 // FileGraph - Code Treemap Visualization
 // ========================================
 
-// Language colors based on common conventions
-const LANGUAGE_COLORS: Record<string, string> = {
-  TypeScript: '#3178C6',
-  JavaScript: '#F7DF1E',
-  CSS: '#563D7C',
-  SCSS: '#CC6699',
-  HTML: '#E34C26',
-  JSON: '#F5D800',
-  Markdown: '#083FA1',
-  Python: '#3776AB',
-  Go: '#00ADD8',
-  Rust: '#DEA584',
-  Java: '#B07219',
-  Ruby: '#CC342D',
-  PHP: '#4F5D95',
-  C: '#555555',
-  'C++': '#F34B7D',
-  'C#': '#178600',
-  Swift: '#F05138',
-  Kotlin: '#A97BFF',
-  Shell: '#89E051',
-  YAML: '#CB171E',
-  TOML: '#9C4221',
-  XML: '#0060AC',
-  SQL: '#E38C00',
-  GraphQL: '#E535AB',
-  Vue: '#41B883',
-  Svelte: '#FF3E00',
-  Other: '#6B7280',
+// Chart palette tokens (resolved in renderer via CSS variables)
+const CHART_PALETTE = [
+  'var(--chart-1)',
+  'var(--chart-2)',
+  'var(--chart-3)',
+  'var(--chart-4)',
+  'var(--chart-5)',
+  'var(--chart-6)',
+  'var(--chart-7)',
+  'var(--chart-8)',
+]
+
+const getPaletteColor = (language: string): string => {
+  if (language === 'Other') return CHART_PALETTE[CHART_PALETTE.length - 1]
+  let hash = 0
+  for (let i = 0; i < language.length; i++) {
+    hash = (hash * 31 + language.charCodeAt(i)) | 0
+  }
+  return CHART_PALETTE[Math.abs(hash) % CHART_PALETTE.length]
 }
 
 // Extension to language mapping
@@ -859,7 +849,7 @@ export async function getFileGraph(ctx: RepositoryContext): Promise<FileGraphDat
     .map(([language, lines]) => ({
       language,
       lines,
-      color: LANGUAGE_COLORS[language] || LANGUAGE_COLORS.Other,
+      color: getPaletteColor(language),
     }))
     .sort((a, b) => b.lines - a.lines)
 

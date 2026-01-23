@@ -218,6 +218,10 @@ const electronAPI = {
   updateCanvas: (canvasId: string, updates: unknown) => ipcRenderer.invoke('update-canvas', canvasId, updates),
   // Repo operations
   getSiblingRepos: () => ipcRenderer.invoke('get-sibling-repos'),
+  // ERD operations
+  getERDSchema: (repoPath?: string) => ipcRenderer.invoke('get-erd-schema', repoPath),
+  detectERDFramework: (repoPath?: string) => ipcRenderer.invoke('detect-erd-framework', repoPath),
+  parseMermaidERD: (content: string) => ipcRenderer.invoke('parse-mermaid-erd', content),
 }
 
 // Security verification (from kaurifund's bug fix)
