@@ -542,6 +542,7 @@ export function TechTreeChart({ limit = 25, formatRelativeTime, onSelectNode }: 
                   height: size.height,
                   fontSize: size.fontSize,
                   '--node-color': color,
+                  '--node-glow': `${color}40`,
                 } as React.CSSProperties}
                 onClick={() => handleNodeClick(node)}
               >

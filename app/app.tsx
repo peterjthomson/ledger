@@ -353,6 +353,8 @@ export default function App() {
         setCommits([])
         setPullRequests([])
         setWorkingStatus(null)
+        setFileGraph(null)
+        setFileGraphLoading(false)
         setRepoPath(path)
         setStatus({ type: 'info', message: 'Loading repository...' })
         await refresh(path)
