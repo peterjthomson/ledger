@@ -104,7 +104,7 @@ export async function getIssues(
       'issue', 'list',
       '--state', state,
       '--limit', String(limit),
-      '--json', 'number,title,state,stateReason,author,assignees,labels,milestone,comments,createdAt,updatedAt,closedAt,url,isPinned,locked'
+      '--json', 'number,title,state,stateReason,author,assignees,labels,milestone,comments,createdAt,updatedAt,closedAt,url,isPinned'
     ]
 
     if (assignee) {
@@ -147,7 +147,7 @@ export async function getIssues(
       })),
       milestone: issue.milestone?.title || null,
       milestoneNumber: issue.milestone?.number || null,
-      comments: issue.comments || 0,
+      comments: Array.isArray(issue.comments) ? issue.comments.length : (issue.comments || 0),
       createdAt: issue.createdAt,
       updatedAt: issue.updatedAt,
       closedAt: issue.closedAt || null,
@@ -192,7 +192,7 @@ export async function getIssueDetail(
       'gh',
       [
         'issue', 'view', String(issueNumber),
-        '--json', 'number,title,body,state,stateReason,author,assignees,labels,milestone,comments,createdAt,updatedAt,closedAt,url,isPinned,locked'
+        '--json', 'number,title,body,state,stateReason,author,assignees,labels,milestone,comments,createdAt,updatedAt,closedAt,url,isPinned'
       ],
       { cwd: ctx.path }
     )
@@ -223,7 +223,7 @@ export async function getIssueDetail(
       })),
       milestone: issue.milestone?.title || null,
       milestoneNumber: issue.milestone?.number || null,
-      comments: issue.comments || 0,
+      comments: Array.isArray(issue.comments) ? issue.comments.length : (issue.comments || 0),
       createdAt: issue.createdAt,
       updatedAt: issue.updatedAt,
       closedAt: issue.closedAt || null,

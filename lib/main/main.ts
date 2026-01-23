@@ -46,14 +46,8 @@ const IPC_CHANNELS = [
   // Pull requests
   'get-pull-requests', 'open-pull-request', 'create-pull-request', 'checkout-pr-branch',
   'get-pr-detail', 'get-pr-review-comments', 'get-pr-file-diff', 'comment-on-pr', 'merge-pr', 'get-github-url',
-  // Issues
-  'get-issues', 'get-issue-detail', 'get-issue-comments', 'open-issue',
-  'create-issue', 'edit-issue', 'close-issue', 'reopen-issue', 'comment-on-issue',
-  'create-issue-branch', 'get-repo-labels', 'get-repo-milestones', 'get-open-issue-count',
-  // Quick Capture
-  'quick-capture:create-issue', 'quick-capture:screenshot', 'quick-capture:recent-repos',
-  'quick-capture:current-repo', 'quick-capture:labels', 'quick-capture:priority-labels',
-  'quick-capture:settings',
+  // Issues - registered via registerIssueHandlers() (conveyor)
+  // Quick Capture - registered via registerQuickCaptureHandlers()
   // Commits
   'get-commit-history', 'get-commit-diff', 'get-branch-diff', 'get-commit-graph-history', 'get-contributor-stats',
   'get-merged-branch-tree', 'reset-to-commit',

@@ -5723,7 +5723,7 @@ export async function getIssues(options: ListIssuesOptions = {}): Promise<IssueL
   const { state = 'open', assignee, labels, milestone, search, limit = 50, sort = 'updated' } = options
 
   try {
-    let cmd = `gh issue list --state ${state} --limit ${limit} --json number,title,state,stateReason,author,assignees,labels,milestone,comments,createdAt,updatedAt,closedAt,url,isPinned,locked`
+    let cmd = `gh issue list --state ${state} --limit ${limit} --json number,title,state,stateReason,author,assignees,labels,milestone,comments,createdAt,updatedAt,closedAt,url,isPinned`
 
     if (assignee) {
       cmd += ` --assignee "${assignee}"`
@@ -5761,7 +5761,7 @@ export async function getIssues(options: ListIssuesOptions = {}): Promise<IssueL
       })),
       milestone: issue.milestone?.title || null,
       milestoneNumber: issue.milestone?.number || null,
-      comments: issue.comments || 0,
+      comments: Array.isArray(issue.comments) ? issue.comments.length : (issue.comments || 0),
       createdAt: issue.createdAt,
       updatedAt: issue.updatedAt,
       closedAt: issue.closedAt || null,
@@ -5802,7 +5802,7 @@ export async function getIssueDetail(issueNumber: number): Promise<IssueDetail |
 
   try {
     const { stdout } = await execAsync(
-      `gh issue view ${issueNumber} --json number,title,body,state,stateReason,author,assignees,labels,milestone,comments,createdAt,updatedAt,closedAt,url,isPinned,locked`,
+      `gh issue view ${issueNumber} --json number,title,body,state,stateReason,author,assignees,labels,milestone,comments,createdAt,updatedAt,closedAt,url,isPinned`,
       { cwd: repoPath }
     )
 
@@ -5828,7 +5828,7 @@ export async function getIssueDetail(issueNumber: number): Promise<IssueDetail |
       })),
       milestone: issue.milestone?.title || null,
       milestoneNumber: issue.milestone?.number || null,
-      comments: issue.comments || 0,
+      comments: Array.isArray(issue.comments) ? issue.comments.length : (issue.comments || 0),
       createdAt: issue.createdAt,
       updatedAt: issue.updatedAt,
       closedAt: issue.closedAt || null,

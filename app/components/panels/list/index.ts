@@ -13,6 +13,9 @@ export { ListPanelHeader } from './ListPanelHeader'
 export { PRList } from './PRList'
 export type { PRListProps } from './PRList'
 
+export { IssueList } from './IssueList'
+export type { IssueListProps } from './IssueList'
+
 export { BranchList } from './BranchList'
 export type { BranchListProps } from './BranchList'
 

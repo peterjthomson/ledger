@@ -7,6 +7,7 @@ import type { SlotType, PanelType, Column } from '../types/app-types'
 const PANEL_OPTIONS: Record<SlotType, { value: PanelType; label: string }[]> = {
   list: [
     { value: 'pr-list', label: 'Pull Requests' },
+    { value: 'issue-list', label: 'Issues' },
     { value: 'branch-list', label: 'Branches' },
     { value: 'remote-list', label: 'Remotes' },
     { value: 'worktree-list', label: 'Worktrees' },

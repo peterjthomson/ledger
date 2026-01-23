@@ -42,9 +42,19 @@
   background: var(--qc-bg);
   color: var(--qc-text);
   border-radius: 10px;
-  overflow: hidden;
   border: 1px solid var(--qc-border);
   box-shadow: var(--qc-shadow);
+  /* Note: no overflow:hidden - needed for repo dropdown to display properly */
+  /* Ensure all content is interactive (not draggable) in frameless window */
+  -webkit-app-region: no-drag;
+}
+
+/* Ensure all interactive elements are clickable */
+.quick-capture button,
+.quick-capture input,
+.quick-capture textarea,
+.quick-capture select {
+  -webkit-app-region: no-drag;
 }
 
 /* Header */
@@ -55,6 +65,9 @@
   padding: 12px 16px;
   border-bottom: 1px solid var(--qc-border);
   background: rgba(0, 0, 0, 0.02);
+  overflow: visible;
+  position: relative;
+  z-index: 10;
 }
 
 .header-title {

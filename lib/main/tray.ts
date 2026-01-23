@@ -185,8 +185,14 @@ function createQuickCaptureWindow(): void {
   })
 
   // Hide when losing focus (click outside)
+  // Use a small delay to allow dropdown interactions to complete
   quickCaptureWindow.on('blur', () => {
-    quickCaptureWindow?.hide()
+    setTimeout(() => {
+      // Only hide if still blurred (not refocused by dropdown click)
+      if (quickCaptureWindow && !quickCaptureWindow.isFocused()) {
+        quickCaptureWindow.hide()
+      }
+    }, 100)
   })
 
   // Prevent closing, just hide

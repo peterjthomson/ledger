@@ -30,7 +30,7 @@ import { Canvas } from './Canvas'
 import { EditorSlot } from './EditorSlot'
 
 // Import panels
-import { PRList, BranchList, WorktreeList, StashList, CommitList, Sidebar, RepoList } from '../panels/list'
+import { PRList, IssueList, BranchList, WorktreeList, StashList, CommitList, Sidebar, RepoList } from '../panels/list'
 import { GitGraph, ContributorChart, TechTreeChart } from '../panels/viz'
 
 // ========================================
@@ -196,6 +196,20 @@ export function CanvasRenderer({
               onSelect={handlers.onSelectPR}
               onDoubleClick={handlers.onDoubleClickPR}
               onContextMenu={handlers.onContextMenuPR}
+            />
+          )
+
+        case 'issue-list':
+          return (
+            <IssueList
+              column={column}
+              issues={data.issues}
+              selectedIssue={selection.selectedIssue}
+              error={data.issueError}
+              formatRelativeTime={handlers.formatRelativeTime}
+              onSelect={handlers.onSelectIssue}
+              onDoubleClick={handlers.onDoubleClickIssue}
+              onContextMenu={handlers.onContextMenuIssue}
             />
           )
 
