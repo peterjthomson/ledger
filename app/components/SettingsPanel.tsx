@@ -195,7 +195,7 @@ export const SettingsPanel = ({ themeMode: _themeMode, onThemeChange, onBack }: 
     reorderColumns,
     addColumn,
     removeColumn,
-    setColumnPanel,
+    updateColumn,
   } = useCanvas()
   const [newCanvasName, setNewCanvasName] = useState('')
   const [selectedCanvasId, setSelectedCanvasId] = useState<string | null>(null)
@@ -252,6 +252,10 @@ export const SettingsPanel = ({ themeMode: _themeMode, onThemeChange, onBack }: 
 
   // Group themes by category
   const categories = [...new Set(BUILT_IN_THEMES.map((t) => t.category))]
+
+  const getPanelLabel = (slotType: SlotType, panel: PanelType) => {
+    return PANEL_OPTIONS[slotType].find((option) => option.value === panel)?.label || panel
+  }
 
   // Canvas handlers
   const handleCreateCanvas = () => {
@@ -321,7 +325,7 @@ export const SettingsPanel = ({ themeMode: _themeMode, onThemeChange, onBack }: 
     
     const slotType = newColumnSlotType
     const panel = DEFAULT_PANELS[slotType]
-    const panelLabel = PANEL_OPTIONS[slotType].find(p => p.value === panel)?.label || panel
+    const panelLabel = getPanelLabel(slotType, panel)
     
     addColumn(canvasId, {
       id: `col-${Date.now()}`,
@@ -341,7 +345,32 @@ export const SettingsPanel = ({ themeMode: _themeMode, onThemeChange, onBack }: 
   }
 
   const handleChangePanel = (canvasId: string, columnId: string, panel: PanelType) => {
-    setColumnPanel(canvasId, columnId, panel)
+    const canvas = canvasState.canvases.find((c) => c.id === canvasId)
+    const column = canvas?.columns.find((col) => col.id === columnId)
+    if (!column) return
+
+    const updates: Partial<Column> = { panel }
+
+    if (!canvas?.isPreset) {
+      const currentLabel = column.label?.trim()
+      const previousDefaultLabel = getPanelLabel(column.slotType, column.panel)
+
+      if (!currentLabel || currentLabel === previousDefaultLabel) {
+        updates.label = getPanelLabel(column.slotType, panel)
+      }
+    }
+
+    updateColumn(canvasId, columnId, updates)
+  }
+
+  const handleColumnLabelChange = (canvasId: string, columnId: string, label: string) => {
+    updateColumn(canvasId, columnId, { label })
+  }
+
+  const handleColumnLabelBlur = (canvasId: string, column: Column) => {
+    const trimmedLabel = column.label?.trim()
+    if (trimmedLabel === column.label) return
+    updateColumn(canvasId, column.id, { label: trimmedLabel || undefined })
   }
 
   // Drag-drop handlers for column reordering
@@ -489,13 +518,20 @@ export const SettingsPanel = ({ themeMode: _themeMode, onThemeChange, onBack }: 
                       {canvas.columns.map((column, index) => {
                         const isDragging = draggingColumn?.canvasId === canvas.id && draggingColumn?.index === index
                         const isDragOver = draggingColumn?.canvasId === canvas.id && dragOverIndex === index
+                        const defaultLabel = getPanelLabel(column.slotType, column.panel)
                         
                         return (
                           <div 
                             key={column.id} 
                             className={`canvas-column-item ${isDragging ? 'dragging' : ''} ${isDragOver ? 'drag-over' : ''}`}
                             draggable
-                            onDragStart={() => handleDragStart(canvas.id, index)}
+                            onDragStart={(e) => {
+                              if ((e.target as HTMLElement).closest('input, select, button')) {
+                                e.preventDefault()
+                                return
+                              }
+                              handleDragStart(canvas.id, index)
+                            }}
                             onDragOver={(e) => handleDragOver(e, index)}
                             onDragEnd={handleDragEnd}
                             onDragLeave={handleDragLeave}
@@ -513,7 +549,19 @@ export const SettingsPanel = ({ themeMode: _themeMode, onThemeChange, onBack }: 
                             </div>
                             
                             <span className="canvas-column-icon">{column.icon || SLOT_ICONS[column.slotType]}</span>
-                            <span className="canvas-column-label">{column.label || column.id}</span>
+                            {canvas.isPreset ? (
+                              <span className="canvas-column-label">{column.label || column.id}</span>
+                            ) : (
+                              <input
+                                type="text"
+                                className="canvas-column-label-input"
+                                value={column.label || ''}
+                                placeholder={defaultLabel}
+                                onChange={(e) => handleColumnLabelChange(canvas.id, column.id, e.target.value)}
+                                onBlur={() => handleColumnLabelBlur(canvas.id, column)}
+                                onClick={(e) => e.stopPropagation()}
+                              />
+                            )}
                             
                             {/* Panel dropdown */}
                             <select

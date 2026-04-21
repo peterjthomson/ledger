@@ -15,7 +15,7 @@ import {
   Trash2,
   RefreshCw,
   ExternalLink,
-  Github,
+  Globe2,
   FolderGit2,
   ChevronRight,
   Globe,
@@ -258,7 +258,7 @@ export function RepositoryManagerPanel({ context, onClose }: PluginPanelProps) {
     // Local repos show provider icon
     switch (repo.provider.toLowerCase()) {
       case 'github':
-        return <Github size={14} />
+        return <Globe2 size={14} />
       default:
         return <FolderGit2 size={14} />
     }
