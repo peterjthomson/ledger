@@ -96,7 +96,7 @@ export function IssueDetailPanel({
   onCreateBranch,
   onClose,
   onReopen,
-  onIssueUpdated,
+  onIssueUpdated: _onIssueUpdated,
   switching,
 }: IssueDetailPanelProps) {
   const [activeTab, setActiveTab] = useState<IssueTab>('description')

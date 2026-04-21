@@ -235,7 +235,7 @@ export async function getIssueDetail(
       linkedPRs,
       linkedBranches: [], // TODO: Could fetch from GitHub API
     }
-  } catch (error) {
+  } catch (_error) {
     return null
   }
 }

@@ -13,14 +13,12 @@ import {
   getRepoLabels,
   getRepoMilestones,
   getOpenIssueCount,
+  type ListIssuesOptions,
+  type CreateIssueOptions,
+  type EditIssueOptions,
+  type CloseIssueOptions,
 } from '@/lib/main/git-service'
 import { serializeError, logHandlerError } from '@/lib/utils/error-helpers'
-import type {
-  ListIssuesOptions,
-  CreateIssueOptions,
-  EditIssueOptions,
-  CloseIssueOptions,
-} from '@/lib/main/git-service'
 
 export const registerIssueHandlers = () => {
   handle('get-issues', async (options?: ListIssuesOptions) => {

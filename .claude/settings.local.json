@@ -10,7 +10,12 @@
       "Bash(grep:*)",
       "Bash(tree:*)",
       "Bash(find:*)",
-      "Bash(ls:*)"
+      "Bash(ls:*)",
+      "mcp__voice__speak",
+      "Bash(npm outdated:*)",
+      "Bash(npm update:*)",
+      "Bash(npm install:*)",
+      "Bash(npm view:*)"
     ]
   }
 }

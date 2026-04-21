@@ -39,6 +39,22 @@ export function QuickCaptureApp() {
   const [showRepoDropdown, setShowRepoDropdown] = useState(false)
 
   const textareaRef = useRef<HTMLTextAreaElement>(null)
+  const repoSelectorRef = useRef<HTMLDivElement>(null)
+
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    if (!showRepoDropdown) return
+
+    const handleClickOutside = (e: MouseEvent) => {
+      if (repoSelectorRef.current && !repoSelectorRef.current.contains(e.target as Node)) {
+        setShowRepoDropdown(false)
+      }
+    }
+
+    // Use mousedown instead of click to handle before blur fires
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => document.removeEventListener('mousedown', handleClickOutside)
+  }, [showRepoDropdown])
 
   // Initialize on mount
   useEffect(() => {
@@ -212,7 +228,7 @@ export function QuickCaptureApp() {
         </div>
 
         {/* Repo selector */}
-        <div className="repo-selector">
+        <div className="repo-selector" ref={repoSelectorRef}>
           <button className="repo-button" onClick={() => setShowRepoDropdown(!showRepoDropdown)}>
             {selectedRepo ? (
               <>
@@ -226,11 +242,15 @@ export function QuickCaptureApp() {
           </button>
 
           {showRepoDropdown && repos.length > 0 && (
-            <div className="repo-dropdown">
+            <div className="repo-dropdown" onMouseDown={(e) => e.stopPropagation()}>
               {repos.map((repo) => (
                 <button
                   key={repo.path}
                   className={`repo-option ${repo.path === selectedRepo?.path ? 'selected' : ''}`}
+                  onMouseDown={(e) => {
+                    // Prevent blur by stopping propagation and keeping focus
+                    e.stopPropagation()
+                  }}
                   onClick={() => handleRepoChange(repo)}
                 >
                   {repo.owner && <span className="repo-owner">{repo.owner}/</span>}

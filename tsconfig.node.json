@@ -13,7 +13,6 @@
     "composite": true,
     "moduleResolution": "bundler",
     "types": ["electron-vite/node"],
-    "baseUrl": ".",
     "paths": {
       "@/*": ["./*"]
     }

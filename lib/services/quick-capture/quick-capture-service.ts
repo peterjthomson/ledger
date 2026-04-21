@@ -10,14 +10,14 @@ import { promisify } from 'util'
 import { writeFile, unlink, mkdir } from 'fs/promises'
 import { join } from 'path'
 import { tmpdir } from 'os'
-import type {
-  QuickIssue,
-  QuickIssueResult,
-  ScreenshotResult,
-  QuickCaptureSettings,
-  QuickCaptureRepo,
+import {
+  DEFAULT_QUICK_CAPTURE_SETTINGS,
+  type QuickIssue,
+  type QuickIssueResult,
+  type ScreenshotResult,
+  type QuickCaptureSettings,
+  type QuickCaptureRepo,
 } from './quick-capture-types'
-import { DEFAULT_QUICK_CAPTURE_SETTINGS } from './quick-capture-types'
 
 const execAsync = promisify(exec)
 

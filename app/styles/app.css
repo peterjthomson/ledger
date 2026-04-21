@@ -7411,6 +7411,28 @@ body,
   white-space: nowrap;
 }
 
+.canvas-column-label-input {
+  flex: 1;
+  min-width: 0;
+  padding: 4px 8px;
+  border: 1px solid var(--border-subtle);
+  border-radius: 4px;
+  background: var(--bg-secondary);
+  color: var(--text-primary);
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.canvas-column-label-input:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+
+.canvas-column-label-input::placeholder {
+  color: var(--text-muted);
+  font-weight: 400;
+}
+
 .canvas-column-hidden {
   font-size: 10px;
   padding: 1px 4px;

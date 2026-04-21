@@ -7,10 +7,9 @@
  * - Badge: Shows open issue count
  */
 
-import { Tray, Menu, nativeImage, app, BrowserWindow } from 'electron'
+import { Tray, Menu, nativeImage, app, BrowserWindow, type Rectangle } from 'electron'
 import { join } from 'path'
 import { getOpenIssueCount } from './git-service'
-import type { Rectangle } from 'electron'
 
 let tray: Tray | null = null
 let quickCaptureWindow: BrowserWindow | null = null
@@ -144,7 +143,6 @@ function showQuickCaptureWindow(trayBounds: Rectangle): void {
 
   // Position the window below the tray icon (macOS style)
   const windowWidth = 400
-  const windowHeight = 500
 
   // Center horizontally under tray icon
   const x = Math.round(trayBounds.x + (trayBounds.width / 2) - (windowWidth / 2))
@@ -185,14 +183,15 @@ function createQuickCaptureWindow(): void {
   })
 
   // Hide when losing focus (click outside)
-  // Use a small delay to allow dropdown interactions to complete
+  // Use a longer delay to allow dropdown interactions to complete
+  // Frameless windows can lose focus momentarily during internal click handling
   quickCaptureWindow.on('blur', () => {
     setTimeout(() => {
       // Only hide if still blurred (not refocused by dropdown click)
       if (quickCaptureWindow && !quickCaptureWindow.isFocused()) {
         quickCaptureWindow.hide()
       }
-    }, 100)
+    }, 200)
   })
 
   // Prevent closing, just hide

@@ -339,36 +339,6 @@ export default function App() {
     setActivePluginNavItem(itemId)
   }, [])
 
-  const selectRepo = async () => {
-    if (switching) return
-
-    setSwitching(true)
-    setStatus({ type: 'info', message: 'Opening repository selector...' })
-
-    try {
-      const path = await window.electronAPI.selectRepo()
-      if (path) {
-        // Clear state before switching to prevent stale data mixing with new repo
-        setWorktrees([])
-        setBranches([])
-        setCommits([])
-        setPullRequests([])
-        setWorkingStatus(null)
-        setRepoPath(path)
-        setStatus({ type: 'info', message: 'Loading repository...' })
-        await refresh(path)
-        setStatus({ type: 'success', message: 'Repository loaded' })
-      } else {
-        // User cancelled dialog - clear status
-        setStatus(null)
-      }
-    } catch (err) {
-      setStatus({ type: 'error', message: (err as Error).message })
-    } finally {
-      setSwitching(false)
-    }
-  }
-
   const refresh = useCallback(async (repoPathForTitle: string | null = repoPath) => {
     setLoading(true)
     setError(null)
@@ -452,6 +422,62 @@ export default function App() {
       setLoading(false)
     }
   }, [repoPath, setTitle, showCheckpoints])
+
+  const resetRepositoryViewState = useCallback(() => {
+    setWorktrees([])
+    setBranches([])
+    setCommits([])
+    setPullRequests([])
+    setIssues([])
+    setGraphCommits([])
+    setStashes([])
+    setWorkingStatus(null)
+    setSelectedCommit(null)
+    setCommitDiff(null)
+    setSidebarFocus(null)
+    setGithubUrl(null)
+    setCurrentBranch('')
+    setError(null)
+    setPrError(null)
+    setIssueError(null)
+  }, [])
+
+  const loadRepositoryData = useCallback(async (path: string) => {
+    resetRepositoryViewState()
+    setRepoPath(path)
+    await refresh(path)
+  }, [refresh, resetRepositoryViewState])
+
+  const openRepositoryPath = useCallback(async (path: string) => {
+    const result = await window.conveyor.repo.openRepository(path)
+    if (!result.success) {
+      throw new Error(result.message || 'Failed to open repository')
+    }
+    await loadRepositoryData(path)
+  }, [loadRepositoryData])
+
+  const selectRepo = async () => {
+    if (switching) return
+
+    setSwitching(true)
+    setStatus({ type: 'info', message: 'Opening repository selector...' })
+
+    try {
+      const path = await window.electronAPI.selectRepo()
+      if (path) {
+        setStatus({ type: 'info', message: 'Loading repository...' })
+        await loadRepositoryData(path)
+        setStatus({ type: 'success', message: 'Repository loaded' })
+      } else {
+        // User cancelled dialog - clear status
+        setStatus(null)
+      }
+    } catch (err) {
+      setStatus({ type: 'error', message: (err as Error).message })
+    } finally {
+      setSwitching(false)
+    }
+  }
 
   // Keep the repository store in sync so plugin apps/panels can rely on it.
   // (This avoids a full migration of App state back to Zustand while restoring the plugin UI.)
@@ -1504,8 +1530,7 @@ export default function App() {
             if (repo.isCurrent) return
             setStatus({ type: 'info', message: `Opening ${repo.name}...` })
             try {
-              setRepoPath(repo.path)
-              await refresh(repo.path)
+              await openRepositoryPath(repo.path)
               setStatus({ type: 'success', message: `Opened ${repo.name}` })
             } catch (err) {
               setStatus({ type: 'error', message: (err as Error).message })
@@ -1558,6 +1583,7 @@ export default function App() {
     formatRelativeTime, formatDate, handlePRCheckout, handleBranchDoubleClick,
     handleRemoteBranchDoubleClick, handleWorktreeDoubleClick, handleDeleteBranch, handleRenameBranch,
     handleDeleteRemoteBranch, branches, repoPath, worktrees, pullRequests, handleSidebarFocus,
+    openRepositoryPath,
     selectedCommit, loadingDiff, commitDiff, handleCommitCheckout
   ])
 
@@ -1594,8 +1620,7 @@ export default function App() {
       // Switch to this repo
       setStatus({ type: 'info', message: `Opening ${repo.name}...` })
       try {
-        setRepoPath(repo.path)
-        await refresh(repo.path)
+        await openRepositoryPath(repo.path)
         setStatus({ type: 'success', message: `Opened ${repo.name}` })
       } catch (err) {
         setStatus({ type: 'error', message: (err as Error).message })
@@ -1642,7 +1667,8 @@ export default function App() {
   }), [
     formatRelativeTime, formatDate, handleRadarItemClick, handleRadarPRClick, handleRadarIssueClick, handleRadarBranchClick,
     handleRadarWorktreeClick, handleRadarStashClick, handleContextMenu, handleSelectCommit, navigateToEditor,
-    renderEditorContent, setActiveCanvas, workingStatus, handleRadarUncommittedClick, setStatus, refresh, branches, handleSidebarFocus
+    renderEditorContent, setActiveCanvas, workingStatus, handleRadarUncommittedClick, setStatus, branches, handleSidebarFocus,
+    openRepositoryPath
   ])
 
   const canvasUIState: CanvasUIState = useMemo(() => ({
@@ -1746,22 +1772,10 @@ export default function App() {
               currentPath={repoPath}
               onRepoChange={(path) => {
                 if (path === repoPath) return
-                // Clear state before switching to prevent stale data mixing with new repo
-                setWorktrees([])
-                setBranches([])
-                setCommits([])
-                setPullRequests([])
-                setGraphCommits([])
-                setStashes([])
-                setWorkingStatus(null)
-                setSelectedCommit(null)
-                setCommitDiff(null)
-                setSidebarFocus(null)
-                setError(null)
-                setPrError(null)
-                setRepoPath(path)
                 setStatus({ type: 'info', message: 'Switching repository...' })
-                refresh(path)
+                loadRepositoryData(path).catch((err) => {
+                  setStatus({ type: 'error', message: (err as Error).message })
+                })
               }}
             />
           )}

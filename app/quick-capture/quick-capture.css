@@ -168,8 +168,9 @@
 .screenshot-preview img {
   display: block;
   width: 100%;
-  max-height: 150px;
-  object-fit: cover;
+  max-height: 180px;
+  object-fit: contain;
+  background: var(--qc-input-bg);
 }
 
 .screenshot-actions {
