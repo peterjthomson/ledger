@@ -23,6 +23,8 @@ export type {
   TechTreeData,
   BehindMainResult,
   RepoInfo,
+  FileNode,
+  FileGraphData,
 } from './analytics-types'
 
 // Service functions
@@ -31,4 +33,5 @@ export {
   getContributorStats,
   getMergedBranchTree,
   getSiblingRepos,
+  getFileGraph,
 } from './analytics-service'

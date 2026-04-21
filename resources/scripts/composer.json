@@ -1,0 +1,13 @@
+{
+    "name": "ledger/php-ast-parser",
+    "description": "PHP AST parser for Ledger Code Graph",
+    "type": "library",
+    "require": {
+        "php": ">=7.4",
+        "nikic/php-parser": "^5.0"
+    },
+    "config": {
+        "optimize-autoloader": true,
+        "sort-packages": true
+    }
+}

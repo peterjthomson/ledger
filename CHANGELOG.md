@@ -5,6 +5,19 @@ All notable changes to Ledger are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+
+- **FileGraph Visualization** - New `file-graph` viz panel type
+  - Treemap visualization showing repository code sized by line count
+  - Files colored by programming language (25+ languages supported)
+  - Click folders to drill down, breadcrumb navigation to go back up
+  - Language legend showing line counts per language
+  - Hover tooltips with file path, line count, and language
+  - Respects `.gitignore` (uses `git ls-files`)
+  - Available as a panel type in the Graph canvas
+
 ## [0.1.0] - 2024-12-27
 
 ### Added

@@ -10,3 +10,6 @@ export type { ContributorChartProps } from './ContributorChart'
 
 export { TechTreeChart } from './TechTreeChart'
 export type { TechTreeChartProps } from './TechTreeChart'
+
+export { FileGraph } from './FileGraph'
+export type { FileGraphProps } from './FileGraph'

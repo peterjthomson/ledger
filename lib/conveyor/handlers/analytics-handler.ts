@@ -4,6 +4,7 @@ import {
   getContributorStats,
   getMergedBranchTree,
   getSiblingRepos,
+  getFileGraph,
 } from '@/lib/services/analytics'
 
 export const registerAnalyticsHandlers = () => {
@@ -40,6 +41,19 @@ export const registerAnalyticsHandlers = () => {
       return await getSiblingRepos(ctx)
     } catch (_error) {
       return []
+    }
+  })
+
+  handle('get-file-graph', async () => {
+    try {
+      const ctx = getRepositoryManager().requireActive()
+      return await getFileGraph(ctx)
+    } catch (_error) {
+      return {
+        root: { name: '', path: '', lines: 0, language: null, isDirectory: true, children: [] },
+        totalLines: 0,
+        languages: [],
+      }
     }
   })
 }

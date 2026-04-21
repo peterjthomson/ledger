@@ -37,6 +37,8 @@ asarUnpack:
 extraResources:
   - from: resources/themes
     to: themes
+  - from: resources/scripts
+    to: scripts
   # Note: resources/icons/ is intentionally excluded (unused)
 win:
   executableName: Ledger

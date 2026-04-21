@@ -5,4 +5,5 @@ export class AnalyticsApi extends ConveyorApi {
     this.invoke('get-contributor-stats', topN, bucketSize)
   getMergedBranchTree = (limit?: number) => this.invoke('get-merged-branch-tree', limit)
   getSiblingRepos = () => this.invoke('get-sibling-repos')
+  getFileGraph = () => this.invoke('get-file-graph')
 }

@@ -1,4 +1,4 @@
-import { z } from 'zod'
+import { z, type ZodType } from 'zod'
 
 // Analytics-specific schemas
 export const ContributorTimeSeriesSchema = z.object({
@@ -72,6 +72,38 @@ export const RepoInfoSchema = z.object({
   isCurrent: z.boolean(),
 })
 
+type FileNodeSchemaType = {
+  name: string
+  path: string
+  lines: number
+  language: string | null
+  isDirectory: boolean
+  children?: FileNodeSchemaType[]
+}
+
+export const FileNodeSchema: ZodType<FileNodeSchemaType> = z.lazy(() =>
+  z.object({
+    name: z.string(),
+    path: z.string(),
+    lines: z.number(),
+    language: z.string().nullable(),
+    isDirectory: z.boolean(),
+    children: z.array(FileNodeSchema).optional(),
+  })
+)
+
+export const FileGraphDataSchema = z.object({
+  root: FileNodeSchema,
+  totalLines: z.number(),
+  languages: z.array(
+    z.object({
+      language: z.string(),
+      lines: z.number(),
+      color: z.string(),
+    })
+  ),
+})
+
 export const analyticsIpcSchema = {
   'get-contributor-stats': {
     args: z.tuple([z.number().optional(), z.enum(['day', 'week', 'month']).optional()]),
@@ -84,5 +116,9 @@ export const analyticsIpcSchema = {
   'get-sibling-repos': {
     args: z.tuple([]),
     return: z.array(RepoInfoSchema),
+  },
+  'get-file-graph': {
+    args: z.tuple([]),
+    return: FileGraphDataSchema,
   },
 }

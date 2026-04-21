@@ -90,3 +90,19 @@ export interface RepoInfo {
   name: string
   isCurrent: boolean
 }
+
+// FileGraph types (code treemap visualization)
+export interface FileNode {
+  name: string
+  path: string
+  lines: number
+  language: string | null
+  isDirectory: boolean
+  children?: FileNode[]
+}
+
+export interface FileGraphData {
+  root: FileNode
+  totalLines: number
+  languages: { language: string; lines: number; color: string }[]
+}

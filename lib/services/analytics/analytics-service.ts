@@ -17,6 +17,8 @@ import {
   TechTreeBranchType,
   BehindMainResult,
   RepoInfo,
+  FileGraphData,
+  FileNode,
 } from './analytics-types'
 
 // ========================================
@@ -646,5 +648,214 @@ export async function getSiblingRepos(ctx: RepositoryContext): Promise<RepoInfo[
   } catch (error) {
     console.error('Error scanning sibling repos:', error)
     return []
+  }
+}
+
+// ========================================
+// FileGraph - Code Treemap Visualization
+// ========================================
+
+// Chart palette tokens (resolved in renderer via CSS variables)
+const CHART_PALETTE = [
+  'var(--chart-1)',
+  'var(--chart-2)',
+  'var(--chart-3)',
+  'var(--chart-4)',
+  'var(--chart-5)',
+  'var(--chart-6)',
+  'var(--chart-7)',
+  'var(--chart-8)',
+]
+
+const getPaletteColor = (language: string): string => {
+  if (language === 'Other') return CHART_PALETTE[CHART_PALETTE.length - 1]
+  let hash = 0
+  for (let i = 0; i < language.length; i++) {
+    hash = (hash * 31 + language.charCodeAt(i)) | 0
+  }
+  return CHART_PALETTE[Math.abs(hash) % CHART_PALETTE.length]
+}
+
+// Extension to language mapping
+const EXTENSION_TO_LANGUAGE: Record<string, string> = {
+  // TypeScript/JavaScript
+  ts: 'TypeScript',
+  tsx: 'TypeScript',
+  js: 'JavaScript',
+  jsx: 'JavaScript',
+  mjs: 'JavaScript',
+  cjs: 'JavaScript',
+  // Web
+  css: 'CSS',
+  scss: 'SCSS',
+  sass: 'SCSS',
+  less: 'CSS',
+  html: 'HTML',
+  htm: 'HTML',
+  vue: 'Vue',
+  svelte: 'Svelte',
+  // Data
+  json: 'JSON',
+  yaml: 'YAML',
+  yml: 'YAML',
+  toml: 'TOML',
+  xml: 'XML',
+  // Docs
+  md: 'Markdown',
+  mdx: 'Markdown',
+  // Backend
+  py: 'Python',
+  go: 'Go',
+  rs: 'Rust',
+  java: 'Java',
+  kt: 'Kotlin',
+  rb: 'Ruby',
+  php: 'PHP',
+  // Systems
+  c: 'C',
+  h: 'C',
+  cpp: 'C++',
+  cc: 'C++',
+  cxx: 'C++',
+  hpp: 'C++',
+  cs: 'C#',
+  swift: 'Swift',
+  // Shell/config
+  sh: 'Shell',
+  bash: 'Shell',
+  zsh: 'Shell',
+  fish: 'Shell',
+  // Query
+  sql: 'SQL',
+  graphql: 'GraphQL',
+  gql: 'GraphQL',
+}
+
+// Binary/non-code extensions to skip
+const BINARY_EXTENSIONS = new Set([
+  'png', 'jpg', 'jpeg', 'gif', 'webp', 'ico', 'svg',
+  'woff', 'woff2', 'ttf', 'eot', 'otf',
+  'mp3', 'mp4', 'wav', 'ogg', 'webm',
+  'pdf', 'doc', 'docx', 'xls', 'xlsx',
+  'zip', 'tar', 'gz', 'rar', '7z',
+  'exe', 'dll', 'so', 'dylib',
+  'lock', // package-lock.json is huge and not useful
+])
+
+const getLanguageFromPath = (filePath: string): string | null => {
+  const ext = path.extname(filePath).slice(1).toLowerCase()
+  if (BINARY_EXTENSIONS.has(ext)) return null
+  return EXTENSION_TO_LANGUAGE[ext] || null
+}
+
+const countFileLines = async (filePath: string): Promise<number> => {
+  try {
+    const content = await fs.promises.readFile(filePath, 'utf-8')
+    return content.split('\n').filter(line => line.trim().length > 0).length
+  } catch {
+    return 0
+  }
+}
+
+/**
+ * Scan repository and build a file tree with line counts and language detection.
+ * Uses git ls-files to respect .gitignore automatically.
+ */
+export async function getFileGraph(ctx: RepositoryContext): Promise<FileGraphData> {
+  if (!ctx.git || !ctx.path) throw new Error('No repository selected')
+
+  const repoPath = ctx.path
+  const filesOutput = await ctx.git.raw(['ls-files'])
+  const filePaths = filesOutput.trim().split('\n').filter(Boolean)
+
+  const root: FileNode = {
+    name: path.basename(repoPath),
+    path: '',
+    lines: 0,
+    language: null,
+    isDirectory: true,
+    children: [],
+  }
+
+  const languageStats = new Map<string, number>()
+
+  for (const relativePath of filePaths) {
+    const ext = path.extname(relativePath).slice(1).toLowerCase()
+    if (BINARY_EXTENSIONS.has(ext)) continue
+
+    const fullPath = path.join(repoPath, relativePath)
+    const lines = await countFileLines(fullPath)
+    if (lines === 0) continue
+
+    const language = getLanguageFromPath(relativePath)
+
+    if (language) {
+      languageStats.set(language, (languageStats.get(language) || 0) + lines)
+    } else {
+      languageStats.set('Other', (languageStats.get('Other') || 0) + lines)
+    }
+
+    const parts = relativePath.split('/')
+    let current = root
+
+    for (let i = 0; i < parts.length; i++) {
+      const part = parts[i]
+      const isFile = i === parts.length - 1
+      const partPath = parts.slice(0, i + 1).join('/')
+
+      if (isFile) {
+        current.children!.push({
+          name: part,
+          path: partPath,
+          lines,
+          language: language || 'Other',
+          isDirectory: false,
+        })
+
+        let parent: FileNode | undefined = root
+        for (let j = 0; j < parts.length - 1; j++) {
+          const dirName = parts[j]
+          parent = parent.children?.find(c => c.name === dirName && c.isDirectory)
+          if (parent) parent.lines += lines
+        }
+        root.lines += lines
+      } else {
+        let dir = current.children?.find(c => c.name === part && c.isDirectory)
+        if (!dir) {
+          dir = {
+            name: part,
+            path: partPath,
+            lines: 0,
+            language: null,
+            isDirectory: true,
+            children: [],
+          }
+          current.children!.push(dir)
+        }
+        current = dir
+      }
+    }
+  }
+
+  const sortByLines = (node: FileNode): void => {
+    if (node.children) {
+      node.children.sort((a, b) => b.lines - a.lines)
+      node.children.forEach(sortByLines)
+    }
+  }
+  sortByLines(root)
+
+  const languages = Array.from(languageStats.entries())
+    .map(([language, lines]) => ({
+      language,
+      lines,
+      color: getPaletteColor(language),
+    }))
+    .sort((a, b) => b.lines - a.lines)
+
+  return {
+    root,
+    totalLines: root.lines,
+    languages,
   }
 }
