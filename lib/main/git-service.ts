@@ -281,8 +281,13 @@ function detectAgent(worktreePath: string): WorktreeAgent {
     return 'cursor'
   }
 
-  // Claude Code might use ~/.claude/worktrees/ or similar
-  if (worktreePath.includes('/.claude/worktrees/') || worktreePath.includes('/claude-worktrees/')) {
+  // Claude Code Desktop uses ~/.claude-worktrees/ by default (configurable)
+  // Also support legacy patterns: ~/.claude/worktrees/ or /claude-worktrees/
+  if (
+    worktreePath.includes('/.claude-worktrees/') ||
+    worktreePath.includes('/.claude/worktrees/') ||
+    worktreePath.includes('/claude-worktrees/')
+  ) {
     return 'claude'
   }
 

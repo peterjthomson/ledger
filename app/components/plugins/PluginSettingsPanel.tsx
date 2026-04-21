@@ -19,7 +19,7 @@ import {
   Sliders,
   Plus,
   Trash2,
-  Github,
+  Globe2,
   Link,
   Package,
   Loader2,
@@ -299,7 +299,7 @@ export function PluginSettingsPanel() {
                     onClick={() => setInstallSource('github')}
                     disabled={isInstalling}
                   >
-                    <Github size={14} />
+                    <Globe2 size={14} />
                     GitHub
                   </button>
                   <button
