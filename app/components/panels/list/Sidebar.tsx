@@ -6,8 +6,40 @@
  */
 
 import { useState, useMemo, useCallback, useEffect } from 'react'
-import type { PullRequest, Branch, Worktree, StashEntry, RepoInfo, WorkingStatus } from '../../../types/electron'
+import type {
+  PullRequest,
+  Branch,
+  Worktree,
+  StashEntry,
+  RepoInfo,
+  WorkingStatus,
+  BranchFilter,
+  BranchSort,
+  PRFilter,
+  PRSort,
+  StashFilter,
+  StashSort,
+  WorktreeSort,
+} from '../../../types/electron'
 import type { Column } from '../../../types/app-types'
+import {
+  applyBranchControls,
+  applyPRControls,
+  applyRepoControls,
+  applyStashControls,
+  applyWorktreeControls,
+  getWorktreeParents,
+  BRANCH_FILTER_OPTIONS,
+  BRANCH_SORT_OPTIONS,
+  PR_FILTER_OPTIONS,
+  PR_SORT_OPTIONS,
+  REPO_SORT_OPTIONS,
+  STASH_FILTER_OPTIONS,
+  STASH_SORT_OPTIONS,
+  WORKTREE_SORT_OPTIONS,
+  type RepoSort,
+  type SelectOption,
+} from './list-filters'
 
 export interface SidebarProps {
   column?: Column
@@ -131,6 +163,21 @@ export function Sidebar({
     repos: '',
   })
 
+  // Per-section filter/sort state.
+  // Same options and defaults as the matching radar column header, so a section behaves
+  // the same whichever surface you drive it from.
+  const [prFilter, setPrFilter] = useState<PRFilter>('open-not-draft')
+  const [prSort, setPrSort] = useState<PRSort>('updated')
+  const [branchFilter, setBranchFilter] = useState<BranchFilter>('all')
+  const [branchSort, setBranchSort] = useState<BranchSort>('name')
+  const [remoteFilter, setRemoteFilter] = useState<BranchFilter>('all')
+  const [remoteSort, setRemoteSort] = useState<BranchSort>('name')
+  const [worktreeParent, setWorktreeParent] = useState<string>('all')
+  const [worktreeSort, setWorktreeSort] = useState<WorktreeSort>('last-modified')
+  const [stashFilter, setStashFilter] = useState<StashFilter>('all')
+  const [stashSort, setStashSort] = useState<StashSort>('date')
+  const [repoSort, setRepoSort] = useState<RepoSort>('current-first')
+
   // Sibling repos state
   const [repos, setRepos] = useState<RepoInfo[]>([])
 
@@ -150,50 +197,71 @@ export function Sidebar({
   const localBranches = useMemo(() => branches.filter((b) => !b.isRemote), [branches])
   const remoteBranches = useMemo(() => branches.filter((b) => b.isRemote), [branches])
 
-  // Filter items by per-section search
-  const filteredPRs = useMemo(() => {
-    const s = sectionSearch.prs.toLowerCase().trim()
-    if (!s) return prs
-    return prs.filter(
-      (pr) =>
-        pr.title.toLowerCase().includes(s) ||
-        pr.branch.toLowerCase().includes(s)
-    )
-  }, [prs, sectionSearch.prs])
+  // Filter/sort items using the same logic as the radar column headers
+  const filteredPRs = useMemo(
+    () => applyPRControls(prs, { search: sectionSearch.prs, filter: prFilter, sort: prSort }),
+    [prs, sectionSearch.prs, prFilter, prSort]
+  )
 
-  const filteredLocalBranches = useMemo(() => {
-    const s = sectionSearch.branches.toLowerCase().trim()
-    if (!s) return localBranches
-    return localBranches.filter((b) => b.name.toLowerCase().includes(s))
-  }, [localBranches, sectionSearch.branches])
+  const filteredLocalBranches = useMemo(
+    () =>
+      applyBranchControls(localBranches, {
+        search: sectionSearch.branches,
+        filter: branchFilter,
+        sort: branchSort,
+      }),
+    [localBranches, sectionSearch.branches, branchFilter, branchSort]
+  )
 
-  const filteredRemoteBranches = useMemo(() => {
-    const s = sectionSearch.remotes.toLowerCase().trim()
-    if (!s) return remoteBranches
-    return remoteBranches.filter((b) => b.name.toLowerCase().includes(s))
-  }, [remoteBranches, sectionSearch.remotes])
+  const filteredRemoteBranches = useMemo(
+    () =>
+      applyBranchControls(remoteBranches, {
+        search: sectionSearch.remotes,
+        filter: remoteFilter,
+        sort: remoteSort,
+      }),
+    [remoteBranches, sectionSearch.remotes, remoteFilter, remoteSort]
+  )
 
-  const filteredWorktrees = useMemo(() => {
-    const s = sectionSearch.worktrees.toLowerCase().trim()
-    if (!s) return worktrees
-    return worktrees.filter(
-      (wt) =>
-        wt.path.toLowerCase().includes(s) ||
-        (wt.branch && wt.branch.toLowerCase().includes(s))
-    )
-  }, [worktrees, sectionSearch.worktrees])
+  // Parent folders available as worktree filters, same as the radar column
+  const worktreeParents = useMemo(
+    () => getWorktreeParents(worktrees, repoPath ?? null),
+    [worktrees, repoPath]
+  )
 
-  const filteredStashes = useMemo(() => {
-    const s = sectionSearch.stashes.toLowerCase().trim()
-    if (!s) return stashes
-    return stashes.filter((st) => st.message.toLowerCase().includes(s))
-  }, [stashes, sectionSearch.stashes])
+  const worktreeFilterOptions = useMemo<SelectOption<string>[]>(
+    () => [
+      { value: 'all', label: 'All' },
+      ...worktreeParents.map((parent) => ({ value: parent, label: parent })),
+    ],
+    [worktreeParents]
+  )
 
-  const filteredRepos = useMemo(() => {
-    const s = sectionSearch.repos.toLowerCase().trim()
-    if (!s) return repos
-    return repos.filter((r) => r.name.toLowerCase().includes(s))
-  }, [repos, sectionSearch.repos])
+  const filteredWorktrees = useMemo(
+    () =>
+      applyWorktreeControls(worktrees, {
+        search: sectionSearch.worktrees,
+        parentFilter: worktreeParent,
+        sort: worktreeSort,
+        repoPath: repoPath ?? null,
+      }),
+    [worktrees, sectionSearch.worktrees, worktreeParent, worktreeSort, repoPath]
+  )
+
+  const filteredStashes = useMemo(
+    () =>
+      applyStashControls(stashes, {
+        search: sectionSearch.stashes,
+        filter: stashFilter,
+        sort: stashSort,
+      }),
+    [stashes, sectionSearch.stashes, stashFilter, stashSort]
+  )
+
+  const filteredRepos = useMemo(
+    () => applyRepoControls(repos, { search: sectionSearch.repos, sort: repoSort }),
+    [repos, sectionSearch.repos, repoSort]
+  )
 
   // Toggle section expand/collapse
   const toggleSection = useCallback((section: keyof SectionState) => {
@@ -281,13 +349,30 @@ export function Sidebar({
     </div>
   )
 
-  // Section filter panel component
-  const SectionFilter = ({
+  /**
+   * Section filter panel.
+   *
+   * Offers the same Search / Filter / Sort controls as the radar column header for the
+   * matching item type. Sections without a filter dimension (repos) just omit that row.
+   */
+  const SectionFilter = <F extends string, S extends string>({
     sectionKey,
     placeholder,
+    filterOptions,
+    filterValue,
+    onFilterChange,
+    sortOptions,
+    sortValue,
+    onSortChange,
   }: {
     sectionKey: keyof FilterState
     placeholder: string
+    filterOptions?: SelectOption<F>[]
+    filterValue?: F
+    onFilterChange?: (value: F) => void
+    sortOptions: SelectOption<S>[]
+    sortValue: S
+    onSortChange: (value: S) => void
   }) => {
     if (!filters[sectionKey]) return null
     return (
@@ -300,6 +385,36 @@ export function Sidebar({
           onChange={(e) => updateSearch(sectionKey, e.target.value)}
           autoFocus
         />
+        {filterOptions && filterValue !== undefined && onFilterChange && (
+          <div className="section-filter-row">
+            <label>Filter</label>
+            <select
+              className="section-filter-select"
+              value={filterValue}
+              onChange={(e) => onFilterChange(e.target.value as F)}
+            >
+              {filterOptions.map((opt) => (
+                <option key={opt.value} value={opt.value}>
+                  {opt.label}
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
+        <div className="section-filter-row">
+          <label>Sort</label>
+          <select
+            className="section-filter-select"
+            value={sortValue}
+            onChange={(e) => onSortChange(e.target.value as S)}
+          >
+            {sortOptions.map((opt) => (
+              <option key={opt.value} value={opt.value}>
+                {opt.label}
+              </option>
+            ))}
+          </select>
+        </div>
       </div>
     )
   }
@@ -331,9 +446,18 @@ export function Sidebar({
             sectionIcon="⬡"
             sectionLabel="Pull Requests"
             count={filteredPRs.length}
-            hasActiveFilter={!!sectionSearch.prs.trim()}
+            hasActiveFilter={!!sectionSearch.prs.trim() || prFilter !== 'open-not-draft'}
           />
-          <SectionFilter sectionKey="prs" placeholder="Filter PRs..." />
+          <SectionFilter
+            sectionKey="prs"
+            placeholder="Filter PRs..."
+            filterOptions={PR_FILTER_OPTIONS}
+            filterValue={prFilter}
+            onFilterChange={setPrFilter}
+            sortOptions={PR_SORT_OPTIONS}
+            sortValue={prSort}
+            onSortChange={setPrSort}
+          />
           {sections.prs && (
             <ul className="sidebar-items">
               {filteredPRs.map((pr) => (
@@ -362,10 +486,19 @@ export function Sidebar({
             sectionIcon="⎇"
             sectionLabel="Branches"
             count={filteredLocalBranches.length + (workingStatus?.hasChanges ? 1 : 0)}
-            hasActiveFilter={!!sectionSearch.branches.trim()}
+            hasActiveFilter={!!sectionSearch.branches.trim() || branchFilter !== 'all'}
             onAdd={onCreateBranch}
           />
-          <SectionFilter sectionKey="branches" placeholder="Filter branches..." />
+          <SectionFilter
+            sectionKey="branches"
+            placeholder="Filter branches..."
+            filterOptions={BRANCH_FILTER_OPTIONS}
+            filterValue={branchFilter}
+            onFilterChange={setBranchFilter}
+            sortOptions={BRANCH_SORT_OPTIONS}
+            sortValue={branchSort}
+            onSortChange={setBranchSort}
+          />
           {sections.branches && (
             <ul className="sidebar-items">
               {/* Uncommitted changes as virtual branch */}
@@ -407,9 +540,18 @@ export function Sidebar({
             sectionIcon="◈"
             sectionLabel="Remotes"
             count={filteredRemoteBranches.length}
-            hasActiveFilter={!!sectionSearch.remotes.trim()}
+            hasActiveFilter={!!sectionSearch.remotes.trim() || remoteFilter !== 'all'}
           />
-          <SectionFilter sectionKey="remotes" placeholder="Filter remotes..." />
+          <SectionFilter
+            sectionKey="remotes"
+            placeholder="Filter remotes..."
+            filterOptions={BRANCH_FILTER_OPTIONS}
+            filterValue={remoteFilter}
+            onFilterChange={setRemoteFilter}
+            sortOptions={BRANCH_SORT_OPTIONS}
+            sortValue={remoteSort}
+            onSortChange={setRemoteSort}
+          />
           {sections.remotes && (
             <ul className="sidebar-items">
               {filteredRemoteBranches.map((branch) => (
@@ -437,10 +579,19 @@ export function Sidebar({
             sectionIcon="⊙"
             sectionLabel="Worktrees"
             count={filteredWorktrees.length}
-            hasActiveFilter={!!sectionSearch.worktrees.trim()}
+            hasActiveFilter={!!sectionSearch.worktrees.trim() || worktreeParent !== 'all'}
             onAdd={onCreateWorktree}
           />
-          <SectionFilter sectionKey="worktrees" placeholder="Filter worktrees..." />
+          <SectionFilter
+            sectionKey="worktrees"
+            placeholder="Filter worktrees..."
+            filterOptions={worktreeFilterOptions}
+            filterValue={worktreeParent}
+            onFilterChange={setWorktreeParent}
+            sortOptions={WORKTREE_SORT_OPTIONS}
+            sortValue={worktreeSort}
+            onSortChange={setWorktreeSort}
+          />
           {sections.worktrees && (
             <ul className="sidebar-items">
               {filteredWorktrees.map((wt) => (
@@ -469,9 +620,18 @@ export function Sidebar({
             sectionIcon="⊡"
             sectionLabel="Stashes"
             count={filteredStashes.length}
-            hasActiveFilter={!!sectionSearch.stashes.trim()}
+            hasActiveFilter={!!sectionSearch.stashes.trim() || stashFilter !== 'all'}
           />
-          <SectionFilter sectionKey="stashes" placeholder="Filter stashes..." />
+          <SectionFilter
+            sectionKey="stashes"
+            placeholder="Filter stashes..."
+            filterOptions={STASH_FILTER_OPTIONS}
+            filterValue={stashFilter}
+            onFilterChange={setStashFilter}
+            sortOptions={STASH_SORT_OPTIONS}
+            sortValue={stashSort}
+            onSortChange={setStashSort}
+          />
           {sections.stashes && (
             <ul className="sidebar-items">
               {filteredStashes.map((stash, index) => (
@@ -504,7 +664,13 @@ export function Sidebar({
             count={filteredRepos.length}
             hasActiveFilter={!!sectionSearch.repos.trim()}
           />
-          <SectionFilter sectionKey="repos" placeholder="Filter repos..." />
+          <SectionFilter
+            sectionKey="repos"
+            placeholder="Filter repos..."
+            sortOptions={REPO_SORT_OPTIONS}
+            sortValue={repoSort}
+            onSortChange={setRepoSort}
+          />
           {sections.repos && (
             <ul className="sidebar-items">
               {filteredRepos.map((repo) => (
