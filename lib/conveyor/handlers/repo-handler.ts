@@ -31,6 +31,7 @@ export const registerRepoHandlers = () => {
     const result = await dialog.showOpenDialog({
       properties: ['openDirectory'],
       title: 'Select Git Repository',
+      securityScopedBookmarks: process.mas,
     })
 
     if (result.canceled || result.filePaths.length === 0) {
@@ -38,6 +39,7 @@ export const registerRepoHandlers = () => {
     }
 
     const selectedPath = result.filePaths[0]
+    const bookmark = result.bookmarks?.[0]
     const previousPath = getRepoPath()
 
     // Open in RepositoryManager and sync module state
@@ -46,7 +48,7 @@ export const registerRepoHandlers = () => {
       const ctx = await manager.open(selectedPath)
       // Update module state
       setRepoPath(ctx.path)
-      saveLastRepoPath(ctx.path)
+      saveLastRepoPath(ctx.path, bookmark)
       addRecentRepo(ctx.path)
 
       // Emit events
@@ -59,7 +61,7 @@ export const registerRepoHandlers = () => {
     } catch (_error) {
       // Direct path handling if RepositoryManager fails
       setRepoPath(selectedPath)
-      saveLastRepoPath(selectedPath)
+      saveLastRepoPath(selectedPath, bookmark)
       addRecentRepo(selectedPath)
 
       // Emit events

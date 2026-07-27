@@ -75,6 +75,9 @@ See: [Opinionated Git Behaviors](docs/opinionated-git.md)
 
 - Ledger runs locally and shells out to `git` / `gh` for operations.
 - Auth and network access (for GitHub) are handled by `gh` and your git remote configuration.
+- Optional AI and notification integrations send user-selected content only to services you configure.
+
+See the [Ledger Privacy Policy](docs/privacy.md) for details.
 
 ## Development 
 You can download the source code of Ledger to contribute your ideas or fork Ledger to customize it for yourself.

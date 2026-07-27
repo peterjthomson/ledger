@@ -205,6 +205,7 @@ app.whenReady().then(() => {
     const result = await dialog.showOpenDialog({
       properties: ['openDirectory'],
       title: 'Select Git Repository',
+      securityScopedBookmarks: process.mas,
     })
 
     if (result.canceled || result.filePaths.length === 0) {
@@ -212,18 +213,19 @@ app.whenReady().then(() => {
     }
 
     const selectedPath = result.filePaths[0]
+    const bookmark = result.bookmarks?.[0]
     
     // Open in RepositoryManager and sync module state
     const manager = getRepositoryManager()
     try {
       const ctx = await manager.open(selectedPath)
       setRepoPath(ctx.path)
-      saveLastRepoPath(ctx.path)
+      saveLastRepoPath(ctx.path, bookmark)
       return ctx.path
     } catch (_error) {
       // Fallback if path isn't a valid git repo
       setRepoPath(selectedPath)
-      saveLastRepoPath(selectedPath)
+      saveLastRepoPath(selectedPath, bookmark)
       return selectedPath
     }
   })

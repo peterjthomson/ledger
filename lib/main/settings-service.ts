@@ -46,6 +46,7 @@ interface CanvasConfig {
 
 interface Settings {
   lastRepoPath?: string;
+  securityScopedBookmarks?: Record<string, string>;
   viewMode?: ViewMode;
   themeMode?: ThemeMode;
   selectedThemeId?: string;  // e.g., 'dracula', 'claude-desktop', 'light'
@@ -60,6 +61,7 @@ interface Settings {
 // Allow tests (and power users) to override the settings location to avoid coupling to
 // the real user profile / machine-specific paths.
 const settingsPath = process.env.LEDGER_SETTINGS_PATH || path.join(app.getPath('userData'), 'ledger-settings.json');
+const activeSecurityScopedPaths = new Map<string, () => void>();
 
 function loadSettings(): Settings {
   try {
@@ -85,6 +87,9 @@ function saveSettings(settings: Settings): void {
 
 export function getLastRepoPath(): string | null {
   const settings = loadSettings();
+  if (settings.lastRepoPath) {
+    startAccessingSecurityScopedPath(settings.lastRepoPath);
+  }
   // Verify the path still exists
   if (settings.lastRepoPath && fs.existsSync(settings.lastRepoPath)) {
     return settings.lastRepoPath;
@@ -92,10 +97,36 @@ export function getLastRepoPath(): string | null {
   return null;
 }
 
-export function saveLastRepoPath(repoPath: string): void {
+export function saveLastRepoPath(repoPath: string, bookmark?: string): void {
   const settings = loadSettings();
   settings.lastRepoPath = repoPath;
+  if (bookmark) {
+    settings.securityScopedBookmarks = {
+      ...settings.securityScopedBookmarks,
+      [repoPath]: bookmark,
+    };
+  }
   saveSettings(settings);
+}
+
+export function startAccessingSecurityScopedPath(repoPath: string): boolean {
+  if (activeSecurityScopedPaths.has(repoPath)) {
+    return true;
+  }
+
+  const bookmark = loadSettings().securityScopedBookmarks?.[repoPath];
+  if (!bookmark) {
+    return false;
+  }
+
+  try {
+    const stopAccessing = app.startAccessingSecurityScopedResource(bookmark);
+    activeSecurityScopedPaths.set(repoPath, stopAccessing);
+    return true;
+  } catch (error) {
+    console.error(`Failed to restore sandbox access for ${repoPath}:`, error);
+    return false;
+  }
 }
 
 export function clearLastRepoPath(): void {
@@ -280,6 +311,9 @@ const MAX_RECENT_REPOS = 10;
 
 export function getRecentRepos(): string[] {
   const settings = loadSettings() as Settings & { recentRepos?: string[] };
+  for (const repoPath of settings.recentRepos || []) {
+    startAccessingSecurityScopedPath(repoPath);
+  }
   // Filter out paths that no longer exist
   return (settings.recentRepos || []).filter((repoPath) => fs.existsSync(repoPath));
 }
@@ -304,6 +338,9 @@ export function addRecentRepo(repoPath: string): void {
 export function removeRecentRepo(repoPath: string): void {
   const settings = loadSettings() as Settings & { recentRepos?: string[] };
   (settings as Settings & { recentRepos: string[] }).recentRepos = (settings.recentRepos || []).filter((p) => p !== repoPath);
+  if (settings.securityScopedBookmarks && settings.lastRepoPath !== repoPath) {
+    delete settings.securityScopedBookmarks[repoPath];
+  }
   saveSettings(settings);
 }
 
@@ -448,4 +485,3 @@ export function setDefaultAIProvider(provider: 'anthropic' | 'openai' | 'gemini'
   settings.ai = currentAI;
   saveSettings(settings);
 }
-

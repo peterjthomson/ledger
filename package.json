@@ -32,6 +32,7 @@
     "build:mac:arm64": "run-s vite:build:app electron:build:mac:arm64 && ./scripts/check-app-size.sh && xattr -cr dist/mac-arm64/Ledger.app",
     "build:mac:x64": "run-s vite:build:app electron:build:mac:x64 && xattr -cr dist/mac-x64/Ledger.app",
     "build:mac:universal": "run-s vite:build:app electron:build:mac:universal && xattr -cr dist/mac-universal/Ledger.app",
+    "build:mas": "run-s vite:build:app && ./scripts/build-mas.sh",
     "build:linux": "run-s vite:build:app electron:build:linux",
     "release": "run-s vite:build:app && electron-builder --mac --publish always",
     "test": "cross-env ELECTRON_RUN_AS_NODE= playwright test",

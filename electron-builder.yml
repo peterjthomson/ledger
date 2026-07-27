@@ -67,7 +67,15 @@ mac:
   extendInfo:
     - NSDocumentsFolderUsageDescription: Ledger needs access to read git repositories.
     - NSDownloadsFolderUsageDescription: Ledger needs access to read git repositories.
+    - ITSAppUsesNonExemptEncryption: false
   notarize: true
+mas:
+  identity: "Peter Thomson (R4RRG93J68)"
+  hardenedRuntime: true
+  category: public.app-category.developer-tools
+  entitlements: resources/build/entitlements.mas.plist
+  entitlementsInherit: resources/build/entitlements.mas.inherit.plist
+  artifactName: ${productName}-${version}-${arch}-mas.${ext}
 dmg:
   artifactName: ${productName}-${version}-${arch}.${ext}
   title: ${productName}
