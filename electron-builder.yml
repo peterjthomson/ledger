@@ -53,11 +53,9 @@ mac:
   hardenedRuntime: true
   # Build for Apple Silicon (arm64), Intel (x64), or both (universal)
   target:
-    # ZIP only - DMGs have been rejected with "Team not configured" error
-    # DMG can be re-enabled once Apple account issue is resolved
-    # - target: dmg
-    #   arch:
-    #     - arm64
+    - target: dmg
+      arch:
+        - arm64
     - target: zip
       arch:
         - arm64        # Apple Silicon only (smaller, faster)
@@ -69,8 +67,7 @@ mac:
   extendInfo:
     - NSDocumentsFolderUsageDescription: Ledger needs access to read git repositories.
     - NSDownloadsFolderUsageDescription: Ledger needs access to read git repositories.
-  # Skip flakey in-process notarization, use dedicated CLI tool to allow for better monitoring
-  notarize: false
+  notarize: true
 dmg:
   artifactName: ${productName}-${version}-${arch}.${ext}
   title: ${productName}
@@ -84,7 +81,7 @@ appImage:
   artifactName: ${name}-${version}.${ext}
 npmRebuild: false
 publish:
-  # Skip suto publishing to GitHub and upload manually once notarization is complete.
+  # Upload manually after notarization and local verification are complete.
   provider: github
   owner: peterjthomson
   repo: ledger
