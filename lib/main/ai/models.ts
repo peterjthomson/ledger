@@ -170,7 +170,67 @@ export const MODEL_REGISTRY: Record<string, ModelDefinition> = {
   },
 
   // OpenCode Zen Free Models (anonymous access, no API key required)
-  // Only models verified to work with "public" API key
+  // Only models verified to answer with the "public" API key.
+  //
+  // These are all reasoning models: with a small max_tokens the whole budget is
+  // spent on reasoning tokens and `message.content` comes back null. Callers must
+  // allow a few hundred output tokens - see MIN_FREE_TIER_OUTPUT_TOKENS.
+  'ling-3.0-flash-free': {
+    id: 'ling-3.0-flash-free',
+    name: 'Ling 3.0 Flash (Free)',
+    provider: 'openrouter',
+    tier: 'quick',
+    contextWindow: 128000,
+    maxOutputTokens: 8192,
+    inputCostPer1M: 0,
+    outputCostPer1M: 0,
+    supportsVision: false,
+    supportsJsonMode: true,
+    supportsStreaming: true,
+    description: 'Fast free model via OpenCode Zen',
+  },
+  'north-mini-code-free': {
+    id: 'north-mini-code-free',
+    name: 'North Mini Code (Free)',
+    provider: 'openrouter',
+    tier: 'balanced',
+    contextWindow: 128000,
+    maxOutputTokens: 8192,
+    inputCostPer1M: 0,
+    outputCostPer1M: 0,
+    supportsVision: false,
+    supportsJsonMode: true,
+    supportsStreaming: true,
+    description: 'Code-optimized free model via OpenCode Zen',
+  },
+  'nemotron-3-ultra-free': {
+    id: 'nemotron-3-ultra-free',
+    name: 'Nemotron 3 Ultra (Free)',
+    provider: 'openrouter',
+    tier: 'powerful',
+    contextWindow: 128000,
+    maxOutputTokens: 8192,
+    inputCostPer1M: 0,
+    outputCostPer1M: 0,
+    supportsVision: false,
+    supportsJsonMode: true,
+    supportsStreaming: true,
+    description: 'Most capable free model via OpenCode Zen',
+  },
+  'deepseek-v4-flash-free': {
+    id: 'deepseek-v4-flash-free',
+    name: 'DeepSeek V4 Flash (Free)',
+    provider: 'openrouter',
+    tier: 'quick',
+    contextWindow: 128000,
+    maxOutputTokens: 8192,
+    inputCostPer1M: 0,
+    outputCostPer1M: 0,
+    supportsVision: false,
+    supportsJsonMode: true,
+    supportsStreaming: true,
+    description: 'Fast free model via OpenCode Zen',
+  },
   'big-pickle': {
     id: 'big-pickle',
     name: 'Big Pickle (Free)',
@@ -183,23 +243,18 @@ export const MODEL_REGISTRY: Record<string, ModelDefinition> = {
     supportsVision: false,
     supportsJsonMode: true,
     supportsStreaming: true,
-    description: 'Fast balanced model via OpenCode Zen',
-  },
-  'grok-code': {
-    id: 'grok-code',
-    name: 'Grok Code (Free)',
-    provider: 'openrouter',
-    tier: 'powerful',
-    contextWindow: 256000,
-    maxOutputTokens: 8192,
-    inputCostPer1M: 0,
-    outputCostPer1M: 0,
-    supportsVision: false,
-    supportsJsonMode: true,
-    supportsStreaming: true,
-    description: 'Code-optimized model via OpenCode Zen',
+    description: 'Balanced model via OpenCode Zen (frequently returns 500s)',
   },
 }
+
+/**
+ * Minimum output token budget for the OpenCode Zen free tier.
+ *
+ * Every free model is a reasoning model. Reasoning tokens are billed against
+ * max_tokens, so a small budget is consumed entirely before any visible content is
+ * produced and the response comes back with content: null, finish_reason: "length".
+ */
+export const MIN_FREE_TIER_OUTPUT_TOKENS = 512
 
 /**
  * Default model IDs by tier
@@ -221,9 +276,9 @@ export const DEFAULT_MODELS = {
     powerful: 'gemini-2.5-pro',
   },
   openrouter: {
-    quick: 'big-pickle',
-    balanced: 'big-pickle',
-    powerful: 'grok-code',
+    quick: 'ling-3.0-flash-free',
+    balanced: 'north-mini-code-free',
+    powerful: 'nemotron-3-ultra-free',
   },
 } as const
 

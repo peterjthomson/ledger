@@ -9,6 +9,7 @@ import { useState, useMemo, useEffect } from 'react'
 import type { RepoInfo } from '../../../types/electron'
 import type { Column } from '../../../types/app-types'
 import { ListPanelHeader } from './ListPanelHeader'
+import { applyRepoControls, REPO_SORT_OPTIONS, type RepoSort } from './list-filters'
 
 export interface RepoListProps {
   /** Column configuration */
@@ -22,8 +23,6 @@ export interface RepoListProps {
   /** Called when repo is double-clicked (open in Ledger) */
   onDoubleClick?: (repo: RepoInfo) => void
 }
-
-type RepoSort = 'name' | 'current-first'
 
 export function RepoList({
   column,
@@ -62,32 +61,10 @@ export function RepoList({
   }, [repoPath])
 
   // Filter and sort repos
-  const filteredRepos = useMemo(() => {
-    let filtered = repos
-
-    // Apply search
-    if (search.trim()) {
-      const searchLower = search.toLowerCase().trim()
-      filtered = filtered.filter((r) => r.name.toLowerCase().includes(searchLower))
-    }
-
-    // Apply sort
-    const sorted = [...filtered]
-    switch (sort) {
-      case 'current-first':
-        sorted.sort((a, b) => {
-          if (a.isCurrent && !b.isCurrent) return -1
-          if (!a.isCurrent && b.isCurrent) return 1
-          return a.name.localeCompare(b.name)
-        })
-        break
-      case 'name':
-      default:
-        sorted.sort((a, b) => a.name.localeCompare(b.name))
-    }
-
-    return sorted
-  }, [repos, search, sort])
+  const filteredRepos = useMemo(
+    () => applyRepoControls(repos, { search, sort }),
+    [repos, search, sort]
+  )
 
   const label = column?.label || 'Repositories'
   const icon = column?.icon || '⌂'
@@ -131,8 +108,11 @@ export function RepoList({
               onChange={(e) => setSort(e.target.value as RepoSort)}
               className="control-select"
             >
-              <option value="current-first">Current First</option>
-              <option value="name">Name</option>
+              {REPO_SORT_OPTIONS.map((opt) => (
+                <option key={opt.value} value={opt.value}>
+                  {opt.label}
+                </option>
+              ))}
             </select>
           </div>
         </div>

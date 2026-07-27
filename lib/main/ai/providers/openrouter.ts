@@ -7,7 +7,9 @@
  * 1. FREE TIER (no API key): Uses OpenCode Zen API with anonymous access
  *    - Endpoint: https://opencode.ai/zen/v1
  *    - API Key: "public"
- *    - Free models: gpt-5-nano, big-pickle, glm-4.7-free, grok-code, minimax-m2.1-free
+ *    - Free models: the `-free` suffixed ids from GET /zen/v1/models, plus big-pickle.
+ *      The catalogue moves; MODEL_REGISTRY lists the ones verified to answer
+ *      anonymously. All of them are reasoning models - see MIN_FREE_TIER_OUTPUT_TOKENS.
  *
  * 2. PAID TIER (with API key): Uses OpenRouter API for 300+ models
  *    - Endpoint: https://openrouter.ai/api/v1
@@ -15,6 +17,7 @@
  */
 
 import OpenAI from 'openai'
+import { MIN_FREE_TIER_OUTPUT_TOKENS } from '../models'
 import type {
   AIProviderInterface,
   AIMessage,
@@ -27,11 +30,10 @@ import type {
 
 // Default free models by tier (OpenCode Zen)
 // Model definitions are in lib/main/ai/models.ts (MODEL_REGISTRY)
-// Using big-pickle for quick/balanced since it's fast and reliable
 export const OPENROUTER_DEFAULTS = {
-  quick: 'big-pickle',
-  balanced: 'big-pickle',
-  powerful: 'grok-code',
+  quick: 'ling-3.0-flash-free',
+  balanced: 'north-mini-code-free',
+  powerful: 'nemotron-3-ultra-free',
 }
 
 // OpenCode Zen API endpoint (free, anonymous access)
@@ -168,6 +170,29 @@ export class OpenRouterProvider implements AIProviderInterface {
   }
 
   /**
+   * Free-tier models are all reasoning models and reasoning tokens count against
+   * max_tokens, so a small budget yields content: null. Raise the floor rather than
+   * hand callers an empty response.
+   */
+  private resolveMaxTokens(maxTokens?: number): number | undefined {
+    if (!this.isUsingFreeTier) return maxTokens
+    if (maxTokens === undefined) return undefined
+    return Math.max(maxTokens, MIN_FREE_TIER_OUTPUT_TOKENS)
+  }
+
+  /**
+   * Pull the assistant text out of a choice.
+   *
+   * Reasoning models put their visible answer in `content`, but when the response is
+   * truncated mid-reasoning `content` is null and only `reasoning` is populated. Fall
+   * back to it so a truncated reply isn't indistinguishable from a failed call.
+   */
+  private extractContent(message: unknown): string {
+    const msg = message as { content?: string | null; reasoning?: string | null } | undefined
+    return msg?.content || msg?.reasoning || ''
+  }
+
+  /**
    * Map finish reason to our format
    */
   private mapFinishReason(
@@ -208,18 +233,19 @@ export class OpenRouterProvider implements AIProviderInterface {
       this.configure()
     }
     const convertedMessages = this.convertMessages(messages, options)
+    const maxTokens = this.resolveMaxTokens(options.maxTokens)
 
     try {
       const response = await this.client!.chat.completions.create({
         model: modelId,
         messages: convertedMessages,
-        ...(options.maxTokens && { max_tokens: options.maxTokens }),
+        ...(maxTokens && { max_tokens: maxTokens }),
         ...(options.temperature !== undefined && { temperature: options.temperature }),
         ...(options.stopSequences && { stop: options.stopSequences }),
       })
 
       const choice = response.choices?.[0]
-      const content = choice?.message?.content || ''
+      const content = this.extractContent(choice?.message)
 
       // Handle usage - may be undefined or have different field names
       const usage: AIUsage = {
@@ -273,6 +299,7 @@ export class OpenRouterProvider implements AIProviderInterface {
       this.configure()
     }
     const convertedMessages = this.convertMessages(messages, options)
+    const maxTokens = this.resolveMaxTokens(options.maxTokens)
 
     let fullText = ''
 
@@ -281,7 +308,7 @@ export class OpenRouterProvider implements AIProviderInterface {
         model: modelId,
         messages: convertedMessages,
         stream: true,
-        ...(options.maxTokens && { max_tokens: options.maxTokens }),
+        ...(maxTokens && { max_tokens: maxTokens }),
         ...(options.temperature !== undefined && { temperature: options.temperature }),
         ...(options.stopSequences && { stop: options.stopSequences }),
       })

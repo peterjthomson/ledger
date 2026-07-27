@@ -205,13 +205,17 @@ export function AISettingsSection() {
       }))
 
       try {
-        // Send a simple test message
+        // Send a simple test message.
+        // The budget has to clear reasoning tokens: reasoning models spend max_tokens on
+        // reasoning first, so a tight budget returns empty content and looks like a
+        // connection failure even though the provider answered.
         const response = await ai.quick(
           [{ role: 'user', content: 'Say "Hello" in exactly one word.' }],
-          { provider, maxTokens: 10 }
+          { provider, maxTokens: 512 }
         )
 
-        if (response?.content) {
+        // A truncated reply still proves the provider is reachable and authenticated.
+        if (response?.content || response?.finishReason === 'length') {
           setTestResults((prev) => ({
             ...prev,
             [provider]: {

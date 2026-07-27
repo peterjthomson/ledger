@@ -11,6 +11,7 @@ import { useState, useMemo } from 'react'
 import type { PullRequest, PRFilter, PRSort } from '../../../types/electron'
 import type { Column } from '../../../types/app-types'
 import { ListPanelHeader } from './ListPanelHeader'
+import { applyPRControls, PR_FILTER_OPTIONS, PR_SORT_OPTIONS } from './list-filters'
 
 export interface PRListProps {
   /** Column configuration */
@@ -67,52 +68,10 @@ export function PRList({
   const [sort, setSort] = useState<PRSort>('updated')
 
   // Filter and sort PRs
-  const filteredPRs = useMemo(() => {
-    let filtered = [...prs]
-
-    // Apply filter
-    switch (filter) {
-      case 'open-not-draft':
-        filtered = filtered.filter((pr) => !pr.isDraft)
-        break
-      case 'open-draft':
-        filtered = filtered.filter((pr) => pr.isDraft)
-        break
-      case 'all':
-      default:
-        break
-    }
-
-    // Apply search
-    if (search.trim()) {
-      const searchLower = search.toLowerCase().trim()
-      filtered = filtered.filter(
-        (pr) =>
-          pr.title.toLowerCase().includes(searchLower) ||
-          pr.branch.toLowerCase().includes(searchLower) ||
-          pr.author.toLowerCase().includes(searchLower)
-      )
-    }
-
-    // Apply sort
-    switch (sort) {
-      case 'comments':
-        filtered.sort((a, b) => b.comments - a.comments)
-        break
-      case 'first-commit':
-        filtered.sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime())
-        break
-      case 'last-commit':
-        filtered.sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime())
-        break
-      case 'updated':
-      default:
-        filtered.sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime())
-        break
-    }
-
-    return filtered
-  }, [prs, filter, sort, search])
+  const filteredPRs = useMemo(
+    () => applyPRControls(prs, { search, filter, sort }),
+    [prs, filter, sort, search]
+  )
 
   const label = column?.label || 'Pull Requests'
   const icon = column?.icon || '⬡'
@@ -155,9 +114,11 @@ export function PRList({
               onChange={(e) => setFilter(e.target.value as PRFilter)}
               className="control-select"
             >
-              <option value="all">All Open</option>
-              <option value="open-not-draft">Open + Not Draft</option>
-              <option value="open-draft">Open + Draft</option>
+              {PR_FILTER_OPTIONS.map((opt) => (
+                <option key={opt.value} value={opt.value}>
+                  {opt.label}
+                </option>
+              ))}
             </select>
           </div>
           <div className="control-row">
@@ -167,10 +128,11 @@ export function PRList({
               onChange={(e) => setSort(e.target.value as PRSort)}
               className="control-select"
             >
-              <option value="updated">Last Updated</option>
-              <option value="comments">Comments</option>
-              <option value="first-commit">First Commit</option>
-              <option value="last-commit">Last Commit</option>
+              {PR_SORT_OPTIONS.map((opt) => (
+                <option key={opt.value} value={opt.value}>
+                  {opt.label}
+                </option>
+              ))}
             </select>
           </div>
         </div>

@@ -11,6 +11,7 @@ import { useState, useMemo } from 'react'
 import type { StashEntry, StashFilter, StashSort } from '../../../types/electron'
 import type { Column } from '../../../types/app-types'
 import { ListPanelHeader } from './ListPanelHeader'
+import { applyStashControls, STASH_FILTER_OPTIONS, STASH_SORT_OPTIONS } from './list-filters'
 
 export interface StashListProps {
   /** Column configuration */
@@ -44,56 +45,11 @@ export function StashList({
   const [filter, setFilter] = useState<StashFilter>('all')
   const [sort, setSort] = useState<StashSort>('date')
 
-  // Sort stashes
-  const sortStashes = (stashList: StashEntry[]): StashEntry[] => {
-    const sorted = [...stashList]
-    switch (sort) {
-      case 'message':
-        return sorted.sort((a, b) => a.message.localeCompare(b.message))
-      case 'branch':
-        return sorted.sort((a, b) => (a.branch || '').localeCompare(b.branch || ''))
-      case 'date':
-      default:
-        // Default git stash order is already by date (newest first)
-        return sorted.sort((a, b) => {
-          if (!a.date) return 1
-          if (!b.date) return -1
-          return new Date(b.date).getTime() - new Date(a.date).getTime()
-        })
-    }
-  }
-
   // Filter and sort stashes
-  const filteredStashes = useMemo(() => {
-    let filtered = [...stashes]
-
-    // Apply filter based on redundant status
-    switch (filter) {
-      case 'has-changes':
-        // Show stashes that would add changes (not redundant)
-        filtered = filtered.filter((stash) => !stash.redundant)
-        break
-      case 'redundant':
-        // Show stashes whose changes already exist on the branch
-        filtered = filtered.filter((stash) => stash.redundant)
-        break
-      case 'all':
-      default:
-        break
-    }
-
-    // Apply search
-    if (search.trim()) {
-      const searchLower = search.toLowerCase().trim()
-      filtered = filtered.filter(
-        (stash) =>
-          stash.message.toLowerCase().includes(searchLower) ||
-          (stash.branch && stash.branch.toLowerCase().includes(searchLower))
-      )
-    }
-
-    return sortStashes(filtered)
-  }, [stashes, search, filter, sort])
+  const filteredStashes = useMemo(
+    () => applyStashControls(stashes, { search, filter, sort }),
+    [stashes, search, filter, sort]
+  )
 
   const label = column?.label || 'Stashes'
   const icon = column?.icon || '⊡'
@@ -138,9 +94,11 @@ export function StashList({
               onChange={(e) => setFilter(e.target.value as StashFilter)}
               className="control-select"
             >
-              <option value="all">All</option>
-              <option value="has-changes">Has Changes</option>
-              <option value="redundant">Redundant</option>
+              {STASH_FILTER_OPTIONS.map((opt) => (
+                <option key={opt.value} value={opt.value}>
+                  {opt.label}
+                </option>
+              ))}
             </select>
           </div>
           <div className="control-row">
@@ -150,9 +108,11 @@ export function StashList({
               onChange={(e) => setSort(e.target.value as StashSort)}
               className="control-select"
             >
-              <option value="date">Date Created</option>
-              <option value="message">Message</option>
-              <option value="branch">Branch</option>
+              {STASH_SORT_OPTIONS.map((opt) => (
+                <option key={opt.value} value={opt.value}>
+                  {opt.label}
+                </option>
+              ))}
             </select>
           </div>
         </div>

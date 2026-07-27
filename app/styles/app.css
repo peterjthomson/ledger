@@ -7930,6 +7930,40 @@ body,
   border-color: var(--accent);
 }
 
+/* Filter/sort rows - mirror the radar column controls */
+.section-filter-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 4px;
+}
+
+.section-filter-row label {
+  flex-shrink: 0;
+  width: 36px;
+  font-size: 10px;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.section-filter-select {
+  flex: 1;
+  min-width: 0;
+  padding: 3px 6px;
+  font-size: 11px;
+  color: var(--text-primary);
+  background: var(--bg-primary);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  outline: none;
+  cursor: pointer;
+}
+
+.section-filter-select:focus {
+  border-color: var(--accent);
+}
+
 .sidebar-items {
   list-style: none;
   margin: 0;
