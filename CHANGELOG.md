@@ -7,6 +7,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.5.0] - 2026-07-27
+
+### Changed
+
+- **Dependency shotgun upgrade** (typecheck, lint, E2E, and local packaging green)
+  - Electron `41` → `43.2`
+  - better-sqlite3 `12` → `13`
+  - tldraw `4` → `5`
+  - shiki `3` → `4`
+  - ts-morph `27` → `28`
+  - Anthropic SDK `0.50` → `0.115`
+  - electron-builder `26.0` → `26.15`
+  - Many minor/patch bumps (React 19.2, Playwright 1.62, simple-git 3.36, openai, lucide, etc.)
+  - Intentionally held: TypeScript `6.0` (typescript-eslint needs `<6.1`), Vite `7` (electron-vite peers), ESLint `9` (eslint-plugin-react peers)
+
+### Fixed
+
+- **Remote / branch list sorting** — tip dates loaded via bulk `git for-each-ref` so Last Commit reorder works; fixed simple-git last/first commit metadata parsing
+- **E2E Electron launch under agent harnesses** — clear `ELECTRON_RUN_AS_NODE` in Playwright launches so Chromium flags work
+- **Main window visibility** — force show/focus with fallback so the window is not left invisible
+
 ### Added
 
 - **FileGraph Visualization** - New `file-graph` viz panel type

@@ -2,6 +2,7 @@ import { test, expect, _electron as electron, ElectronApplication, Page } from '
 import * as path from 'path'
 import * as fs from 'fs'
 import * as os from 'os'
+import { electronTestEnv } from './electron-test-env'
 
 const TEST_REPO = path.join(__dirname, '..')
 
@@ -17,7 +18,7 @@ test.describe('Ledger App - Welcome Screen', () => {
 
     app = await electron.launch({
       args: [path.join(__dirname, '../out/main/main.js')],
-      env: { ...process.env, LEDGER_SETTINGS_PATH: settingsPath },
+      env: electronTestEnv({ LEDGER_SETTINGS_PATH: settingsPath }),
     })
     
     page = await app.firstWindow()
@@ -67,11 +68,10 @@ test.describe('Ledger App - Main View', () => {
         path.join(__dirname, '../out/main/main.js'),
         `--repo=${TEST_REPO}`
       ],
-      env: {
-        ...process.env,
+      env: electronTestEnv({
         LEDGER_SETTINGS_PATH: settingsPath,
         LEDGER_MOCK_OPENROUTER: '1',
-      },
+      }),
     })
     
     page = await app.firstWindow()
@@ -215,11 +215,10 @@ test.describe('Ledger App - AI Settings', () => {
         path.join(__dirname, '../out/main/main.js'),
         `--repo=${TEST_REPO}`
       ],
-      env: {
-        ...process.env,
+      env: electronTestEnv({
         LEDGER_SETTINGS_PATH: settingsPath,
         LEDGER_MOCK_OPENROUTER: '1',
-      },
+      }),
     })
     
     page = await app.firstWindow()

@@ -3,6 +3,7 @@ import * as path from 'path'
 import * as fs from 'fs'
 import * as os from 'os'
 import { execFileSync } from 'child_process'
+import { electronTestEnv } from './electron-test-env'
 
 function runGit(args: string[], cwd: string) {
   execFileSync('git', args, {
@@ -48,7 +49,7 @@ test.describe('Ledger App - Repo Switching', () => {
 
     app = await electron.launch({
       args: [path.join(__dirname, '../out/main/main.js'), `--repo=${repoOnePath}`],
-      env: { ...process.env, LEDGER_SETTINGS_PATH: settingsPath },
+      env: electronTestEnv({ LEDGER_SETTINGS_PATH: settingsPath }),
     })
 
     page = await app.firstWindow()

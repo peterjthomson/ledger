@@ -55,28 +55,47 @@ function filterBranches(branchList: Branch[], filter: BranchFilter): Branch[] {
 }
 
 /**
- * Sort branches
+ * Sort branches. Missing values sort last; ties break on name so order is stable.
  */
 function sortBranches(branchList: Branch[], sort: BranchSort): Branch[] {
+  const byName = (a: Branch, b: Branch) => a.name.localeCompare(b.name)
   const sorted = [...branchList]
+
   switch (sort) {
     case 'last-commit':
       return sorted.sort((a, b) => {
-        if (!a.lastCommitDate) return 1
-        if (!b.lastCommitDate) return -1
-        return new Date(b.lastCommitDate).getTime() - new Date(a.lastCommitDate).getTime()
+        const aTime = a.lastCommitDate ? new Date(a.lastCommitDate).getTime() : Number.NaN
+        const bTime = b.lastCommitDate ? new Date(b.lastCommitDate).getTime() : Number.NaN
+        const aMissing = Number.isNaN(aTime)
+        const bMissing = Number.isNaN(bTime)
+        if (aMissing && bMissing) return byName(a, b)
+        if (aMissing) return 1
+        if (bMissing) return -1
+        if (bTime !== aTime) return bTime - aTime
+        return byName(a, b)
       })
     case 'first-commit':
       return sorted.sort((a, b) => {
-        if (!a.firstCommitDate) return 1
-        if (!b.firstCommitDate) return -1
-        return new Date(a.firstCommitDate).getTime() - new Date(b.firstCommitDate).getTime()
+        const aTime = a.firstCommitDate ? new Date(a.firstCommitDate).getTime() : Number.NaN
+        const bTime = b.firstCommitDate ? new Date(b.firstCommitDate).getTime() : Number.NaN
+        const aMissing = Number.isNaN(aTime)
+        const bMissing = Number.isNaN(bTime)
+        if (aMissing && bMissing) return byName(a, b)
+        if (aMissing) return 1
+        if (bMissing) return -1
+        if (aTime !== bTime) return aTime - bTime
+        return byName(a, b)
       })
     case 'most-commits':
-      return sorted.sort((a, b) => (b.commitCount || 0) - (a.commitCount || 0))
+      return sorted.sort((a, b) => {
+        const aCount = a.commitCount ?? -1
+        const bCount = b.commitCount ?? -1
+        if (bCount !== aCount) return bCount - aCount
+        return byName(a, b)
+      })
     case 'name':
     default:
-      return sorted.sort((a, b) => a.name.localeCompare(b.name))
+      return sorted.sort(byName)
   }
 }
 

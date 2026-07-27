@@ -54,10 +54,53 @@ export interface BranchInfo {
   isMerged?: boolean
 }
 
+/**
+ * Map git for-each-ref names onto simple-git branch keys:
+ *   refs/heads/foo          -> foo
+ *   refs/remotes/origin/foo -> remotes/origin/foo
+ */
+function refNameToBranchKey(refname: string): string | null {
+  if (refname.startsWith('refs/heads/')) {
+    return refname.slice('refs/heads/'.length)
+  }
+  if (refname.startsWith('refs/remotes/')) {
+    return `remotes/${refname.slice('refs/remotes/'.length)}`
+  }
+  return null
+}
+
+/**
+ * Bulk tip (last-commit) dates for all local + remote branches in one git call.
+ * Used so list sorts work before expensive per-branch metadata finishes.
+ */
+async function getBranchTipDates(): Promise<Map<string, string>> {
+  if (!git) throw new Error('No repository selected')
+
+  const raw = await git.raw([
+    'for-each-ref',
+    '--format=%(refname)|%(committerdate:iso-strict)',
+    'refs/heads',
+    'refs/remotes',
+  ])
+
+  const map = new Map<string, string>()
+  for (const line of raw.split('\n')) {
+    if (!line.trim()) continue
+    const sep = line.indexOf('|')
+    if (sep === -1) continue
+    const refname = line.slice(0, sep)
+    const date = line.slice(sep + 1).trim()
+    if (!date || refname.endsWith('/HEAD')) continue
+    const key = refNameToBranchKey(refname)
+    if (key) map.set(key, date)
+  }
+  return map
+}
+
 export async function getBranches() {
   if (!git) throw new Error('No repository selected')
 
-  const result = await git.branch(['-a', '-v'])
+  const [result, tipDates] = await Promise.all([git.branch(['-a', '-v']), getBranchTipDates()])
 
   // Get list of remote branch names for local-only detection
   const remoteBranches = new Set<string>()
@@ -77,6 +120,8 @@ export async function getBranches() {
     label: data.label,
     isRemote: name.startsWith('remotes/'),
     isLocalOnly: !name.startsWith('remotes/') && !remoteBranches.has(name),
+    // Tip dates from for-each-ref so last-commit sort works immediately
+    lastCommitDate: tipDates.get(name),
   }))
 
   return {
@@ -93,14 +138,23 @@ export async function getBranchMetadata(branchName: string): Promise<{
 }> {
   if (!git) throw new Error('No repository selected')
 
-  // Get last commit date and message
-  const lastCommit = await git.log([branchName, '-1', '--format=%ci'])
+  // Do not pass custom --format to simple-git's log(): it breaks parsing of latest.date.
+  const lastCommit = await git.log([branchName, '-1'])
   const lastCommitDate = lastCommit.latest?.date || ''
   const lastCommitMessage = lastCommit.latest?.message || ''
 
-  // Get first commit date (oldest commit on this branch)
-  const firstCommitRaw = await git.raw(['log', branchName, '--reverse', '--format=%ci', '-1'])
-  const firstCommitDate = firstCommitRaw.trim()
+  // First commit: `log --reverse -1` only reverses the limited set (wrong tip date).
+  // Use rev-list root(s) then format that commit.
+  let firstCommitDate = ''
+  try {
+    const roots = (await git.raw(['rev-list', '--max-parents=0', branchName])).trim()
+    const firstHash = roots.split('\n').filter(Boolean)[0]
+    if (firstHash) {
+      firstCommitDate = (await git.raw(['log', '-1', '--format=%cI', firstHash])).trim()
+    }
+  } catch {
+    firstCommitDate = ''
+  }
 
   // Get commit count
   const countRaw = await git.raw(['rev-list', '--count', branchName])

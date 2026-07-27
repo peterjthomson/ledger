@@ -41,9 +41,27 @@ export function createAppWindow(): void {
   // Register window-specific IPC handlers (needs mainWindow reference)
   registerWindowHandlers(mainWindow)
 
-  mainWindow.on('ready-to-show', () => {
+  const showMainWindow = () => {
+    if (mainWindow.isDestroyed()) return
     mainWindow.show()
+    mainWindow.focus()
+    if (process.platform === 'darwin') {
+      app.dock?.show()
+      app.focus({ steal: true })
+    }
+  }
+
+  mainWindow.on('ready-to-show', () => {
+    showMainWindow()
   })
+
+  // Fallback: if ready-to-show is delayed/missed (e.g. launch from non-interactive
+  // agent shells), never leave the window permanently invisible.
+  setTimeout(() => {
+    if (!mainWindow.isDestroyed() && !mainWindow.isVisible()) {
+      showMainWindow()
+    }
+  }, 1500)
 
   mainWindow.webContents.setWindowOpenHandler((details) => {
     shell.openExternal(details.url)
