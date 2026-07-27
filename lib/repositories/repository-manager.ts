@@ -39,6 +39,13 @@ export class RepositoryManager {
   // Increments every time the active repo changes
   private _switchEpoch: number = 0
 
+  // Safety: Sequence number for activation requests.
+  // open() is async, so two overlapping calls can resolve out of order. Each call that
+  // asks to become active claims a sequence number; only the most recently *requested*
+  // one is allowed to activate, so a slow open can't steal back a repo the user has
+  // already switched away from.
+  private _activationSeq: number = 0
+
   // Callbacks for state changes (simple event system)
   private onChangeCallbacks: Set<() => void> = new Set()
 
@@ -177,16 +184,21 @@ export class RepositoryManager {
    * @returns The repository context
    */
   async open(repoPath: string, makeActive: boolean = true): Promise<RepositoryContext> {
+    // Claim an activation slot up front so the most recently *requested* open wins,
+    // regardless of which one finishes first.
+    const activationId = makeActive ? ++this._activationSeq : 0
+    const shouldActivate = () => makeActive && activationId === this._activationSeq
+
     // Normalize path to handle trailing slashes, symlinks, etc.
     const normalizedPath = path.resolve(repoPath)
-    
+
     // Check if already open
     const existingId = this.pathIndex.get(normalizedPath)
     if (existingId) {
       const existing = this.contexts.get(existingId)!
       existing.lastAccessed = new Date()
 
-      if (makeActive && this.activeId !== existingId) {
+      if (shouldActivate() && this.activeId !== existingId) {
         // SAFETY: Increment epoch when switching repos
         this._switchEpoch++
         this.activeId = existingId
@@ -210,7 +222,7 @@ export class RepositoryManager {
       if (existingByActualPath) {
         const existing = this.contexts.get(existingByActualPath)!
         existing.lastAccessed = new Date()
-        if (makeActive && this.activeId !== existingByActualPath) {
+        if (shouldActivate() && this.activeId !== existingByActualPath) {
           this._switchEpoch++
           this.activeId = existingByActualPath
           this.syncGlobalState()
@@ -226,7 +238,7 @@ export class RepositoryManager {
       this.pathIndex.set(context.path, context.id)
     }
 
-    if (makeActive) {
+    if (shouldActivate()) {
       // SAFETY: Increment epoch when switching repos
       this._switchEpoch++
       this.activeId = context.id
@@ -288,6 +300,9 @@ export class RepositoryManager {
     if (!this.contexts.has(id)) {
       return false
     }
+
+    // An explicit switch is the newest activation request - invalidates in-flight open()s
+    this._activationSeq++
 
     if (this.activeId !== id) {
       // SAFETY: Increment epoch when switching repos
@@ -421,6 +436,11 @@ export class RepositoryManager {
    * @returns The repository context
    */
   addRemote(context: RepositoryContext, makeActive: boolean = true): RepositoryContext {
+    if (makeActive) {
+      // Newest activation request - invalidates in-flight open()s
+      this._activationSeq++
+    }
+
     // Check if already open by remote fullName
     if (context.remote?.fullName) {
       const existingId = this.remoteIndex.get(context.remote.fullName)

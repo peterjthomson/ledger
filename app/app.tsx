@@ -338,7 +338,15 @@ export default function App() {
     setActivePluginNavItem(itemId)
   }, [])
 
+  // Monotonic token for the in-flight repository load.
+  // Every refresh claims a new token; results from an older load are discarded so a
+  // slow response for the previous repo can't overwrite the repo we just switched to.
+  const loadTokenRef = useRef(0)
+
   const refresh = useCallback(async (repoPathForTitle: string | null = repoPath) => {
+    const token = ++loadTokenRef.current
+    const isStale = () => loadTokenRef.current !== token
+
     setLoading(true)
     setError(null)
     setPrError(null)
@@ -358,6 +366,9 @@ export default function App() {
           window.electronAPI.getCommitGraphHistory(100, true, showCheckpoints), // skipStats for fast load
           window.electronAPI.getStashes(),
         ])
+
+      // A newer load started while this one was in flight - drop these results.
+      if (isStale()) return
 
       setGithubUrl(ghUrl)
 
@@ -399,6 +410,7 @@ export default function App() {
       window.electronAPI
         .getBranchesWithMetadata()
         .then((metaResult) => {
+          if (isStale()) return
           if (!('error' in metaResult)) {
             setBranches(metaResult.branches)
           }
@@ -412,18 +424,24 @@ export default function App() {
       window.electronAPI
         .getFileGraph()
         .then((result) => {
+          if (isStale()) return
           setFileGraph(result)
         })
         .catch(() => {
+          if (isStale()) return
           setFileGraph(null)
         })
         .finally(() => {
+          if (isStale()) return
           setFileGraphLoading(false)
         })
     } catch (err) {
+      if (isStale()) return
       setError((err as Error).message)
     } finally {
-      setLoading(false)
+      if (!isStale()) {
+        setLoading(false)
+      }
     }
   }, [repoPath, setTitle, showCheckpoints])
 
@@ -444,10 +462,22 @@ export default function App() {
     setPrError(null)
   }, [])
 
+  // Path of the load currently in flight. Switching a repo can be signalled twice
+  // (component callback + repo:switched event); this keeps it to a single load.
+  const loadingRepoPathRef = useRef<string | null>(null)
+
   const loadRepositoryData = useCallback(async (path: string) => {
-    resetRepositoryViewState()
-    setRepoPath(path)
-    await refresh(path)
+    if (loadingRepoPathRef.current === path) return
+    loadingRepoPathRef.current = path
+    try {
+      resetRepositoryViewState()
+      setRepoPath(path)
+      await refresh(path)
+    } finally {
+      if (loadingRepoPathRef.current === path) {
+        loadingRepoPathRef.current = null
+      }
+    }
   }, [refresh, resetRepositoryViewState])
 
   const openRepositoryPath = useCallback(async (path: string) => {
@@ -529,15 +559,18 @@ export default function App() {
   // Event Subscriptions (auto-refresh)
   // ============================================================================
 
-  // Auto-refresh when repo is switched (from another window or component)
+  // Auto-refresh when repo is switched (from another window or component).
+  // Goes through loadRepositoryData so stale selections/diffs from the previous
+  // repo are cleared, not just the list data.
   useRepoSwitched(
     (_fromPath, toPath, _name) => {
-      if (toPath !== repoPath) {
-        setRepoPath(toPath)
-        refresh(toPath)
+      if (toPath && toPath !== repoPath) {
+        loadRepositoryData(toPath).catch((err) => {
+          setStatus({ type: 'error', message: (err as Error).message })
+        })
       }
     },
-    [repoPath, refresh]
+    [repoPath, loadRepositoryData]
   )
 
   // Auto-refresh when git checkout happens
@@ -618,6 +651,7 @@ export default function App() {
       case 'uncommitted': return 'staging'
       case 'create-worktree': return 'create-worktree'
       case 'mailmap': return 'mailmap-detail'
+      case 'repo': return 'repo-detail'
       default: return 'empty'
     }
   }, [])

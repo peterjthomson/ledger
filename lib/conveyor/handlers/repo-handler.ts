@@ -46,9 +46,11 @@ export const registerRepoHandlers = () => {
     const manager = getRepositoryManager()
     try {
       const ctx = await manager.open(selectedPath)
-      // Update module state
-      setRepoPath(ctx.path)
-      saveLastRepoPath(ctx.path, bookmark)
+      // Update module state, unless a newer open has already taken over
+      if (manager.getActive()?.id === ctx.id) {
+        setRepoPath(ctx.path)
+        saveLastRepoPath(ctx.path, bookmark)
+      }
       addRecentRepo(ctx.path)
 
       // Emit events
@@ -214,8 +216,13 @@ export const registerRepoHandlers = () => {
 
     try {
       const ctx = await manager.open(repoPath)
-      setRepoPath(ctx.path)
-      saveLastRepoPath(ctx.path)
+      // manager.open() already synced module state. Only re-assert it if this open is
+      // still the newest one - otherwise a slower concurrent open would point git-service
+      // back at a repo the user has already switched away from.
+      if (manager.getActive()?.id === ctx.id) {
+        setRepoPath(ctx.path)
+        saveLastRepoPath(ctx.path)
+      }
       addRecentRepo(ctx.path)
 
       // Emit events
