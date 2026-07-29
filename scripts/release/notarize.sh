@@ -138,6 +138,21 @@ cmd_status() {
   }
 }
 
+# Stapling appends the ticket, so every sha512/size an installer feed recorded
+# before this point is now wrong. electron-updater refuses a download whose
+# checksum disagrees with the feed, and the failure is silent until someone
+# tries to update. Refresh any latest*.yml sitting beside the artifact.
+refresh_feeds() {
+  local artifact="$1"
+  local dir name
+  dir="$(dirname "$artifact")"
+  name="$(basename "$artifact")"
+  for feed in "$dir"/latest*.yml; do
+    [ -f "$feed" ] || continue
+    python3 "$(dirname "${BASH_SOURCE[0]}")/refresh-feed.py" "$feed" "$name" "$artifact"
+  done
+}
+
 cmd_staple() {
   require_tools
   [ -f "$STATE" ] || die "no submissions recorded in $STATE"
@@ -159,6 +174,7 @@ cmd_staple() {
     xcrun stapler staple "$path"
     # Fail loudly rather than ship an artifact whose ticket did not attach.
     xcrun stapler validate "$path"
+    refresh_feeds "$path"
     echo "notarize: $name stapled and validated"
     stapled=$((stapled + 1))
   done < <(state_py <<'PY'

@@ -79,6 +79,11 @@ mas:
 dmg:
   artifactName: ${productName}-${version}-${arch}.${ext}
   title: ${productName}
+  # electron-builder only notarizes the .app; the DMG wrapping it is left
+  # unsigned by default, and Gatekeeper cannot assess an unsigned disk image
+  # even when it carries a stapled ticket. Sign it, then notarize + staple the
+  # DMG itself via scripts/release/notarize.sh.
+  sign: true
 linux:
   target:
     - AppImage
