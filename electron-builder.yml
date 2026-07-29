@@ -91,7 +91,12 @@ linux:
   maintainer: peterjthomson
   category: Development
 appImage:
-  artifactName: ${name}-${version}.${ext}
+  # ${arch} is mandatory: without it every arch resolves to the same filename and
+  # the second AppImage build silently overwrites the first, leaving one binary
+  # that both latest-linux.yml and latest-linux-arm64.yml point at with different
+  # checksums. Ledger 1.5.0 shipped an aarch64 AppImage named ledger-1.5.0.AppImage
+  # to x64 users this way.
+  artifactName: ${name}-${version}-${arch}.${ext}
 npmRebuild: false
 publish:
   # Upload manually after notarization and local verification are complete.
