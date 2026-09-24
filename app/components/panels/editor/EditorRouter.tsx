@@ -67,6 +67,7 @@ export function EditorRouter({
   branches,
   repoPath,
   prs,
+  worktrees,
   onFocusWorktree,
   onNavigateToPR,
   onOpenRepo,
@@ -94,6 +95,8 @@ export function EditorRouter({
           onOpenStaging={onOpenStaging}
           onNavigateToPR={onNavigateToPR}
           prs={prs}
+          worktrees={worktrees}
+          onFocusWorktree={onFocusWorktree}
           switching={switching}
           deleting={deleting}
           renaming={renaming}

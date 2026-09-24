@@ -10313,3 +10313,26 @@ body,
   color: var(--text-muted);
   font-size: 13px;
 }
+
+/* Diff navigation and changes within a line. */
+.diff-search-bar {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  position: sticky;
+  top: 0;
+  z-index: 5;
+  padding: 8px;
+  background: var(--bg-primary);
+  border-bottom: 1px solid var(--border-color);
+  font-size: 12px;
+  flex-shrink: 0;
+}
+.diff-search-bar input { min-width: 60px; flex: 1; }
+.diff-search-bar button { padding: 2px 7px; }
+.diff-search-bar span { white-space: nowrap; }
+.diff-line-add .diff-inline-change { background: rgba(46, 160, 67, 0.3); border-radius: 2px; }
+.diff-line-delete .diff-inline-change { background: rgba(248, 81, 73, 0.3); border-radius: 2px; }
+.diff-search-match { background: #ffe58a; color: #242424; }
+.diff-search-match.active { background: #ffb84d; outline: 1px solid #986000; }
+[data-diff-search]:focus { outline: none; }

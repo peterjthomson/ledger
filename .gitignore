@@ -13,3 +13,6 @@ wip/
 tickets/
 # Ledger worktrees convention - worktrees created by Ledger
 .worktrees/
+
+# TypeScript project build cache
+*.tsbuildinfo

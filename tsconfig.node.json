@@ -6,7 +6,7 @@
     "lib/**/*",
     "resources/**/*",
     "app/**/*",
-    "playwright.config.ts",
+    "playwright*.config.ts",
     "tests/**/*"
   ],
   "compilerOptions": {

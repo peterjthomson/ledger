@@ -6,9 +6,9 @@ Thank you for your interest in contributing to Ledger! This document provides gu
 
 ### Prerequisites
 
-- Node.js 18+
+- Node.js 20.19+ (see `package.json`)
 - npm 9+
-- macOS (for development, as the app is currently macOS-only)
+- macOS for the local Electron and packaging workflow described below
 - [GitHub CLI](https://cli.github.com/) (`gh`) - for PR integration features
 
 ### Setup
@@ -48,18 +48,21 @@ ledger/
 
 | File | Purpose |
 |------|---------|
-| `lib/main/git-service.ts` | All git operations via `simple-git` |
+| `lib/services/` | Git operations accepting an explicit repository context |
+| `lib/main/git-service.ts` | Legacy Git operations still used by some handlers |
+| `lib/conveyor/` | Typed IPC schemas, handlers, and renderer APIs |
 | `lib/main/main.ts` | IPC handler registration |
 | `app/app.tsx` | Main React component |
 | `app/types/electron.d.ts` | TypeScript types for IPC |
 
 ### Adding a Git Operation
 
-1. Add function to `lib/main/git-service.ts`
-2. Add IPC handler in `lib/main/main.ts`
-3. Expose in `lib/preload/preload.ts`
-4. Add types to `app/types/electron.d.ts`
-5. Call from `app/app.tsx`
+1. Add the operation to the appropriate module in `lib/services/`, accepting a repository context.
+2. Define its Zod arguments and result in `lib/conveyor/schemas/`.
+3. Add its handler in `lib/conveyor/handlers/` and API method in `lib/conveyor/api/`.
+4. Call the typed `window.conveyor` API from the renderer.
+
+Some existing handlers still use `lib/main/git-service.ts` and the legacy `window.electronAPI`. When fixing both paths, share pure helpers instead of copying behavior. Staging uses the shared diff parser and partial-patch builder in `lib/services/staging/`.
 
 ## Code Style
 
@@ -94,21 +97,45 @@ npm run format
 ## Testing
 
 ```bash
-# Run E2E tests
+# Build and run app regressions and focused Git tests
 npm test
 
 # Run tests with visible browser
 npm run test:headed
 ```
 
-Tests use Playwright and are located in `tests/`. The test suite covers:
-- Welcome screen (no repo selected)
-- Main view with repository
+Tests use Playwright and live in `tests/`. App tests use Electron; focused Git tests use disposable repositories and verify the resulting file/index contents. Keep tests tied to observable behavior and use explicit expected results. Avoid duplicating the implementation in assertions.
+
+After changing app code, `npm test` builds before running the suite. For a focused run:
+
+```bash
+npm run vite:build:app
+npx playwright test tests/open-issues.spec.ts tests/partial-patch.spec.ts
+```
 
 Selector guidance:
 - Prefer user-facing selectors (role, text, label) where possible.
 - Use `data-testid` sparingly and only when other selectors would be brittle or ambiguous.
 - Avoid adding new `data-testid` attributes unless they materially improve test stability.
+
+### Packaged-app smoke test
+
+Packaging tests are excluded from the normal suite. Build an unsigned local macOS package, then test the actual executable:
+
+```bash
+npm run vite:build:app
+npx electron-builder --mac --dir -c.mac.identity=null -c.mac.notarize=false \
+  -c.directories.output=wip/package-check --publish never
+LEDGER_PACKAGED_EXECUTABLE="$PWD/wip/package-check/mac-arm64/Ledger.app/Contents/MacOS/Ledger" \
+  npm run test:packaged
+```
+
+The smoke test checks startup, bundled module resolution, and a native SQLite query from outside the checkout. It fails immediately if the executable path is missing or invalid. A passing macOS run does not establish Linux or Windows compatibility; run the packaged test on each release platform.
+
+### Typechecking
+
+`npm run typecheck` checks both projects referenced by `tsconfig.json` without emitting application code. It currently exits nonzero for existing project errors, including overlapping main/renderer configuration and legacy API types. Record failures honestly and compare diagnostics with the base branch when changing types. Production bundling passing is a separate check.
+
 
 ## Submitting Changes
 
@@ -159,7 +186,7 @@ Uses React hooks for local UI state, plus a small shared store for cross-compone
 
 ### Git Operations
 
-All git commands go through `simple-git` library in `git-service.ts`. PR operations use GitHub CLI (`gh`).
+Git operations use `simple-git` and targeted Git subprocesses in `lib/services/` and the legacy `lib/main/git-service.ts`. PR operations use GitHub CLI (`gh`).
 
 ## Questions?
 

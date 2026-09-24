@@ -5,7 +5,9 @@
  * for creating new branches and PRs.
  */
 
-import { useState, useEffect, useRef, useCallback } from 'react'
+import { DiffSearch, DiffLineContent } from '../../ui/DiffSearch'
+import { inlineChanges } from '../../../utils/inline-diff'
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import type { WorkingStatus, UncommittedFile, StagingFileDiff } from '../../../types/electron'
 import type { StatusMessage } from '../../../types/app-types'
 import { beforeCommit, afterCommit } from '@/lib/plugins'
@@ -294,6 +296,8 @@ export function StagingPanel({ workingStatus, currentBranch, onRefresh, onStatus
     },
     [fileDiff, highlightedLines]
   )
+
+  const inlineDiffs = useMemo(() => fileDiff?.hunks.map(hunk => inlineChanges(hunk.lines)) || [], [fileDiff])
 
   // Line selection handlers
   const handleLineClick = (hunkIndex: number, lineIndex: number, shiftKey: boolean) => {
@@ -1039,7 +1043,7 @@ export function StagingPanel({ workingStatus, currentBranch, onRefresh, onStatus
   }
 
   return (
-    <div className="staging-panel">
+    <DiffSearch className="staging-panel">
       {/* Header */}
       <div className="staging-header">
         <div className="staging-title">
@@ -1318,7 +1322,7 @@ export function StagingPanel({ workingStatus, currentBranch, onRefresh, onStatus
                     </div>
                   </div>
                   <div className="staging-hunk-lines">
-                    {hunk.lines.map((line) => {
+                    {hunk.lines.map((line, lineArrayIndex) => {
                       const isSelectable = line.type !== 'context'
                       const isSelected = selectedLines.get(hunkIdx)?.has(line.lineIndex) || false
                       const highlightedHtml = getHighlightedContent(hunkIdx, line.lineIndex)
@@ -1337,14 +1341,7 @@ export function StagingPanel({ workingStatus, currentBranch, onRefresh, onStatus
                           <span className="diff-line-prefix">
                             {line.type === 'add' ? '+' : line.type === 'delete' ? '-' : ' '}
                           </span>
-                          {highlightedHtml ? (
-                            <span
-                              className="diff-line-content highlighted"
-                              dangerouslySetInnerHTML={{ __html: highlightedHtml }}
-                            />
-                          ) : (
-                            <span className="diff-line-content">{line.content}</span>
-                          )}
+                          <DiffLineContent content={line.content} html={highlightedHtml} changes={inlineDiffs[hunkIdx]?.get(lineArrayIndex)} />
                         </div>
                       )
                     })}
@@ -1528,6 +1525,6 @@ export function StagingPanel({ workingStatus, currentBranch, onRefresh, onStatus
           </button>
         )}
       </div>
-    </div>
+    </DiffSearch>
   )
 }

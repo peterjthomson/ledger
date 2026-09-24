@@ -42,13 +42,22 @@ Version control is the heart of software development. The core ledger concept be
 - View all local and remote branches with metadata (commit dates, counts)
 - Filter: All, Local Only, Unmerged
 - Sort: Name, Last Commit, First Commit, Most Commits
-- Double-click to switch branches with auto-stash
+- Current branch stays first, followed by main/master, under every sort
+- Branch status links to its checked-out worktree
+- Double-click to open branch details; use Checkout to switch branches
 
 ### 📝 Commit & Staging
 - View commit history with graph visualization
-- Stage/unstage files with diff preview
+- Stage/unstage files, hunks, or selected lines with diff preview
+- See character-level changes within replacement lines
+- Find text in expanded diffs with **Command-F** (macOS) or **Ctrl-F**
+- Double-click a commit to inspect its changes without checking it out
 - Commit with message and description
 - Reset to previous commits
+
+In the staging diff, click changed lines to select them; Shift-click selects a range within a hunk. Use **Stage Selected**, **Unstage Selected**, or **Discard Selected**. Discard requires a second click to confirm.
+
+Diff search includes old and new content in expanded files. **Enter** moves to the next match, **Shift-Enter** to the previous match, and **Escape** closes search.
 
 ### 📦 Stash Management
 - View, apply, and pop stashes
@@ -103,7 +112,9 @@ npm run dev
 | `npm run dev` | Start development with hot reload |
 | `npm run lint` | Run ESLint |
 | `npm run format` | Format code with Prettier |
-| `npm test` | Run E2E tests |
+| `npm test` | Build and run app regressions and focused Git tests |
+| `npm run test:packaged` | Test an existing packaged app; requires `LEDGER_PACKAGED_EXECUTABLE` |
+| `npm run typecheck` | Check both TypeScript projects; currently reports existing type errors |
 | `npm run build:mac:arm64` | Build for Apple Silicon |
 
 ### Project Structure

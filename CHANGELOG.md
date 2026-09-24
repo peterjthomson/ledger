@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Find text in expanded diffs with Command/Ctrl-F, match navigation, and character-level change highlighting.
+- Branch status links to the worktree where the branch is checked out.
+- Explicit packaged-app smoke test via `npm run test:packaged`.
+
+### Fixed
+
+- Partial staging, unstaging, and discard preserve adjacent unselected changes, line order, and missing final newlines.
+- Current branch and main/master stay above other branches under every sort.
+- `npm run typecheck` now checks the referenced projects and reports existing failures.
+
 ## [1.5.0] - 2026-07-27
 
 ### Changed

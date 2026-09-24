@@ -4,6 +4,7 @@
  * Shows PR details, allows commenting, merging, and viewing file diffs.
  */
 
+import { DiffSearch } from '../../ui/DiffSearch'
 import { useState, useEffect, useMemo, useCallback, useRef, useLayoutEffect } from 'react'
 import type {
   PullRequest,
@@ -306,7 +307,7 @@ export function PRReviewPanel({ pr, repoPath, formatRelativeTime, onCheckout, on
   }
 
   return (
-    <div className="pr-review-panel">
+    <DiffSearch className="pr-review-panel">
       {/* Header */}
       <div className="pr-review-header">
         <div className="detail-type-badge">Pull Request</div>
@@ -591,6 +592,6 @@ export function PRReviewPanel({ pr, repoPath, formatRelativeTime, onCheckout, on
         )}
       </div>
 
-    </div>
+    </DiffSearch>
   )
 }
