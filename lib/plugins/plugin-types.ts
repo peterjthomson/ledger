@@ -9,7 +9,8 @@
  * - **Service Plugins**: Headless plugins providing hooks and background services
  */
 
-import type { Commit, PullRequest, Branch, Worktree, StashEntry } from '@/app/types/electron'
+import type { Commit, PullRequest, Branch, Worktree, StashEntry, WorkingStatus } from '@/app/types/electron'
+export type { Commit, PullRequest, Branch, Worktree, StashEntry } from '@/app/types/electron'
 
 // ============================================================================
 // Plugin Types
@@ -453,9 +454,9 @@ export interface PluginAPI {
   /** Get commits */
   getCommits(limit?: number): Promise<Commit[]>
   /** Get working status (equivalent to getStagingStatus) */
-  getWorkingStatus(): Promise<unknown>
+  getWorkingStatus(): Promise<WorkingStatus | null>
   /** Get staging status (fetches fresh data via IPC when available) */
-  getStagingStatus(): Promise<unknown>
+  getStagingStatus(): Promise<WorkingStatus | null>
   /** Execute a git command */
   git(args: string[]): Promise<string>
   /** Show a notification */

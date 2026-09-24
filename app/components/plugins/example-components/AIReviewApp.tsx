@@ -14,16 +14,10 @@ import {
   RefreshCw,
   AlertTriangle,
   CheckCircle,
-  Info,
   Code,
-  FileText,
   Clock,
   TrendingUp,
   Users,
-  AlertCircle,
-  ChevronRight,
-  Copy,
-  ExternalLink,
 } from 'lucide-react'
 import type { PluginAppProps, CommitAnalysis } from '@/lib/plugins/plugin-types'
 import type { Commit, PullRequest } from '@/app/types/electron'
@@ -49,7 +43,7 @@ interface InsightMetrics {
   mergedPRs: number
 }
 
-export function AIReviewApp({ context, repoPath, activeNavItem, onNavigate }: PluginAppProps) {
+export function AIReviewApp({ context, repoPath, activeNavItem }: PluginAppProps) {
   const [commits, setCommits] = useState<Commit[]>([])
   const [prs, setPRs] = useState<PullRequest[]>([])
   const [isLoading, setIsLoading] = useState(true)

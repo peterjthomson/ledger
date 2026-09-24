@@ -11,7 +11,6 @@ import {
   AlertTriangle,
   AlertCircle,
   Clock,
-  GitBranch,
 } from 'lucide-react'
 import type { PluginWidgetProps, Branch, Worktree } from '@/lib/plugins/plugin-types'
 import './example-plugin-styles.css'
@@ -30,7 +29,7 @@ const STALE_DAYS = 14
 const WARNING_BEHIND = 10
 const CRITICAL_BEHIND = 50
 
-export function BranchHealthWidget({ context, slot, data }: PluginWidgetProps) {
+export function BranchHealthWidget({ slot, data }: PluginWidgetProps) {
   // Handle both branch and worktree data
   const branchData = useMemo(() => {
     if (slot === 'branch-list-item') {

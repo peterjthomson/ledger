@@ -5,18 +5,7 @@
  * Shows PRs needing review with aging indicators and quick actions.
  */
 
-import type { PanelPlugin, PluginContext, PullRequest } from '../plugin-types'
-
-/**
- * Extended PR info with review metadata
- */
-interface ReviewQueueItem {
-  pr: PullRequest
-  waitingHours: number
-  urgency: 'low' | 'medium' | 'high' | 'critical'
-  reviewers: string[]
-  yourReview: 'pending' | 'approved' | 'changes_requested' | 'none'
-}
+import type { PanelPlugin, PluginContext } from '../plugin-types'
 
 /**
  * PR Review Queue Panel
@@ -134,80 +123,12 @@ export const prReviewQueuePlugin: PanelPlugin = {
  */
 async function checkOverduePRs(
   context: PluginContext,
-  warningHours: number,
-  criticalHours: number
+  _warningHours: number,
+  _criticalHours: number
 ): Promise<void> {
   // In production, would fetch actual PR data
   // For demo, just log
   context.logger.debug('Checking for overdue PRs...')
-}
-
-/**
- * Calculate urgency based on waiting time
- */
-function calculateUrgency(
-  waitingHours: number,
-  warningThreshold: number,
-  criticalThreshold: number
-): ReviewQueueItem['urgency'] {
-  if (waitingHours >= criticalThreshold) return 'critical'
-  if (waitingHours >= warningThreshold * 2) return 'high'
-  if (waitingHours >= warningThreshold) return 'medium'
-  return 'low'
-}
-
-/**
- * Build review queue from PRs
- */
-function buildReviewQueue(
-  prs: PullRequest[],
-  warningThreshold: number,
-  criticalThreshold: number,
-  currentUser?: string
-): ReviewQueueItem[] {
-  const now = new Date()
-
-  return prs
-    .filter((pr) => !pr.isDraft)
-    .map((pr) => {
-      const created = new Date(pr.createdAt)
-      const waitingHours = (now.getTime() - created.getTime()) / (1000 * 60 * 60)
-
-      return {
-        pr,
-        waitingHours: Math.floor(waitingHours),
-        urgency: calculateUrgency(waitingHours, warningThreshold, criticalThreshold),
-        reviewers: [], // Would come from GitHub API
-        yourReview: 'none' as const,
-      }
-    })
-    .sort((a, b) => b.waitingHours - a.waitingHours)
-}
-
-/**
- * Format waiting time for display
- */
-function formatWaitingTime(hours: number): string {
-  if (hours < 1) return 'Just now'
-  if (hours < 24) return `${hours}h`
-  const days = Math.floor(hours / 24)
-  return `${days}d ${hours % 24}h`
-}
-
-/**
- * Get color for urgency level
- */
-function getUrgencyColor(urgency: ReviewQueueItem['urgency']): string {
-  switch (urgency) {
-    case 'critical':
-      return 'var(--error)'
-    case 'high':
-      return 'var(--warning)'
-    case 'medium':
-      return 'var(--info)'
-    case 'low':
-      return 'var(--success)'
-  }
 }
 
 export default prReviewQueuePlugin

@@ -328,8 +328,6 @@ async function parseRailsSchema(repoPath: string): Promise<ERDSchema> {
   } catch {
     // Try structure.sql instead
     try {
-      const structurePath = path.join(repoPath, 'db', 'structure.sql')
-      const _content = await fs.readFile(structurePath, 'utf-8')
       // TODO: Parse SQL CREATE TABLE statements
     } catch {
       // No schema file found

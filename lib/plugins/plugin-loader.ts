@@ -181,7 +181,7 @@ class PluginLoader {
 
       // Download plugin files (for remote sources)
       if (source.type === 'git' || source.type === 'url') {
-        await this.downloadPlugin(source, manifest)
+        await this.downloadPlugin(source)
       }
 
       // Register in registry
@@ -209,7 +209,7 @@ class PluginLoader {
       return { success: true, pluginId: manifest.id }
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Unknown error'
-      return { success: false, message }
+      return { success: false, error: message }
     }
   }
 
@@ -334,7 +334,7 @@ class PluginLoader {
     }
   }
 
-  private async fetchBuiltinManifest(id: string): Promise<PluginManifest | null> {
+  private async fetchBuiltinManifest(_id: string): Promise<PluginManifest | null> {
     // Built-in plugins are imported directly, manifest is derived from plugin object
     return null
   }
@@ -342,7 +342,7 @@ class PluginLoader {
   private async fetchLocalManifest(path: string): Promise<PluginManifest | null> {
     // In Electron, would use fs to read package.json or ledger-plugin.json
     try {
-      const response = await window.electronAPI?.readPluginManifest?.(path)
+      const response = await window.conveyor.plugin.getManifest(path)
       return response ?? null
     } catch {
       return null
@@ -395,7 +395,7 @@ class PluginLoader {
     throw new Error('Unsupported git provider')
   }
 
-  private async downloadPlugin(source: PluginSource, manifest: PluginManifest): Promise<void> {
+  private async downloadPlugin(source: PluginSource): Promise<void> {
     // In production, this would:
     // 1. Clone git repo or download from URL
     // 2. Save to plugins directory
@@ -403,7 +403,8 @@ class PluginLoader {
     // 4. Extract/prepare files
 
     // For now, we'll rely on the IPC bridge
-    await window.electronAPI?.installPlugin?.(source, manifest)
+    const result = await window.conveyor.plugin.install(source)
+    if (!result.success) throw new Error(result.message || 'Plugin installation failed')
   }
 
   private async loadPlugin(pluginId: string): Promise<Plugin | null> {
@@ -451,12 +452,12 @@ class PluginLoader {
   }
 
   private async loadExternalPlugin(pluginId: string): Promise<Plugin | null> {
-    // Load via IPC from plugins directory
-    const plugin = await window.electronAPI?.loadPlugin?.(pluginId)
-    return plugin ?? null
+    // External executable plugin loading has no supported IPC bridge yet.
+    console.warn(`[PluginLoader] External plugin loading is not supported: ${pluginId}`)
+    return null
   }
 
-  private async loadNpmPlugin(packageName: string): Promise<Plugin | null> {
+  private async loadNpmPlugin(_packageName: string): Promise<Plugin | null> {
     // Would require bundling or dynamic import
     return null
   }
@@ -509,18 +510,3 @@ class PluginLoader {
 }
 
 export const pluginLoader = new PluginLoader()
-
-// ============================================================================
-// Electron API Extensions (types)
-// ============================================================================
-
-declare global {
-  interface Window {
-    electronAPI?: {
-      readPluginManifest?: (path: string) => Promise<PluginManifest | null>
-      installPlugin?: (source: PluginSource, manifest: PluginManifest) => Promise<void>
-      loadPlugin?: (pluginId: string) => Promise<Plugin | null>
-      uninstallPlugin?: (pluginId: string) => Promise<void>
-    }
-  }
-}

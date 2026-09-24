@@ -8,7 +8,7 @@ export const CanvasColumnSchema = z.object({
   panel: z.string(),
   width: z.union([z.number(), z.literal('flex')]),
   minWidth: z.number().optional(),
-  config: z.record(z.unknown()).optional(),
+  config: z.record(z.string(), z.unknown()).optional(),
   label: z.string().optional(),
   icon: z.string().optional(),
   visible: z.boolean().optional(),

@@ -104,7 +104,7 @@ export function createRelationshipArrows(
     const fromShape = editor.getShape(fromShapeId)
     const toShape = editor.getShape(toShapeId)
 
-    if (!fromShape || !toShape) continue
+    if (fromShape?.type !== 'erd-entity' || toShape?.type !== 'erd-entity') continue
 
     // Calculate connection points (center of shapes)
     const fromCenter = {

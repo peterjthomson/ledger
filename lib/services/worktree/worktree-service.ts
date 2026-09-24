@@ -2,7 +2,7 @@
  * Worktree Service
  *
  * Pure functions for Worktree operations.
- * All functions accept a RepositoryContext as the first parameter.
+ * All functions accept a LocalRepositoryContext as the first parameter.
  *
  * SAFETY: These functions are pure - they don't access global state.
  * The caller is responsible for providing a valid, current context.
@@ -11,7 +11,7 @@
 import * as fs from 'fs'
 import * as path from 'path'
 import { promisify } from 'util'
-import { RepositoryContext } from '@/lib/repositories'
+import { LocalRepositoryContext } from '@/lib/repositories'
 import { stashChanges } from '@/lib/services/branch'
 import { safeExec } from '@/lib/utils/safe-exec'
 import { getCursorAgentTaskHint, getClaudeCodeAgentTaskHint } from '@/lib/utils/agent-hints'
@@ -30,7 +30,7 @@ const statAsync = promisify(fs.stat)
 /**
  * Get basic worktree list
  */
-export async function getWorktrees(ctx: RepositoryContext): Promise<BasicWorktree[]> {
+export async function getWorktrees(ctx: LocalRepositoryContext): Promise<BasicWorktree[]> {
   // git worktree list --porcelain gives machine-readable output
   const result = await ctx.git.raw(['worktree', 'list', '--porcelain'])
 
@@ -328,7 +328,7 @@ function calculateActivityStatus(
 /**
  * Get enhanced worktrees with agent detection and metadata
  */
-export async function getEnhancedWorktrees(ctx: RepositoryContext): Promise<EnhancedWorktree[]> {
+export async function getEnhancedWorktrees(ctx: LocalRepositoryContext): Promise<EnhancedWorktree[]> {
   // Get basic worktree list
   const basicWorktrees = await getWorktrees(ctx)
 
@@ -402,7 +402,7 @@ export async function getEnhancedWorktrees(ctx: RepositoryContext): Promise<Enha
  * Takes changes from a worktree, creates a new branch from master/main with the folder name, and applies the changes
  */
 export async function convertWorktreeToBranch(
-  ctx: RepositoryContext,
+  ctx: LocalRepositoryContext,
   worktreePath: string
 ): Promise<{ success: boolean; message: string; branchName?: string }> {
   try {
@@ -542,7 +542,7 @@ export async function convertWorktreeToBranch(
  * Apply changes from a worktree to the main repo
  */
 export async function applyWorktreeChanges(
-  ctx: RepositoryContext,
+  ctx: LocalRepositoryContext,
   worktreePath: string
 ): Promise<WorktreeResult> {
   try {
@@ -626,7 +626,7 @@ export async function applyWorktreeChanges(
  * Remove a worktree
  */
 export async function removeWorktree(
-  ctx: RepositoryContext,
+  ctx: LocalRepositoryContext,
   worktreePath: string,
   force: boolean = false
 ): Promise<WorktreeResult> {
@@ -682,7 +682,7 @@ export async function removeWorktree(
  * Create a new worktree
  */
 export async function createWorktree(
-  ctx: RepositoryContext,
+  ctx: LocalRepositoryContext,
   options: CreateWorktreeOptions
 ): Promise<WorktreeResult> {
   const { branchName, folderPath, isNewBranch } = options

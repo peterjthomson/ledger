@@ -61,7 +61,7 @@ Styling in `app/styles/app.css` uses CSS variables for theming.
 npm run dev      # Development with hot reload
 npm test         # Run E2E tests
 npm run lint     # Check for linting issues
-npm run typecheck # Check both referenced TypeScript projects (existing errors remain)
+npm run typecheck # Check all TypeScript (also required before production builds)
 npm run build:mac:arm64  # Build for Apple Silicon
 ```
 

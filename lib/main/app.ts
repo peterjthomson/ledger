@@ -6,7 +6,7 @@ import { registerWindowHandlers } from '@/lib/conveyor/handlers/window-handler'
 export function createAppWindow(): void {
   // Set dock icon for macOS (works in dev mode)
   if (process.platform === 'darwin') {
-    app.dock.setIcon(nativeImage.createFromPath(appIcon))
+    app.dock?.setIcon(nativeImage.createFromPath(appIcon))
   }
 
   // Create the main window.

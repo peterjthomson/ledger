@@ -107,7 +107,7 @@ Commit: ${commit.shortHash}
 Author: ${commit.author}
 Date: ${commit.date}
 Message: ${commit.message}
-Files changed: ${commit.changedFiles || 'unknown'}
+Files changed: ${commit.filesChanged || 'unknown'}
 Additions: ${commit.additions ?? 0}
 Deletions: ${commit.deletions ?? 0}
 `

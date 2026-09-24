@@ -2,13 +2,13 @@
  * Branch Service
  *
  * Pure functions for branch operations.
- * All functions accept a RepositoryContext as the first parameter.
+ * All functions accept a LocalRepositoryContext as the first parameter.
  *
  * SAFETY: These functions are pure - they don't access global state.
  * The caller is responsible for providing a valid, current context.
  */
 
-import { RepositoryContext } from '@/lib/repositories'
+import { LocalRepositoryContext } from '@/lib/repositories'
 import {
   BranchInfo,
   BranchesResult,
@@ -38,7 +38,7 @@ function refNameToBranchKey(refname: string): string | null {
 /**
  * Bulk tip (last-commit) dates for all local + remote branches in one git call.
  */
-async function getBranchTipDates(ctx: RepositoryContext): Promise<Map<string, string>> {
+async function getBranchTipDates(ctx: LocalRepositoryContext): Promise<Map<string, string>> {
   const raw = await ctx.git.raw([
     'for-each-ref',
     '--format=%(refname)|%(committerdate:iso-strict)',
@@ -63,7 +63,7 @@ async function getBranchTipDates(ctx: RepositoryContext): Promise<Map<string, st
 /**
  * Get all branches with basic info
  */
-export async function getBranches(ctx: RepositoryContext): Promise<BranchesResult> {
+export async function getBranches(ctx: LocalRepositoryContext): Promise<BranchesResult> {
   const [result, tipDates] = await Promise.all([
     ctx.git.branch(['-a', '-v']),
     getBranchTipDates(ctx),
@@ -101,7 +101,7 @@ export async function getBranches(ctx: RepositoryContext): Promise<BranchesResul
  * Get metadata for a single branch (expensive operation)
  */
 export async function getBranchMetadata(
-  ctx: RepositoryContext,
+  ctx: LocalRepositoryContext,
   branchName: string
 ): Promise<BranchMetadata> {
   // Do not pass custom --format to simple-git's log(): it breaks parsing of latest.date.
@@ -135,7 +135,7 @@ export async function getBranchMetadata(
  * Get branches that are not merged into the base branch
  */
 export async function getUnmergedBranches(
-  ctx: RepositoryContext,
+  ctx: LocalRepositoryContext,
   baseBranch: string = 'origin/master'
 ): Promise<string[]> {
   try {
@@ -167,7 +167,7 @@ export async function getUnmergedBranches(
 /**
  * Get branches with basic info and merged status (fast)
  */
-export async function getBranchesBasic(ctx: RepositoryContext): Promise<BranchesResult> {
+export async function getBranchesBasic(ctx: LocalRepositoryContext): Promise<BranchesResult> {
   const { current, branches } = await getBranches(ctx)
   const unmergedBranches = await getUnmergedBranches(ctx)
   const unmergedSet = new Set(unmergedBranches)
@@ -187,7 +187,7 @@ export async function getBranchesBasic(ctx: RepositoryContext): Promise<Branches
 /**
  * Get branches with full metadata (expensive - use for background loading)
  */
-export async function getBranchesWithMetadata(ctx: RepositoryContext): Promise<BranchesResult> {
+export async function getBranchesWithMetadata(ctx: LocalRepositoryContext): Promise<BranchesResult> {
   const { current, branches } = await getBranches(ctx)
   const unmergedBranches = await getUnmergedBranches(ctx)
   const unmergedSet = new Set(unmergedBranches)
@@ -229,7 +229,7 @@ export async function getBranchesWithMetadata(ctx: RepositoryContext): Promise<B
 /**
  * Check if there are uncommitted changes
  */
-export async function hasUncommittedChanges(ctx: RepositoryContext): Promise<boolean> {
+export async function hasUncommittedChanges(ctx: LocalRepositoryContext): Promise<boolean> {
   const status = await ctx.git.status()
   return !status.isClean() || status.not_added.length > 0
 }
@@ -238,7 +238,7 @@ export async function hasUncommittedChanges(ctx: RepositoryContext): Promise<boo
  * Stash uncommitted changes
  */
 export async function stashChanges(
-  ctx: RepositoryContext
+  ctx: LocalRepositoryContext
 ): Promise<{ stashed: boolean; message: string }> {
   const hasChanges = await hasUncommittedChanges(ctx)
   if (!hasChanges) {
@@ -256,7 +256,7 @@ export async function stashChanges(
  * Checkout a local branch
  */
 export async function checkoutBranch(
-  ctx: RepositoryContext,
+  ctx: LocalRepositoryContext,
   branchName: string
 ): Promise<CheckoutResult> {
   try {
@@ -284,7 +284,7 @@ export async function checkoutBranch(
  * Push a branch to origin
  */
 export async function pushBranch(
-  ctx: RepositoryContext,
+  ctx: LocalRepositoryContext,
   branchName?: string,
   setUpstream: boolean = true
 ): Promise<PushResult> {
@@ -321,7 +321,7 @@ export async function pushBranch(
  * Create a new branch
  */
 export async function createBranch(
-  ctx: RepositoryContext,
+  ctx: LocalRepositoryContext,
   branchName: string,
   checkout: boolean = true
 ): Promise<CreateBranchResult> {
@@ -364,7 +364,7 @@ export async function createBranch(
  * Checkout a remote branch (creates local tracking branch)
  */
 export async function checkoutRemoteBranch(
-  ctx: RepositoryContext,
+  ctx: LocalRepositoryContext,
   remoteBranch: string
 ): Promise<CheckoutResult> {
   try {
@@ -413,7 +413,7 @@ export async function checkoutRemoteBranch(
  * Pull a remote branch
  */
 export async function pullBranch(
-  ctx: RepositoryContext,
+  ctx: LocalRepositoryContext,
   remoteBranch: string
 ): Promise<CheckoutResult> {
   try {
@@ -444,7 +444,7 @@ export async function pullBranch(
  * Delete a local branch
  */
 export async function deleteBranch(
-  ctx: RepositoryContext,
+  ctx: LocalRepositoryContext,
   branchName: string,
   force: boolean = false
 ): Promise<{ success: boolean; message: string }> {
@@ -468,7 +468,7 @@ export async function deleteBranch(
  * Checkout a specific commit (creates detached HEAD state unless on a branch tip)
  */
 export async function checkoutCommit(
-  ctx: RepositoryContext,
+  ctx: LocalRepositoryContext,
   commitHash: string,
   branchName?: string
 ): Promise<CheckoutResult> {
@@ -548,7 +548,7 @@ export async function checkoutCommit(
  * Rename a branch
  */
 export async function renameBranch(
-  ctx: RepositoryContext,
+  ctx: LocalRepositoryContext,
   oldName: string,
   newName: string
 ): Promise<RenameBranchResult> {
@@ -600,7 +600,7 @@ export async function renameBranch(
  * Delete a remote branch (git push origin --delete branchname)
  */
 export async function deleteRemoteBranch(
-  ctx: RepositoryContext,
+  ctx: LocalRepositoryContext,
   branchName: string
 ): Promise<{ success: boolean; message: string }> {
   const git = ctx.git
@@ -636,7 +636,7 @@ export async function deleteRemoteBranch(
  * Pull current branch from origin (with rebase to avoid merge commits)
  * Ledger Opinion: Auto-stashes uncommitted changes, pulls, then restores them.
  */
-export async function pullCurrentBranch(ctx: RepositoryContext): Promise<PullCurrentBranchResult> {
+export async function pullCurrentBranch(ctx: LocalRepositoryContext): Promise<PullCurrentBranchResult> {
   const git = ctx.git
   if (!git) throw new Error('No repository selected')
 

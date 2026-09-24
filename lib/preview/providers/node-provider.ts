@@ -109,16 +109,6 @@ function hasDevScript(dirPath: string): boolean {
 }
 
 /**
- * Get the dev script command (for display/debugging)
- */
-function _getDevScript(dirPath: string): string | null {
-  const pkg = readPackageJson(dirPath)
-  if (!pkg) return null
-  const scripts = pkg.scripts as Record<string, string> | undefined
-  return scripts?.dev || null
-}
-
-/**
  * Detect the framework from package.json dependencies
  */
 function detectFramework(dirPath: string): string {

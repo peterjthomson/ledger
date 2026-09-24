@@ -16,6 +16,7 @@ export const registerERDHandlers = () => {
     try {
       // Use provided path or current repo path
       const path = repoPath || getRepositoryManager().requireActive().path
+      if (!path) throw new Error('This operation requires a local repository')
       const schema = await parseSchema(path)
       return { success: true, data: schema }
     } catch (error) {
@@ -32,6 +33,7 @@ export const registerERDHandlers = () => {
   handle('detect-erd-framework', async (repoPath?: string) => {
     try {
       const path = repoPath || getRepositoryManager().requireActive().path
+      if (!path) throw new Error('This operation requires a local repository')
       const framework = await detectFramework(path)
       return { success: true, data: framework }
     } catch (error) {

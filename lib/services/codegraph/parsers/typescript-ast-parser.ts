@@ -427,7 +427,7 @@ function getLanguageFromPath(filePath: string): 'typescript' | 'javascript' {
  * Try to find a class node ID by name
  */
 function findClassNodeId(
-  sourceFiles: SourceFile[],
+  _sourceFiles: SourceFile[],
   repoPath: string,
   currentFile: SourceFile,
   className: string,
@@ -464,7 +464,7 @@ function findClassNodeId(
  * Try to find an interface node ID by name
  */
 function findInterfaceNodeId(
-  sourceFiles: SourceFile[],
+  _sourceFiles: SourceFile[],
   repoPath: string,
   currentFile: SourceFile,
   interfaceName: string,

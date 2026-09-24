@@ -5,33 +5,7 @@
  * Supports custom message formatting and channel routing.
  */
 
-import type { ServicePlugin, PluginContext, Commit } from '../plugin-types'
-
-/**
- * Slack message payload
- */
-interface SlackMessage {
-  channel: string
-  username: string
-  icon_emoji: string
-  text?: string
-  blocks?: SlackBlock[]
-}
-
-interface SlackBlock {
-  type: 'section' | 'divider' | 'context' | 'header'
-  text?: { type: 'mrkdwn' | 'plain_text'; text: string }
-  fields?: { type: 'mrkdwn'; text: string }[]
-}
-
-/**
- * Event configuration
- */
-interface EventConfig {
-  enabled: boolean
-  channel: string
-  template: string
-}
+import type { ServicePlugin, PluginContext } from '../plugin-types'
 
 /**
  * Slack Notifications Service
@@ -52,7 +26,7 @@ export const slackNotificationsPlugin: ServicePlugin = {
   description: 'Send git events to Slack channels',
   author: 'Ledger Team',
   homepage: 'https://github.com/ledger/plugins/slack-notifications',
-  permissions: ['git:read', 'notifications', 'storage'],
+  permissions: ['git:read', 'notifications'],
 
   // Settings
   settings: [
@@ -169,87 +143,6 @@ export const slackNotificationsPlugin: ServicePlugin = {
   async deactivate(): Promise<void> {
     console.log('[Slack Notifications] Service deactivated')
   },
-}
-
-/**
- * Build commit notification message
- */
-function buildCommitMessage(
-  commit: Commit,
-  repoName: string,
-  includeStats: boolean
-): SlackMessage {
-  const blocks: SlackBlock[] = [
-    {
-      type: 'header',
-      text: { type: 'plain_text', text: `New commit in ${repoName}` },
-    },
-    {
-      type: 'section',
-      text: {
-        type: 'mrkdwn',
-        text: `*${commit.message.split('\n')[0]}*`,
-      },
-      fields: [
-        { type: 'mrkdwn', text: `*Author:*\n${commit.author}` },
-        { type: 'mrkdwn', text: `*Hash:*\n\`${commit.shortHash}\`` },
-      ],
-    },
-  ]
-
-  if (includeStats && (commit.additions || commit.deletions)) {
-    blocks.push({
-      type: 'context',
-      text: {
-        type: 'mrkdwn',
-        text: `:heavy_plus_sign: ${commit.additions ?? 0} :heavy_minus_sign: ${commit.deletions ?? 0}`,
-      },
-    })
-  }
-
-  return {
-    channel: '#git-activity',
-    username: 'Ledger Bot',
-    icon_emoji: ':git:',
-    blocks,
-  }
-}
-
-/**
- * Build push notification message
- */
-function buildPushMessage(branch: string, commits: number, repoName: string): SlackMessage {
-  return {
-    channel: '#git-activity',
-    username: 'Ledger Bot',
-    icon_emoji: ':rocket:',
-    blocks: [
-      {
-        type: 'section',
-        text: {
-          type: 'mrkdwn',
-          text: `:rocket: *Pushed ${commits} commit${commits === 1 ? '' : 's'}* to \`${branch}\` in ${repoName}`,
-        },
-      },
-    ],
-  }
-}
-
-/**
- * Send message to Slack
- */
-async function sendSlackMessage(webhookUrl: string, message: SlackMessage): Promise<boolean> {
-  try {
-    const response = await fetch(webhookUrl, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(message),
-    })
-    return response.ok
-  } catch (error) {
-    console.error('[Slack] Failed to send message:', error)
-    return false
-  }
 }
 
 export default slackNotificationsPlugin

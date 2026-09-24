@@ -2,7 +2,7 @@
  * Stash Service
  *
  * Pure functions for Stash operations.
- * All functions accept a RepositoryContext as the first parameter.
+ * All functions accept a LocalRepositoryContext as the first parameter.
  *
  * SAFETY: These functions are pure - they don't access global state.
  * The caller is responsible for providing a valid, current context.
@@ -11,14 +11,14 @@
 import * as fs from 'fs'
 import * as path from 'path'
 import simpleGit from 'simple-git'
-import { RepositoryContext } from '@/lib/repositories'
+import { LocalRepositoryContext } from '@/lib/repositories'
 import { StashEntry, StashFile, StashResult, ApplyStashToBranchResult } from './stash-types'
 import { getWorktrees } from '@/lib/services/worktree'
 
 /**
  * Get list of stashes
  */
-export async function getStashes(ctx: RepositoryContext): Promise<StashEntry[]> {
+export async function getStashes(ctx: LocalRepositoryContext): Promise<StashEntry[]> {
   try {
     const output = await ctx.git.raw(['stash', 'list', '--format=%gd|%gs|%ci'])
 
@@ -56,7 +56,7 @@ export async function getStashes(ctx: RepositoryContext): Promise<StashEntry[]> 
 /**
  * Get files changed in a stash
  */
-export async function getStashFiles(ctx: RepositoryContext, stashIndex: number): Promise<StashFile[]> {
+export async function getStashFiles(ctx: LocalRepositoryContext, stashIndex: number): Promise<StashFile[]> {
   try {
     // Run numstat and name-status separately (combining them only returns name-status)
     const [numstatOutput, nameStatusOutput] = await Promise.all([
@@ -131,7 +131,7 @@ export async function getStashFiles(ctx: RepositoryContext, stashIndex: number):
  * Note: git stash show doesn't support -- filepath syntax, so we use git diff instead
  */
 export async function getStashFileDiff(
-  ctx: RepositoryContext,
+  ctx: LocalRepositoryContext,
   stashIndex: number,
   filePath: string
 ): Promise<string | null> {
@@ -148,7 +148,7 @@ export async function getStashFileDiff(
 /**
  * Get full diff for a stash
  */
-export async function getStashDiff(ctx: RepositoryContext, stashIndex: number): Promise<string | null> {
+export async function getStashDiff(ctx: LocalRepositoryContext, stashIndex: number): Promise<string | null> {
   try {
     const output = await ctx.git.raw(['stash', 'show', '-p', `stash@{${stashIndex}}`])
     return output || null
@@ -160,7 +160,7 @@ export async function getStashDiff(ctx: RepositoryContext, stashIndex: number): 
 /**
  * Apply a stash (keeps stash in list)
  */
-export async function applyStash(ctx: RepositoryContext, stashIndex: number): Promise<StashResult> {
+export async function applyStash(ctx: LocalRepositoryContext, stashIndex: number): Promise<StashResult> {
   try {
     await ctx.git.raw(['stash', 'apply', `stash@{${stashIndex}}`])
     return { success: true, message: `Applied stash@{${stashIndex}}` }
@@ -172,7 +172,7 @@ export async function applyStash(ctx: RepositoryContext, stashIndex: number): Pr
 /**
  * Pop a stash (applies and removes from list)
  */
-export async function popStash(ctx: RepositoryContext, stashIndex: number): Promise<StashResult> {
+export async function popStash(ctx: LocalRepositoryContext, stashIndex: number): Promise<StashResult> {
   try {
     await ctx.git.raw(['stash', 'pop', `stash@{${stashIndex}}`])
     return { success: true, message: `Applied and removed stash@{${stashIndex}}` }
@@ -184,7 +184,7 @@ export async function popStash(ctx: RepositoryContext, stashIndex: number): Prom
 /**
  * Drop a stash (removes without applying)
  */
-export async function dropStash(ctx: RepositoryContext, stashIndex: number): Promise<StashResult> {
+export async function dropStash(ctx: LocalRepositoryContext, stashIndex: number): Promise<StashResult> {
   try {
     await ctx.git.raw(['stash', 'drop', `stash@{${stashIndex}}`])
     return { success: true, message: `Dropped stash@{${stashIndex}}` }
@@ -200,7 +200,7 @@ export async function dropStash(ctx: RepositoryContext, stashIndex: number): Pro
  * applies the stash, and drops it if successful
  */
 export async function stashToBranch(
-  ctx: RepositoryContext,
+  ctx: LocalRepositoryContext,
   stashIndex: number,
   branchName: string
 ): Promise<StashResult> {
@@ -219,7 +219,7 @@ export async function stashToBranch(
  * This allows applying stashes to branches without switching your current context.
  */
 export async function applyStashToBranch(
-  ctx: RepositoryContext,
+  ctx: LocalRepositoryContext,
   stashIndex: number,
   targetBranch: string,
   stashMessage: string,

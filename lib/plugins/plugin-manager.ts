@@ -17,7 +17,6 @@ import type {
   PluginHooks,
   PluginEvent,
   PluginEventType,
-  BackgroundTask,
   WidgetSlot,
 } from './plugin-types'
 import { createPluginContext, PluginContextWithDispose } from './plugin-context'
@@ -357,7 +356,7 @@ class PluginManager {
   async callHook<K extends keyof PluginHooks>(
     hook: K,
     ...args: Parameters<PluginHooks[K]>
-  ): Promise<ReturnType<PluginHooks[K]> | null> {
+  ): Promise<Awaited<ReturnType<PluginHooks[K]>> | null> {
     for (const registration of this.plugins.values()) {
       if (!registration.enabled) continue
 
@@ -365,7 +364,7 @@ class PluginManager {
       if (handler) {
         try {
           const result = await (handler as (...args: unknown[]) => Promise<unknown>)(...args)
-          return result as ReturnType<PluginHooks[K]>
+          return result as Awaited<ReturnType<PluginHooks[K]>>
         } catch (error) {
           console.error(
             `[PluginManager] Hook "${hook}" failed in plugin "${registration.plugin.id}":`,
@@ -380,8 +379,8 @@ class PluginManager {
   async callHookAll<K extends keyof PluginHooks>(
     hook: K,
     ...args: Parameters<PluginHooks[K]>
-  ): Promise<Array<ReturnType<PluginHooks[K]>>> {
-    const results: Array<ReturnType<PluginHooks[K]>> = []
+  ): Promise<Array<Awaited<ReturnType<PluginHooks[K]>>>> {
+    const results: Array<Awaited<ReturnType<PluginHooks[K]>>> = []
 
     for (const registration of this.plugins.values()) {
       if (!registration.enabled) continue
@@ -391,7 +390,7 @@ class PluginManager {
         try {
           const result = await (handler as (...args: unknown[]) => Promise<unknown>)(...args)
           if (result !== undefined && result !== null) {
-            results.push(result as ReturnType<PluginHooks[K]>)
+            results.push(result as Awaited<ReturnType<PluginHooks[K]>>)
           }
         } catch (error) {
           console.error(

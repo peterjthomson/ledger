@@ -134,7 +134,7 @@ The smoke test checks startup, bundled module resolution, and a native SQLite qu
 
 ### Typechecking
 
-`npm run typecheck` checks both projects referenced by `tsconfig.json` without emitting application code. It currently exits nonzero for existing project errors, including overlapping main/renderer configuration and legacy API types. Record failures honestly and compare diagnostics with the base branch when changing types. Production bundling passing is a separate check.
+`npm run typecheck` checks all application, shared, configuration, and test sources once using the single `tsconfig.json`. Electron main/preload, renderer, and tests share IPC and model types, so overlapping project references are unnecessary. Strict null checks, unused checks, and return-path checks remain enabled. The `previte:build:app` hook requires a clean typecheck before production builds, tests, or release packaging through npm scripts. Type errors must be fixed rather than suppressed or excluded.
 
 
 ## Submitting Changes

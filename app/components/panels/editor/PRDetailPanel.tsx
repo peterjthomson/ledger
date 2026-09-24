@@ -130,7 +130,7 @@ export function PRReviewPanel({ pr, repoPath, formatRelativeTime, onCheckout, on
         if (statusTimeoutRef.current) clearTimeout(statusTimeoutRef.current)
         statusTimeoutRef.current = setTimeout(() => setCommentStatus(null), 3000)
       } else {
-        setCommentStatus({ type: 'error', message: result.message })
+        setCommentStatus({ type: 'error', message: result.message ?? (result.success ? 'Operation completed' : 'Operation failed') })
       }
     } catch (error) {
       setCommentStatus({ type: 'error', message: (error as Error).message })
@@ -159,7 +159,7 @@ export function PRReviewPanel({ pr, repoPath, formatRelativeTime, onCheckout, on
         if (statusTimeoutRef.current) clearTimeout(statusTimeoutRef.current)
         statusTimeoutRef.current = setTimeout(() => setCommentStatus(null), 3000)
       } else {
-        setCommentStatus({ type: 'error', message: result.message })
+        setCommentStatus({ type: 'error', message: result.message ?? (result.success ? 'Operation completed' : 'Operation failed') })
       }
     } catch (error) {
       setCommentStatus({ type: 'error', message: (error as Error).message })
@@ -184,7 +184,7 @@ export function PRReviewPanel({ pr, repoPath, formatRelativeTime, onCheckout, on
         const warningMsg = result.warnings?.length ? ` (${result.warnings.join(', ')})` : ''
         onStatusChange?.({ type: 'success', message: `Opened ${result.url}${warningMsg}` })
       } else {
-        onStatusChange?.({ type: 'error', message: result.message })
+        onStatusChange?.({ type: 'error', message: result.message ?? (result.success ? 'Operation completed' : 'Operation failed') })
       }
     } catch (error) {
       onStatusChange?.({ type: 'error', message: (error as Error).message })

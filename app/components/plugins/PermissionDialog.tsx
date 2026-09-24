@@ -6,7 +6,7 @@
  * each permission a plugin requests.
  */
 
-import React, { useState, useCallback } from 'react'
+import { useState, useCallback } from 'react'
 import { Shield, AlertTriangle, Check, X } from 'lucide-react'
 import type { PluginPermission } from '@/lib/plugins/plugin-types'
 
@@ -69,7 +69,6 @@ export interface PermissionDialogProps {
 }
 
 export function PermissionDialog({
-  pluginId,
   pluginName,
   permissions,
   onApprove,

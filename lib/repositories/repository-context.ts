@@ -42,16 +42,28 @@ export interface RemoteRepoInfo {
  * - SimpleGit instance (or null for remote)
  * - Metadata for display and caching
  */
-export interface RepositoryContext {
-  id: string                    // UUID for this context
-  type: RepositoryType          // 'local' or 'remote'
-  path: string | null           // Filesystem path (null for remote repos)
-  name: string                  // Display name
-  git: SimpleGit | null         // SimpleGit instance (null for remote repos)
+interface BaseRepositoryContext {
+  id: string
+  name: string
   metadata: RepositoryMetadata
-  remote: RemoteRepoInfo | null // Remote info (for remote repos)
   lastAccessed: Date
 }
+
+export interface LocalRepositoryContext extends BaseRepositoryContext {
+  type: 'local'
+  path: string
+  git: SimpleGit
+  remote: RemoteRepoInfo | null
+}
+
+export interface RemoteRepositoryContext extends BaseRepositoryContext {
+  type: 'remote'
+  path: null
+  git: null
+  remote: RemoteRepoInfo
+}
+
+export type RepositoryContext = LocalRepositoryContext | RemoteRepositoryContext
 
 /**
  * Detect the git provider from a remote URL
@@ -149,7 +161,7 @@ export const getRemoteUrl = async (git: SimpleGit): Promise<string | null> => {
  * // ctx.git is ready to use
  * // ctx.metadata.provider is 'github' if that's the remote
  */
-export const createRepositoryContext = async (repoPath: string): Promise<RepositoryContext> => {
+export const createRepositoryContext = async (repoPath: string): Promise<LocalRepositoryContext> => {
   const git = simpleGit(repoPath)
 
   // Validate this is a git repository
@@ -251,7 +263,7 @@ export const createRemoteRepositoryContext = (
   owner: string,
   repo: string,
   repoInfo: { default_branch: string; html_url: string }
-): RepositoryContext => {
+): RemoteRepositoryContext => {
   const remoteUrl = repoInfo.html_url
 
   const metadata: RepositoryMetadata = {

@@ -40,10 +40,10 @@ export function StashDetailPanel({
     try {
       const result = await window.conveyor.stash.applyStash(stash.index)
       if (result.success) {
-        onStatusChange?.({ type: 'success', message: result.message })
+        onStatusChange?.({ type: 'success', message: result.message ?? (result.success ? 'Operation completed' : 'Operation failed') })
         await onRefresh?.()
       } else {
-        onStatusChange?.({ type: 'error', message: result.message })
+        onStatusChange?.({ type: 'error', message: result.message ?? (result.success ? 'Operation completed' : 'Operation failed') })
       }
     } catch (error) {
       onStatusChange?.({ type: 'error', message: (error as Error).message })
@@ -60,11 +60,11 @@ export function StashDetailPanel({
     try {
       const result = await window.conveyor.stash.popStash(stash.index)
       if (result.success) {
-        onStatusChange?.({ type: 'success', message: result.message })
+        onStatusChange?.({ type: 'success', message: result.message ?? (result.success ? 'Operation completed' : 'Operation failed') })
         onClearFocus?.()
         await onRefresh?.()
       } else {
-        onStatusChange?.({ type: 'error', message: result.message })
+        onStatusChange?.({ type: 'error', message: result.message ?? (result.success ? 'Operation completed' : 'Operation failed') })
       }
     } catch (error) {
       onStatusChange?.({ type: 'error', message: (error as Error).message })
@@ -83,11 +83,11 @@ export function StashDetailPanel({
     try {
       const result = await window.conveyor.stash.dropStash(stash.index)
       if (result.success) {
-        onStatusChange?.({ type: 'success', message: result.message })
+        onStatusChange?.({ type: 'success', message: result.message ?? (result.success ? 'Operation completed' : 'Operation failed') })
         onClearFocus?.()
         await onRefresh?.()
       } else {
-        onStatusChange?.({ type: 'error', message: result.message })
+        onStatusChange?.({ type: 'error', message: result.message ?? (result.success ? 'Operation completed' : 'Operation failed') })
       }
     } catch (error) {
       onStatusChange?.({ type: 'error', message: (error as Error).message })
@@ -106,13 +106,13 @@ export function StashDetailPanel({
     try {
       const result = await window.conveyor.stash.stashToBranch(stash.index, branchName.trim())
       if (result.success) {
-        onStatusChange?.({ type: 'success', message: result.message })
+        onStatusChange?.({ type: 'success', message: result.message ?? (result.success ? 'Operation completed' : 'Operation failed') })
         setShowBranchModal(false)
         setBranchName('')
         onClearFocus?.()
         await onRefresh?.()
       } else {
-        onStatusChange?.({ type: 'error', message: result.message })
+        onStatusChange?.({ type: 'error', message: result.message ?? (result.success ? 'Operation completed' : 'Operation failed') })
       }
     } catch (error) {
       onStatusChange?.({ type: 'error', message: (error as Error).message })

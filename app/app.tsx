@@ -141,8 +141,6 @@ export default function App() {
   // Graph display options
   const [showCheckpoints] = useState(false) // Hide Conductor checkpoints by default
 
-
-
   // Panel visibility is now handled by the canvas system via toggleColumnVisibility
   
   const menuRef = useRef<HTMLDivElement>(null)
@@ -483,7 +481,7 @@ export default function App() {
   const openRepositoryPath = useCallback(async (path: string) => {
     const result = await window.conveyor.repo.openRepository(path)
     if (!result.success) {
-      throw new Error(result.message || 'Failed to open repository')
+      throw new Error(result.error || 'Failed to open repository')
     }
     await loadRepositoryData(path)
   }, [loadRepositoryData])

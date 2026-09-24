@@ -53,9 +53,9 @@ export const registerPRHandlers = () => {
     }
   )
 
-  handle('checkout-pr-branch', async (branchName: string) => {
+  handle('checkout-pr-branch', async (prNumber: number) => {
     try {
-      return await checkoutPRBranch(branchName)
+      return await checkoutPRBranch(prNumber)
     } catch (error) {
       logHandlerError('checkout-pr-branch', error)
       return { success: false, message: serializeError(error) }
@@ -85,7 +85,7 @@ export const registerPRHandlers = () => {
       return await getPRDetail(prNumber)
     } catch (error) {
       logHandlerError('get-pr-detail', error)
-      return { error: serializeError(error), data: null }
+      return null
     }
   })
 
@@ -94,7 +94,7 @@ export const registerPRHandlers = () => {
       return await getPRReviewComments(prNumber)
     } catch (error) {
       logHandlerError('get-pr-review-comments', error)
-      return { error: serializeError(error), comments: [] }
+      return []
     }
   })
 
@@ -103,7 +103,7 @@ export const registerPRHandlers = () => {
       return await getPRFileDiff(prNumber, filePath)
     } catch (error) {
       logHandlerError('get-pr-file-diff', error)
-      return { error: serializeError(error), diff: null }
+      return null
     }
   })
 

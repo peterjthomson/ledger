@@ -18,7 +18,7 @@ import {
   RefreshCw,
 } from 'lucide-react'
 import type { PluginPanelProps } from '@/lib/plugins/plugin-types'
-import type { Commit, Branch } from '@/lib/types'
+import type { Commit, Branch } from '@/app/types/electron'
 
 interface Message {
   id: string
@@ -34,7 +34,7 @@ interface QuickAction {
   prompt: string
 }
 
-export function AIChatPanel({ context, repoPath, onClose }: PluginPanelProps) {
+export function AIChatPanel({ context }: PluginPanelProps) {
   const [messages, setMessages] = useState<Message[]>([])
   const [input, setInput] = useState('')
   const [isTyping, setIsTyping] = useState(false)

@@ -7,11 +7,11 @@
  */
 
 import { memo } from 'react'
-import { Handle, Position, type NodeProps } from '@xyflow/react'
+import { Handle, Position, type Node, type NodeProps } from '@xyflow/react'
 import type { ERDEntity, ERDAttribute, ERDConstraint } from '@/lib/services/erd/erd-types'
 
 // Node data type
-export interface EntityNodeData {
+export interface EntityNodeData extends Record<string, unknown> {
   entity: ERDEntity
 }
 
@@ -46,7 +46,7 @@ function AttributeRow({ attribute }: { attribute: ERDAttribute }) {
 /**
  * React Flow custom node for ERD entities
  */
-function EntityNodeComponent({ data, selected }: NodeProps<EntityNodeData>) {
+function EntityNodeComponent({ data, selected }: NodeProps<Node<EntityNodeData>>) {
   const { entity } = data
 
   return (

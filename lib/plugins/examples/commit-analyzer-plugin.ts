@@ -55,6 +55,7 @@ function estimateComplexity(commit: Commit): CommitAnalysis['complexity'] {
  */
 function generateSummary(commit: Commit, category: CommitAnalysis['category']): string {
   const categoryLabels: Record<CommitAnalysis['category'], string> = {
+    breaking: 'Breaking change',
     feature: 'New feature',
     bugfix: 'Bug fix',
     refactor: 'Code refactoring',
@@ -64,7 +65,7 @@ function generateSummary(commit: Commit, category: CommitAnalysis['category']): 
     other: 'Changes',
   }
 
-  const stats = []
+  const stats: string[] = []
   if (commit.filesChanged) stats.push(`${commit.filesChanged} file(s)`)
   if (commit.additions) stats.push(`+${commit.additions}`)
   if (commit.deletions) stats.push(`-${commit.deletions}`)

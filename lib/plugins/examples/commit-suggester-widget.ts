@@ -5,7 +5,7 @@
  * Demonstrates how to create embedded widget plugins.
  */
 
-import type { WidgetPlugin, PluginContext, CommitContext } from '../plugin-types'
+import type { WidgetPlugin, PluginContext } from '../plugin-types'
 
 /**
  * Commit Message Suggester Widget
@@ -53,9 +53,7 @@ export const commitSuggesterWidgetPlugin: WidgetPlugin = {
   // Hooks
   hooks: {
     'ai:suggest-commit-message': async (
-      diff: string,
-      context?: CommitContext
-    ): Promise<string> => {
+      diff: string    ): Promise<string> => {
       // Analyze the diff to generate a message
       const lines = diff.split('\n')
       const addedLines = lines.filter((l) => l.startsWith('+') && !l.startsWith('+++'))

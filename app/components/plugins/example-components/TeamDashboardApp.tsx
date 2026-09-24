@@ -18,13 +18,11 @@ import {
   CheckCircle,
   AlertCircle,
   RefreshCw,
-  ExternalLink,
   Calendar,
   FileText,
-  Trash2,
 } from 'lucide-react'
 import type { PluginAppProps } from '@/lib/plugins/plugin-types'
-import type { Commit, PullRequest, Branch } from '@/lib/types'
+import type { Commit, PullRequest, Branch } from '@/app/types/electron'
 import { formatRelativeTime } from '@/app/utils/time'
 import './example-plugin-styles.css'
 
@@ -192,9 +190,9 @@ export function TeamDashboardApp({ context, activeNavItem }: PluginAppProps) {
     setIsRefreshing(true)
     try {
       const [commitsData, prsData, branchesData] = await Promise.all([
-        context.api.refreshCommits?.() || context.api.getCommits(),
-        context.api.refreshPullRequests?.() || context.api.getPullRequests(),
-        context.api.refreshBranches?.() || context.api.getBranches(),
+        context.api.getCommits(),
+        context.api.getPullRequests(),
+        context.api.getBranches(),
       ])
       // Ensure we always set arrays (API might return null/undefined on error)
       setCommits(Array.isArray(commitsData) ? commitsData : [])

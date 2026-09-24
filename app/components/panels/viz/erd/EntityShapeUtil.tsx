@@ -19,6 +19,12 @@ export type ERDEntityShape = TLBaseShape<
   }
 >
 
+declare module '@tldraw/tlschema' {
+  interface TLGlobalShapePropsMap {
+    'erd-entity': ERDEntityShape['props']
+  }
+}
+
 // Header height + row height for attribute calculation
 const HEADER_HEIGHT = 32
 const ROW_HEIGHT = 24
@@ -111,12 +117,14 @@ export class EntityShapeUtil extends ShapeUtil<ERDEntityShape> {
     )
   }
 
-  indicator(shape: ERDEntityShape) {
+  getIndicatorPath(shape: ERDEntityShape) {
     // Ensure valid dimensions for the indicator rect
     const width = Number.isFinite(shape.props.w) && shape.props.w > 0 ? shape.props.w : MIN_WIDTH
     const height = Number.isFinite(shape.props.h) && shape.props.h > 0 ? shape.props.h : HEADER_HEIGHT + ROW_HEIGHT + PADDING
 
-    return <rect width={width} height={height} rx={4} ry={4} />
+    const path = new Path2D()
+    path.roundRect(0, 0, width, height, 4)
+    return path
   }
 }
 

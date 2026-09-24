@@ -114,7 +114,7 @@ npm run dev
 | `npm run format` | Format code with Prettier |
 | `npm test` | Build and run app regressions and focused Git tests |
 | `npm run test:packaged` | Test an existing packaged app; requires `LEDGER_PACKAGED_EXECUTABLE` |
-| `npm run typecheck` | Check both TypeScript projects; currently reports existing type errors |
+| `npm run typecheck` | Check all application, shared, configuration, and test TypeScript |
 | `npm run build:mac:arm64` | Build for Apple Silicon |
 
 ### Project Structure

@@ -13,9 +13,9 @@ const statAsync = promisify(fs.stat)
 let git: SimpleGit | null = null
 let repoPath: string | null = null
 
-export function setRepoPath(path: string) {
+export function setRepoPath(path: string | null) {
   repoPath = path
-  git = simpleGit(path)
+  git = path ? simpleGit(path) : null
 }
 
 export function getRepoPath(): string | null {

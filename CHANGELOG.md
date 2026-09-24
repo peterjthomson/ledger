@@ -17,7 +17,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Partial staging, unstaging, and discard preserve adjacent unselected changes, line order, and missing final newlines.
 - Current branch and main/master stay above other branches under every sort.
-- `npm run typecheck` now checks the referenced projects and reports existing failures.
+- `npm run typecheck` checks all source files once and passes; production builds now require it.
+- Corrected asynchronous IPC contracts, local/remote repository types, graph renderer APIs, and plugin status/refresh handling.
 
 ## [1.5.0] - 2026-07-27
 

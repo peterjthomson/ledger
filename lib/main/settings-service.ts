@@ -121,7 +121,7 @@ export function startAccessingSecurityScopedPath(repoPath: string): boolean {
 
   try {
     const stopAccessing = app.startAccessingSecurityScopedResource(bookmark);
-    activeSecurityScopedPaths.set(repoPath, stopAccessing);
+    activeSecurityScopedPaths.set(repoPath, () => stopAccessing());
     return true;
   } catch (error) {
     console.error(`Failed to restore sandbox access for ${repoPath}:`, error);

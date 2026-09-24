@@ -5,21 +5,7 @@
  * PR review status, contributor statistics, and branch health.
  */
 
-import type { AppPlugin, PluginContext, Branch, Commit, PullRequest } from '../plugin-types'
-
-/**
- * Contributor statistics
- */
-interface ContributorStats {
-  name: string
-  email: string
-  commits: number
-  additions: number
-  deletions: number
-  activeBranches: number
-  openPRs: number
-  lastActive: string
-}
+import type { AppPlugin, PluginContext, Branch, Commit } from '../plugin-types'
 
 /**
  * Team activity summary
@@ -52,7 +38,7 @@ export const teamDashboardPlugin: AppPlugin = {
   description: 'Monitor team activity, PR status, and contributor statistics',
   author: 'Ledger Team',
   homepage: 'https://github.com/ledger/plugins/team-dashboard',
-  permissions: ['git:read', 'notifications', 'storage'],
+  permissions: ['git:read', 'notifications'],
 
   // Sidebar configuration
   icon: 'users',
@@ -203,38 +189,6 @@ function calculateTeamStats(branches: Branch[], commits: Commit[]): TeamSummary 
     activeContributors: contributors.size,
     reviewsNeeded: 0,
   }
-}
-
-/**
- * Calculate contributor statistics
- */
-function calculateContributorStats(commits: Commit[]): ContributorStats[] {
-  const statsMap = new Map<string, ContributorStats>()
-
-  for (const commit of commits) {
-    const existing = statsMap.get(commit.author) || {
-      name: commit.author,
-      email: '',
-      commits: 0,
-      additions: commit.additions ?? 0,
-      deletions: commit.deletions ?? 0,
-      activeBranches: 0,
-      openPRs: 0,
-      lastActive: commit.date,
-    }
-
-    existing.commits++
-    existing.additions += commit.additions ?? 0
-    existing.deletions += commit.deletions ?? 0
-
-    if (new Date(commit.date) > new Date(existing.lastActive)) {
-      existing.lastActive = commit.date
-    }
-
-    statsMap.set(commit.author, existing)
-  }
-
-  return Array.from(statsMap.values()).sort((a, b) => b.commits - a.commits)
 }
 
 export default teamDashboardPlugin

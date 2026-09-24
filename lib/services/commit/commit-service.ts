@@ -2,13 +2,13 @@
  * Commit Service
  *
  * Pure functions for commit operations.
- * All functions accept a RepositoryContext as the first parameter.
+ * All functions accept a LocalRepositoryContext as the first parameter.
  *
  * SAFETY: These functions are pure - they don't access global state.
  * The caller is responsible for providing a valid, current context.
  */
 
-import { RepositoryContext } from '@/lib/repositories'
+import { LocalRepositoryContext } from '@/lib/repositories'
 import { stashChanges } from '@/lib/services/branch'
 import {
   CommitInfo,
@@ -32,7 +32,7 @@ import {
  * Get recent commit history for the current branch
  */
 export async function getCommitHistory(
-  ctx: RepositoryContext,
+  ctx: LocalRepositoryContext,
   limit: number = 20
 ): Promise<CommitInfo[]> {
   try {
@@ -88,7 +88,7 @@ export async function getCommitHistory(
  * Get commit history for a specific branch/ref
  */
 export async function getCommitHistoryForRef(
-  ctx: RepositoryContext,
+  ctx: LocalRepositoryContext,
   ref: string,
   limit: number = 50
 ): Promise<CommitInfo[]> {
@@ -122,7 +122,7 @@ export async function getCommitHistoryForRef(
  * showCheckpoints=false hides Conductor checkpoint commits (checkpoint:... messages)
  */
 export async function getCommitGraphHistory(
-  ctx: RepositoryContext,
+  ctx: LocalRepositoryContext,
   limit: number = 100,
   skipStats: boolean = false,
   showCheckpoints: boolean = false
@@ -204,7 +204,7 @@ export async function getCommitGraphHistory(
 /**
  * Get list of uncommitted files (staged + unstaged + untracked)
  */
-export async function getUncommittedFiles(ctx: RepositoryContext): Promise<UncommittedFile[]> {
+export async function getUncommittedFiles(ctx: LocalRepositoryContext): Promise<UncommittedFile[]> {
   try {
     const status = await ctx.git.status()
     const files: UncommittedFile[] = []
@@ -255,7 +255,7 @@ export async function getUncommittedFiles(ctx: RepositoryContext): Promise<Uncom
  * Get detailed information about a specific commit
  */
 export async function getCommitDetails(
-  ctx: RepositoryContext,
+  ctx: LocalRepositoryContext,
   commitHash: string
 ): Promise<CommitDetails | null> {
   try {
@@ -367,7 +367,7 @@ export async function getCommitDetails(
  * Get diff for a specific commit
  */
 export async function getCommitDiff(
-  ctx: RepositoryContext,
+  ctx: LocalRepositoryContext,
   commitHash: string
 ): Promise<CommitDiff | null> {
   try {
@@ -500,7 +500,7 @@ export async function getCommitDiff(
  * Reset to a specific commit
  */
 export async function resetToCommit(
-  ctx: RepositoryContext,
+  ctx: LocalRepositoryContext,
   commitHash: string,
   mode: 'soft' | 'mixed' | 'hard' = 'hard'
 ): Promise<ResetResult> {
@@ -531,7 +531,7 @@ export async function resetToCommit(
  * If behind, return behindCount so UI can prompt user to pull first or commit ahead.
  */
 export async function commitChanges(
-  ctx: RepositoryContext,
+  ctx: LocalRepositoryContext,
   message: string,
   description?: string,
   force: boolean = false
@@ -579,7 +579,7 @@ export async function commitChanges(
 /**
  * Get working directory status with file counts and line change stats
  */
-export async function getWorkingStatus(ctx: RepositoryContext): Promise<WorkingStatus> {
+export async function getWorkingStatus(ctx: LocalRepositoryContext): Promise<WorkingStatus> {
   const git = ctx.git
   if (!git) throw new Error('No repository selected')
 
@@ -632,7 +632,7 @@ export async function getWorkingStatus(ctx: RepositoryContext): Promise<WorkingS
  * 'preview' = simulated merge result (what a PR would contribute)
  */
 export async function getBranchDiff(
-  ctx: RepositoryContext,
+  ctx: LocalRepositoryContext,
   branchName: string,
   diffType: BranchDiffType = 'changes'
 ): Promise<BranchDiff | null> {
@@ -707,7 +707,7 @@ export async function getBranchDiff(
  * This simulates what a PR would look like - the unique contribution of the branch
  */
 async function getBranchMergePreview(
-  ctx: RepositoryContext,
+  ctx: LocalRepositoryContext,
   branchName: string,
   baseBranch: string,
   commitCount: number

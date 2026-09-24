@@ -5,11 +5,11 @@
  */
 
 import { memo } from 'react'
-import { Handle, Position, type NodeProps } from '@xyflow/react'
+import { Handle, Position, type Node, type NodeProps } from '@xyflow/react'
 import type { CodeNode as CodeNodeType } from '@/app/types/electron'
 
 // Node data type
-export interface CodeNodeData {
+export interface CodeNodeData extends Record<string, unknown> {
   node: CodeNodeType
 }
 
@@ -63,7 +63,7 @@ function getNodeClass(node: CodeNodeType): string {
 /**
  * React Flow custom node for code graph
  */
-function CodeNodeComponent({ data, selected }: NodeProps<CodeNodeData>) {
+function CodeNodeComponent({ data, selected }: NodeProps<Node<CodeNodeData>>) {
   const { node } = data
   const icon = getNodeIcon(node)
   const nodeClass = getNodeClass(node)

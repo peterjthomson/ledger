@@ -30,7 +30,7 @@ files:
   - '!{.eslintignore,.eslintrc.cjs,.prettierignore,.prettierrc.yaml,.prettierrc,dev-app-update.yml}'
   - '!{CHANGELOG.md,README.md,AGENTS.md,CLAUDE.md,CONTRIBUTING.md,LICENSE}'
   - '!{.env,.env.*,.npmrc,pnpm-lock.yaml,package-lock.json}'
-  - '!{tsconfig.json,tsconfig.node.json,tsconfig.web.json}'
+  - '!tsconfig*.json'
   - '!{components.json,playwright.config.ts,eslint.config.mjs}'
 asarUnpack:
   - resources/build/**

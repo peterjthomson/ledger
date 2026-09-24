@@ -15,6 +15,8 @@
 
 import type { PluginContext, PluginStorage, PluginLogger, PluginAPI, PluginEvents } from './plugin-types'
 import { hasPermission } from './plugin-permissions'
+import type { Branch, Worktree, PullRequest, Commit, WorkingStatus } from '@/app/types/electron'
+import type { StatusMessage } from '@/app/types/app-types'
 import { agentEvents } from './agent-events'
 
 // ============================================================================
@@ -29,12 +31,12 @@ export interface PluginContextDependencies {
   // Store accessors (work with Zustand getState pattern)
   getRepoPath: () => string | null
   getCurrentBranch: () => string
-  getBranches: () => unknown[]
-  getWorktrees: () => unknown[]
-  getPullRequests: () => unknown[]
-  getCommits: () => unknown[]
-  getWorkingStatus: () => unknown | null
-  setStatus: (status: { type: string; message: string }) => void
+  getBranches: () => Branch[]
+  getWorktrees: () => Worktree[]
+  getPullRequests: () => PullRequest[]
+  getCommits: () => Commit[]
+  getWorkingStatus: () => WorkingStatus | null
+  setStatus: (status: StatusMessage) => void
 
   // Plugin store accessors
   openPanel: (pluginId: string, data?: unknown) => void
@@ -45,11 +47,11 @@ export interface PluginContextDependencies {
   // IPC functions (optional - for renderer process only)
   // These fetch fresh data from the backend and update the store
   ipc?: {
-    getBranches: () => Promise<unknown[]>
-    getWorktrees: () => Promise<unknown[]>
-    getPullRequests: () => Promise<unknown[]>
-    getCommitHistory: (limit?: number) => Promise<unknown[]>
-    getStagingStatus: () => Promise<unknown>
+    getBranches: () => Promise<Branch[]>
+    getWorktrees: () => Promise<Worktree[]>
+    getPullRequests: () => Promise<PullRequest[]>
+    getCommitHistory: (limit?: number) => Promise<Commit[]>
+    getStagingStatus: () => Promise<WorkingStatus | null>
   }
 }
 
@@ -356,7 +358,7 @@ export function createPluginAPI(
     // Notifications (requires notifications permission)
     showNotification: (message, type) => {
       if (!checkPermission('notifications')) return
-      deps.setStatus({ type: type ?? 'info', message })
+      deps.setStatus({ type: type === 'warning' ? 'info' : type ?? 'info', message })
     },
 
     // Plugin navigation

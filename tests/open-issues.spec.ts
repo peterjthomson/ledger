@@ -49,6 +49,19 @@ async function openStaging() {
   await expect(page.locator('.staging-diff-line')).not.toHaveCount(0)
 }
 
+test('commit details survive asynchronous IPC validation with file statistics', async () => {
+  const hash = git('rev-parse', 'HEAD')
+  const details = await page.evaluate(hash => window.electronAPI.getCommitDetails(hash), hash)
+  expect(details).toMatchObject({
+    hash,
+    message: 'Second fixture',
+    author: 'Ledger Test',
+    files: [{ path: 'history.txt', additions: 1, deletions: 0 }],
+    totalAdditions: 1,
+    totalDeletions: 0,
+  })
+})
+
 test('#71 current branch and main precede alphabetical branches in both lists', async () => {
   await expect(page.locator('.branch-list-panel.local .item-name')).toHaveCount(4)
   const names = await page.locator('.branch-list-panel.local .item-name').allTextContents()

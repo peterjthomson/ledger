@@ -2,7 +2,7 @@
  * PR Service
  *
  * Pure functions for Pull Request operations.
- * All functions accept a RepositoryContext as the first parameter.
+ * All functions accept a LocalRepositoryContext as the first parameter.
  *
  * SAFETY: These functions are pure - they don't access global state.
  * The caller is responsible for providing a valid, current context.
@@ -10,7 +10,7 @@
  * NOTE: PR operations require GitHub CLI (gh) to be installed and authenticated.
  */
 
-import { RepositoryContext } from '@/lib/repositories'
+import { LocalRepositoryContext } from '@/lib/repositories'
 import { stashChanges } from '@/lib/services/branch'
 import { safeExec } from '@/lib/utils/safe-exec'
 import {
@@ -27,7 +27,7 @@ import {
 /**
  * Get the GitHub remote URL for the repository
  */
-export async function getGitHubUrl(ctx: RepositoryContext): Promise<string | null> {
+export async function getGitHubUrl(ctx: LocalRepositoryContext): Promise<string | null> {
   try {
     const remotes = await ctx.git.getRemotes(true)
     const origin = remotes.find((r) => r.name === 'origin')
@@ -53,7 +53,7 @@ export async function getGitHubUrl(ctx: RepositoryContext): Promise<string | nul
  * Fetch open pull requests using GitHub CLI
  * Uses safeExec to prevent command injection
  */
-export async function getPullRequests(ctx: RepositoryContext): Promise<PRListResult> {
+export async function getPullRequests(ctx: LocalRepositoryContext): Promise<PRListResult> {
   try {
     // Use gh CLI to list PRs in JSON format
     // Fetch all open PRs (filtering will happen in UI)
@@ -143,7 +143,7 @@ export async function openPullRequest(url: string): Promise<PROperationResult> {
  * Push a branch to origin (helper for createPullRequest)
  */
 async function pushBranchForPR(
-  ctx: RepositoryContext,
+  ctx: LocalRepositoryContext,
   branchName: string
 ): Promise<{ success: boolean; message: string }> {
   try {
@@ -166,7 +166,7 @@ async function pushBranchForPR(
  * Uses safeExec to prevent command injection (title/body passed as separate arguments)
  */
 export async function createPullRequest(
-  ctx: RepositoryContext,
+  ctx: LocalRepositoryContext,
   options: CreatePROptions
 ): Promise<PROperationResult> {
   try {
@@ -243,7 +243,7 @@ export async function createPullRequest(
  * Uses safeExec to prevent command injection
  */
 export async function mergePullRequest(
-  ctx: RepositoryContext,
+  ctx: LocalRepositoryContext,
   prNumber: number,
   options?: MergePROptions
 ): Promise<PROperationResult> {
@@ -303,7 +303,7 @@ export async function mergePullRequest(
  * Get detailed PR information including comments, reviews, files
  * Uses safeExec to prevent command injection
  */
-export async function getPRDetail(ctx: RepositoryContext, prNumber: number): Promise<PRDetail | null> {
+export async function getPRDetail(ctx: LocalRepositoryContext, prNumber: number): Promise<PRDetail | null> {
   try {
     const result = await safeExec(
       'gh',
@@ -374,7 +374,7 @@ export async function getPRDetail(ctx: RepositoryContext, prNumber: number): Pro
  * Get line-specific review comments for a PR
  */
 export async function getPRReviewComments(
-  ctx: RepositoryContext,
+  ctx: LocalRepositoryContext,
   prNumber: number
 ): Promise<PRReviewComment[]> {
   try {
@@ -425,7 +425,7 @@ export async function getPRReviewComments(
  * Get the diff for a specific file in a PR
  */
 export async function getPRFileDiff(
-  ctx: RepositoryContext,
+  ctx: LocalRepositoryContext,
   prNumber: number,
   filePath: string
 ): Promise<string | null> {
@@ -476,7 +476,7 @@ export async function getPRFileDiff(
  * Uses safeExec to prevent command injection (body passed as separate argument)
  */
 export async function commentOnPR(
-  ctx: RepositoryContext,
+  ctx: LocalRepositoryContext,
   prNumber: number,
   body: string
 ): Promise<PROperationResult> {
@@ -513,7 +513,7 @@ export async function commentOnPR(
  * Uses safeExec to prevent command injection
  */
 export async function mergePR(
-  ctx: RepositoryContext,
+  ctx: LocalRepositoryContext,
   prNumber: number,
   mergeMethod: 'merge' | 'squash' | 'rebase' = 'merge'
 ): Promise<PROperationResult> {
@@ -553,7 +553,7 @@ export async function mergePR(
  * Uses safeExec to prevent command injection
  */
 export async function openBranchInGitHub(
-  ctx: RepositoryContext,
+  ctx: LocalRepositoryContext,
   branchName: string
 ): Promise<PROperationResult> {
   try {
@@ -580,7 +580,7 @@ export async function openBranchInGitHub(
  * Checkout a PR branch (by branch name)
  */
 export async function checkoutPRBranch(
-  ctx: RepositoryContext,
+  ctx: LocalRepositoryContext,
   branchName: string
 ): Promise<CheckoutResult> {
   try {
