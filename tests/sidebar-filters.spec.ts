@@ -105,6 +105,45 @@ test.describe('Focus sidebar sections offer the radar column filters', () => {
     await branches.locator('.section-filter-input').fill('')
   })
 
+  test('sort and filter persist across canvas switches and are shared with the radar column', async () => {
+    const branches = page.getByTestId('sidebar-section-branches')
+    const sortSelect = branches.locator('.section-filter-panel .section-filter-select').nth(1)
+    await sortSelect.selectOption('last-commit')
+    // The panel must survive the re-render triggered by the change
+    await expect(sortSelect).toHaveValue('last-commit')
+
+    await page.getByTestId('view-toggle-radar').click()
+    const radarPanel = page.locator('.branch-list-panel.local')
+    if ((await radarPanel.locator('.column-controls').count()) === 0) {
+      await radarPanel.locator('.header-filter-btn').first().click()
+    }
+    await expect(radarPanel.locator('.column-controls .control-select').nth(1)).toHaveValue('last-commit')
+
+    await page.getByTestId('view-toggle-focus').click()
+    await expect(page.getByTestId('sidebar-section-branches').locator('.section-filter-select').nth(1)).toHaveValue(
+      'last-commit'
+    )
+
+    // Restore the default so the persisted preference doesn't leak into other runs
+    await page.getByTestId('sidebar-section-branches').locator('.section-filter-select').nth(1).selectOption('name')
+  })
+
+  test('titlebar back/forward buttons walk the editor history', async () => {
+    const branches = page.getByTestId('sidebar-section-branches')
+    await branches.locator('.sidebar-item', { hasText: 'apple-branch' }).click()
+    await expect(page.locator('.detail-title')).toHaveText('apple-branch')
+    await branches.locator('.sidebar-item', { hasText: 'zebra-branch' }).click()
+    await expect(page.locator('.detail-title')).toHaveText('zebra-branch')
+
+    await page.getByTestId('nav-back').click()
+    await expect(page.locator('.detail-title')).toHaveText('apple-branch')
+    await expect(page.getByTestId('nav-forward')).toBeEnabled()
+
+    await page.getByTestId('nav-forward').click()
+    await expect(page.locator('.detail-title')).toHaveText('zebra-branch')
+    await expect(page.getByTestId('nav-forward')).toBeDisabled()
+  })
+
   test('every filterable section has filter and sort controls', async () => {
     const expectations: Array<[string, number]> = [
       ['sidebar-section-prs', 2],

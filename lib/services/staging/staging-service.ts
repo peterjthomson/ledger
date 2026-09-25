@@ -9,7 +9,7 @@
  */
 
 import { buildPartialPatch } from './partial-patch'
-import { parseDiff } from './diff-parser'
+import { parseDiff, buildUntrackedFileDiff } from './diff-parser'
 import * as fs from 'fs'
 import * as path from 'path'
 import { RepositoryContext } from '@/lib/repositories'
@@ -301,7 +301,7 @@ export async function stageLines(
     const hunk = diff.hunks[hunkIndex]
 
     // Build a partial patch with only the selected lines
-    const partialPatch = buildPartialPatch(filePath, hunk, lineIndices)
+    const partialPatch = buildPartialPatch(filePath, hunk, lineIndices, false, diff.status === 'untracked')
 
     // Apply the partial patch to the index
     await applyPatch(repoPath, partialPatch, ['--cached'])
@@ -415,44 +415,7 @@ export async function getFileDiff(
         const fullPath = path.join(repoPath, filePath)
         try {
           const content = await fs.promises.readFile(fullPath, 'utf-8')
-          const fileLines = content.split('\n')
-
-          // Build raw patch for untracked file
-          const header = `@@ -0,0 +1,${fileLines.length} @@`
-          const patchLines = fileLines.map((l) => '+' + l)
-          const rawPatch =
-            `diff --git a/${filePath} b/${filePath}\n` +
-            `new file mode 100644\n` +
-            `--- /dev/null\n` +
-            `+++ b/${filePath}\n` +
-            header +
-            '\n' +
-            patchLines.join('\n') +
-            '\n'
-
-          return {
-            filePath,
-            status: 'untracked',
-            isBinary: false,
-            additions: fileLines.length,
-            deletions: 0,
-            hunks: [
-              {
-                header,
-                oldStart: 0,
-                oldLines: 0,
-                newStart: 1,
-                newLines: fileLines.length,
-                rawPatch,
-                lines: fileLines.map((line, idx) => ({
-                  type: 'add' as const,
-                  content: line,
-                  newLineNumber: idx + 1,
-                  lineIndex: idx,
-                })),
-              },
-            ],
-          }
+          return buildUntrackedFileDiff(filePath, content)
         } catch {
           return null
         }

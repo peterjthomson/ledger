@@ -8,9 +8,10 @@
  * - Selection and action handlers
  */
 
-import { useState, useMemo } from 'react'
+import { useMemo } from 'react'
 import type { GraphCommit, WorkingStatus } from '../../../types/electron'
 import type { Column } from '../../../types/app-types'
+import { useListControl } from '../../../stores/list-controls-store'
 import { ListPanelHeader } from './ListPanelHeader'
 
 export type CommitFilter = 'all' | 'branch-heads' | 'unmerged'
@@ -63,11 +64,11 @@ export function CommitList({
   onContextMenuUncommitted,
   switching,
 }: CommitListProps) {
-  // Local filter/sort state
-  const [controlsOpen, setControlsOpen] = useState(false)
-  const [search, setSearch] = useState('')
-  const [filter, setFilter] = useState<CommitFilter>('all')
-  const [sort, setSort] = useState<CommitSort>('date')
+  // Filter/sort state kept across panel switches
+  const [controlsOpen, setControlsOpen] = useListControl('commits:open', false)
+  const [search, setSearch] = useListControl('commits:search', '')
+  const [filter, setFilter] = useListControl<CommitFilter>('commits:filter', 'all')
+  const [sort, setSort] = useListControl<CommitSort>('commits:sort', 'date')
 
   // Sort commits
   const sortCommits = (commitList: GraphCommit[]): GraphCommit[] => {

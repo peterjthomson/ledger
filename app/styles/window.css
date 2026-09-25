@@ -230,6 +230,51 @@
   left: var(--window-mac-titlebar-controls-margin);
 }
 
+/* Titlebar Navigation (left side back/forward, like VS Code) */
+.window-titlebar-nav {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  margin-left: var(--window-title-margin);
+  -webkit-app-region: no-drag;
+}
+
+.platform-darwin .window-titlebar-nav {
+  margin-left: var(--window-mac-titlebar-controls-margin);
+}
+
+.window-titlebar-nav + .window-titlebar-title,
+.platform-darwin .window-titlebar-nav + .window-titlebar-title {
+  margin-left: 8px;
+}
+
+.window-titlebar-nav .titlebar-nav-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border: none;
+  background: transparent;
+  border-radius: 4px;
+  cursor: pointer;
+  color: rgba(0, 0, 0, 0.55);
+  transition: background 0.15s ease;
+}
+
+.dark .window-titlebar-nav .titlebar-nav-btn {
+  color: rgba(255, 255, 255, 0.7);
+}
+
+.window-titlebar-nav .titlebar-nav-btn:hover:not(:disabled) {
+  background: var(--window-c-control-hover);
+}
+
+.window-titlebar-nav .titlebar-nav-btn:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+
 /* Titlebar Actions (right side, like VS Code panel toggles) */
 .window-titlebar-actions {
   display: flex;

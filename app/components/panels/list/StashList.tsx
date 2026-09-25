@@ -7,9 +7,10 @@
  * - Selection and action handlers
  */
 
-import { useState, useMemo } from 'react'
+import { useMemo } from 'react'
 import type { StashEntry, StashFilter, StashSort } from '../../../types/electron'
 import type { Column } from '../../../types/app-types'
+import { useListControl } from '../../../stores/list-controls-store'
 import { ListPanelHeader } from './ListPanelHeader'
 import { applyStashControls, STASH_FILTER_OPTIONS, STASH_SORT_OPTIONS } from './list-filters'
 
@@ -39,11 +40,11 @@ export function StashList({
   onDoubleClick,
   onContextMenu,
 }: StashListProps) {
-  // Local filter/sort state
-  const [controlsOpen, setControlsOpen] = useState(false)
-  const [search, setSearch] = useState('')
-  const [filter, setFilter] = useState<StashFilter>('all')
-  const [sort, setSort] = useState<StashSort>('date')
+  // Filter/sort state shared with the sidebar section and kept across panel switches
+  const [controlsOpen, setControlsOpen] = useListControl('stashes:open', false)
+  const [search, setSearch] = useListControl('stashes:search', '')
+  const [filter, setFilter] = useListControl<StashFilter>('stashes:filter', 'all')
+  const [sort, setSort] = useListControl<StashSort>('stashes:sort', 'date')
 
   // Filter and sort stashes
   const filteredStashes = useMemo(

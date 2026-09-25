@@ -1,5 +1,41 @@
 import type { StagingDiffHunk, StagingFileDiff } from './staging-types'
 
+/** Build a staging diff for an untracked file, matching what `git diff --no-index` would report. */
+export function buildUntrackedFileDiff(filePath: string, content: string): StagingFileDiff {
+  const endsWithNewline = content.endsWith('\n')
+  const fileLines = content.length === 0 ? [] : (endsWithNewline ? content.slice(0, -1) : content).split('\n')
+  const header = `@@ -0,0 +1,${fileLines.length} @@`
+  const lines = fileLines.map((line, idx) => ({
+    type: 'add' as const,
+    content: line,
+    newLineNumber: idx + 1,
+    lineIndex: idx,
+    ...(idx === fileLines.length - 1 && !endsWithNewline ? { noNewline: true } : {}),
+  }))
+  const patchLines = fileLines.map((l) => '+' + l)
+  if (fileLines.length > 0 && !endsWithNewline) patchLines.push('\\ No newline at end of file')
+  const rawPatch =
+    `diff --git a/${filePath} b/${filePath}\n` +
+    `new file mode 100644\n` +
+    `--- /dev/null\n` +
+    `+++ b/${filePath}\n` +
+    header +
+    '\n' +
+    patchLines.map((l) => l + '\n').join('')
+
+  return {
+    filePath,
+    status: 'untracked',
+    isBinary: false,
+    additions: fileLines.length,
+    deletions: 0,
+    hunks:
+      fileLines.length === 0
+        ? []
+        : [{ header, oldStart: 0, oldLines: 0, newStart: 1, newLines: fileLines.length, rawPatch, lines }],
+  }
+}
+
 /** Parse staging diffs without losing patch metadata needed by line and hunk actions. */
 export function parseDiff(diffOutput: string, filePath: string): StagingFileDiff {
   const lines = diffOutput.split('\n')

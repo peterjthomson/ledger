@@ -11,6 +11,7 @@ import {
   getPRFileDiff,
   getPRFileDiffParsed,
   commentOnPR,
+  editPRTitle,
   mergePR,
 } from '@/lib/main/git-service'
 import { serializeError, logHandlerError } from '@/lib/utils/error-helpers'
@@ -121,6 +122,15 @@ export const registerPRHandlers = () => {
       return await commentOnPR(prNumber, body)
     } catch (error) {
       logHandlerError('comment-on-pr', error)
+      return { success: false, message: serializeError(error) }
+    }
+  })
+
+  handle('edit-pr-title', async (prNumber: number, title: string) => {
+    try {
+      return await editPRTitle(prNumber, title)
+    } catch (error) {
+      logHandlerError('edit-pr-title', error)
       return { success: false, message: serializeError(error) }
     }
   })

@@ -17,4 +17,5 @@
 export { createAppStore, createSimpleStore } from './create-store'
 export { useRepositoryStore } from './repository-store'
 export { useUIStore } from './ui-store'
+export { useListControlsStore, useListControl } from './list-controls-store'
 export { usePluginStore, selectActiveApp, selectAppPlugins, selectOpenPanels } from './plugin-store'

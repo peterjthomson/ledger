@@ -12,7 +12,7 @@ const SVG_PATHS = {
 
 export const Titlebar = () => {
   const { title, icon, titleCentered, menuItems } = useWindowContext().titlebar
-  const { titlebarActions } = useWindowContext()
+  const { titlebarActions, titlebarNav } = useWindowContext()
   const { menusVisible, setMenusVisible, closeActiveMenu } = useTitlebarContext()
   const { window: wcontext } = useWindowContext()
 
@@ -38,6 +38,7 @@ export const Titlebar = () => {
         </div>
       )}
 
+      {titlebarNav && !menusVisible && <div className="window-titlebar-nav">{titlebarNav}</div>}
       <div
         className="window-titlebar-title"
         {...(titleCentered && { 'data-centered': true })}

@@ -11,6 +11,9 @@ interface WindowContextProps {
   setTitle: (title: string) => void
   titlebarActions: ReactNode
   setTitlebarActions: (actions: ReactNode) => void
+  /** Left-side navigation controls (back/forward), shown after the window controls */
+  titlebarNav: ReactNode
+  setTitlebarNav: (nav: ReactNode) => void
 }
 
 const WindowContext = createContext<WindowContextProps | undefined>(undefined)
@@ -30,6 +33,7 @@ export const WindowContextProvider = ({
   const [initProps, setInitProps] = useState<WindowInitProps>()
   const [title, setTitle] = useState(initialTitlebar.title)
   const [titlebarActions, setTitlebarActions] = useState<ReactNode>(null)
+  const [titlebarNav, setTitlebarNav] = useState<ReactNode>(null)
   useEffect(() => {
     // Initialize window properties - runs once on mount
     window.conveyor.window.windowInit().then(setInitProps)
@@ -56,8 +60,8 @@ export const WindowContextProvider = ({
 
   // Memoize context value to prevent unnecessary re-renders of consumers
   const contextValue = useMemo(
-    () => ({ titlebar, window: windowProps, setTitle, titlebarActions, setTitlebarActions }),
-    [titlebar, windowProps, setTitle, titlebarActions, setTitlebarActions]
+    () => ({ titlebar, window: windowProps, setTitle, titlebarActions, setTitlebarActions, titlebarNav, setTitlebarNav }),
+    [titlebar, windowProps, setTitle, titlebarActions, setTitlebarActions, titlebarNav, setTitlebarNav]
   )
 
   return (
