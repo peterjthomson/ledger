@@ -1,7 +1,7 @@
 # Build & Release Checklist
 
 ## Targets
-- macOS arm64 (zip, signed; notarization optional per `electron-builder.yml`)
+- macOS arm64 (DMG and ZIP; signed and notarized per `electron-builder.yml`)
 - Linux x64 (deb, AppImage)
 - Linux arm64 (deb, AppImage)
 - Windows x64 (NSIS installer; build on Windows runner preferred)
@@ -27,4 +27,5 @@
 ## Publish
 - Upload artifacts to GitHub Releases with SHA256 checksums.
 - Update README download links (already generic to Releases).
-- Notarization (mac) is disabled in config; enable when credentials are available.
+- macOS notarization is enabled in config and requires release credentials.
+- Verify the final artifacts and run the packaged-app checks in [RELEASE-PROTOCOL.md](../RELEASE-PROTOCOL.md) before uploading.

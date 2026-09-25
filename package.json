@@ -39,7 +39,8 @@
     "test:headed": "cross-env ELECTRON_RUN_AS_NODE= playwright test --headed",
     "pretest": "npm run vite:build:app",
     "test:packaged": "cross-env ELECTRON_RUN_AS_NODE= playwright test --config playwright.packaged.config.ts",
-    "previte:build:app": "npm run typecheck"
+    "previte:build:app": "npm run typecheck",
+    "test:release": "python3 -m unittest discover -s scripts/release -p \"test_*.py\""
   },
   "repository": {
     "type": "git",

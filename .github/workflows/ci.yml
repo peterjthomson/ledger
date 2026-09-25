@@ -1,0 +1,31 @@
+name: Build and test
+on:
+  push:
+    branches: [master]
+  pull_request:
+permissions:
+  contents: read
+concurrency:
+  group: ledger-ci-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  macos:
+    runs-on: macos-14
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: npm run test:release
+      - run: npm test
+      - name: Package unsigned app for startup check
+        env:
+          CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+        run: |
+          npx electron-builder --mac dir --"$(node -p process.arch)" --publish never -c.mac.identity=null
+          APP="$(find dist -maxdepth 2 -name Ledger.app -print -quit)"
+          test -n "$APP"
+          echo "LEDGER_PACKAGED_EXECUTABLE=$GITHUB_WORKSPACE/$APP/Contents/MacOS/Ledger" >> "$GITHUB_ENV"
+      - run: npm run test:packaged

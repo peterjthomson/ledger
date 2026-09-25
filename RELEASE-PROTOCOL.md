@@ -1,111 +1,61 @@
-# Release protocol (shared across the productivity suite)
+# Ledger release checks
 
-Canonical copy: `peterjthomson/marktext`. Mirrored into `peterjthomson/ledger`
-and `peterjthomson/year-view` so all three release the same way.
+Ledger's build and release commands are defined in `package.json` and
+`electron-builder.yml`. See [build targets](docs/build-and-release.md) and
+[App Store instructions](docs/app-store/README.md) for their separate workflows.
+Release tooling in this repository is maintained independently.
 
-## The rule that shapes everything
+## Direct-download macOS candidate
 
-**Notarization is asynchronous and may take over a day.** Apple's notary
-service is usually minutes; it has taken more than 24 hours. Any pipeline that
-blocks on the result eventually strands a build, and a stranded build gets
-finished by hand.
+Run `npm test` and `npm run test:release`. Build for the intended architecture
+with the existing `build:mac:*` command. Signing and notarization require the
+release operator's Developer ID identity and credentials; use the credential
+options documented in [AGENTS.md](AGENTS.md#notarization-setup). A keychain profile
+belongs to the machine on which it was configured.
 
-That is not hypothetical. Ledger 1.5.0's DMG shipped containing
-`Ledger.app/Ledger.app` — a folder wearing the `.app` extension with the real,
-correctly-notarized bundle inside it. Finder shows a broken item and
-drag-to-Applications installs something that cannot launch. The repository's own
-`electron-builder` pipeline produces a **correct** DMG; the nesting was
-introduced by the manual step that existed to work around slow notarization. The
-workaround, not the tooling, broke the release.
+For a candidate that must be reviewed before upload, pass `--publish never` to
+electron-builder. `npm run release` retains its existing build-and-publish
+behavior and should only be used when publication is intended.
 
-So: never block on Apple, and never hand-assemble an artifact.
-
-## The five stages
-
-Each stage is idempotent and independently re-runnable. State lives on disk, so
-a stage can be resumed tomorrow without redoing the one before it.
-
-| Stage | Command | Blocks on Apple? |
-|---|---|---|
-| 1. Build | repo-native (`pnpm build:mac:arm64`, `npm run build:mac:arm64`, `xcodebuild archive`) | no |
-| 2. Submit | `scripts/release/notarize.sh submit dist/*.dmg` | no — returns after upload |
-| 3. Collect | `scripts/release/notarize.sh status` | no — poll whenever |
-| 4. Staple | `scripts/release/notarize.sh staple` | no — only staples what is Accepted |
-| 5. Verify | `scripts/release/verify-mac-artifact.sh --dmg … --bundle-id …` | no |
-| 6. Publish | `gh release upload …` | no |
-
-If Apple takes 26 hours, stages 1–2 are already done and nothing is lost: run
-`status` tomorrow, `staple` when it clears, and the ticket attaches to the
-artifact you already built. No rebuild, no re-sign, no hand-made DMG.
+Verify the final ZIP (and DMG if shipping one), using the actual candidate paths:
 
 ```bash
-# Day 1
-pnpm build:mac:arm64                          # or the repo's build command
-./scripts/release/notarize.sh submit dist/*.dmg
-# → "submitted as 3ac911ba-…", terminal returns
-
-# Whenever — an hour later, or Thursday
-./scripts/release/notarize.sh status
-./scripts/release/notarize.sh staple
-./scripts/release/verify-mac-artifact.sh --dmg dist/App.dmg --bundle-id com.example.app
+./scripts/release/verify-mac-artifact.sh \
+  --zip dist/Ledger-<version>-arm64-mac.zip \
+  --feed dist/latest-mac.yml --bundle-id com.peterjthomson.ledger --version <version>
+# Add --dmg dist/Ledger-<version>-arm64.dmg when distributing a DMG.
 ```
 
-`notarize.sh log <artifact>` fetches Apple's detailed report when something is
-Invalid. `notarize.sh reset` forgets recorded submissions without cancelling
-them.
+The verifier extracts a temporary copy and checks bundle layout, identity,
+version, Developer ID signing, stapled notarization and Gatekeeper acceptance.
+It verifies the feed's artifact sizes and SHA-512 checksums, including its legacy
+`path`/`sha512` fields. Every referenced file must be present. ZIP-only releases
+must have a feed containing only the files actually being distributed.
 
-## Stage 5 is not optional
+If a DMG is stapled separately using the existing `scripts/release/notarize.sh`
+helper, it refreshes that artifact's feed checksums. This helper is optional;
+it does not replace electron-builder's configured app notarization. Keep the
+original candidate while waiting on Apple rather than manually assembling an
+installer. See the [DMG investigation](docs/dmg-packaging-investigation.md) for
+the currently unresolved copy failure.
 
-`verify-mac-artifact.sh` is the gate that would have caught Ledger 1.5.0. It
-mounts the DMG the way a user's Mac will — quarantined — and asserts:
+## Test the packaged app
 
-- the DMG carries a stapled ticket, and Gatekeeper accepts it quarantined
-- **exactly one `.app` at the volume root, with `Contents/Info.plist` directly
-  inside it** (the nesting check)
-- the bundle identifier is the expected one
-- the signature is valid deep+strict, and the authority is Developer ID Application
-- the app carries its **own** stapled ticket, so it still validates offline once
-  copied out of the DMG
-- Gatekeeper accepts the app for execution
-- every `latest*.yml` entry matches the bytes on disk — stapling rewrites the
-  DMG *after* electron-builder hashes it, so the feed goes stale silently
-- the zip, if shipped, has the same single well-formed bundle at its root
+Point `LEDGER_PACKAGED_EXECUTABLE` at the executable from the extracted candidate
+and run `npm run test:packaged`. This exercises the packaged runtime and SQLite;
+it does not establish that interactive Git operations work.
 
-Exit code 0 means safe to publish. Run it again on the copy downloaded back from
-the release: that is the artifact users actually get.
+Use a disposable Git repository for a native UI walkthrough. Confirm the app
+opens the fixture, displays branches and diffs, and performs a relevant Git
+operation. Check the result with Git, cancel a destructive dialog, and close
+and reopen the window. Exercise any changed path. Record the source commit,
+version, archive SHA-256, OS/architecture and observed results alongside the
+candidate; keep personal repositories out of test fixtures.
 
-## Credentials
+After verification, upload the chosen artifacts, matching feed and SHA-256
+checksums. Download the published files and verify them again. A passing script
+is one check, not proof of every user path.
 
-One notarytool keychain profile per machine, shared by all three repos:
-
-```bash
-xcrun notarytool store-credentials AC_PASSWORD \
-  --apple-id <email> --team-id R4RRG93J68 --password <app-specific-password>
-```
-
-`APPLE_KEYCHAIN_PROFILE` overrides the name (default `AC_PASSWORD`). The
-credentials live in the macOS data-protection keychain, which is why they cannot
-be read back out for CI — see `signing-and-release.md`.
-
-## Why signing stays off CI
-
-CI builds what needs no secrets (Windows, Linux, unsigned smoke builds and
-tests) and stops there. macOS artifacts are built, signed, notarized and stapled
-on a Mac, then uploaded.
-
-This is a decision, not a gap. The Apple credential cannot be minted from a CLI,
-notarization is the one step that has never actually failed, and putting a
-Developer ID private key in CI buys nothing that the local path does not already
-do. Every historical mac CI failure across these repos was a *signing-path*
-failure while Windows and Linux went green.
-
-The real fragility was always the manual assembly around notarization, which
-stages 2–5 remove.
-
-## Per-repo entry points
-
-| Repo | Build | Notarizes | Publishes |
-|---|---|---|---|
-| marktext | `pnpm build:mac:arm64` | electron-builder (`notarize: true`) + `build/notarize-dmg.cjs` for the DMG | CI publishes win/linux; mac uploaded after stage 5 |
-| ledger | `npm run build:mac:arm64` | **should** use stages 2–4; `scripts/notarize.js` is currently dead code (no `afterSign` wiring) | manual upload |
-| year-view | `xcodebuild archive` + `-exportArchive` | stages 2–4 on the exported zip | manual upload |
+The sandboxed App Store build requires its own installation and launch checks.
+The [1.5.1 review findings](docs/app-store/review-1.5.1.md) remain unresolved by
+these direct-download release checks.

@@ -2,8 +2,6 @@
 # ============================================================================
 # notarize.sh — detached macOS notarization
 # ============================================================================
-# Canonical source: peterjthomson/marktext scripts/release/notarize.sh
-# Shared verbatim with peterjthomson/ledger and peterjthomson/year-view.
 #
 # WHY THIS IS NOT `notarytool submit --wait`
 #
