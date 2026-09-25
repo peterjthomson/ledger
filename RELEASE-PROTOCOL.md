@@ -54,15 +54,17 @@ with a fresh output directory; never overwrite the previous candidate.
 ```bash
 export NOTARIZE_STATE="$PWD/dist/release-<version>/notarize-state.json"
 scripts/release/notarize.sh status
-scripts/release/notarize.sh staple
+scripts/release/notarize.sh staple app.zip
 # Only after the app is Accepted and stapled:
 npm run release:package  # Marktext: pnpm release:package
 scripts/release/notarize.sh submit dist/release-<version>/artifacts/*.dmg
 scripts/release/notarize.sh status
-scripts/release/notarize.sh staple
+scripts/release/notarize.sh staple dist/release-<version>/artifacts/*.dmg
 ```
 
-`status` and `staple` exit 2 while any submission is not accepted. Use `log
+`status` exits 2 while any submission is not accepted. `staple` exits 2 while
+any selected submission is not accepted; pass names to staple only the current
+stage (app, then DMG). Use `log
 <artifact>` to investigate an Invalid submission. Submission is idempotent for
 unchanged bytes; changed artifacts require a new candidate/state file. The
 stored `AC_PASSWORD` keychain profile is shared; `APPLE_KEYCHAIN_PROFILE`

@@ -36,7 +36,8 @@ def main():
     submit.add_argument('--app', type=Path, help='App to staple when its submission ZIP is accepted')
     submit.add_argument('artifacts', nargs='+', type=Path)
     sub.add_parser('status')
-    sub.add_parser('staple')
+    staple = sub.add_parser('staple')
+    staple.add_argument('artifacts', nargs='*', help='Optional recorded artifact names for this stage')
     log = sub.add_parser('log')
     log.add_argument('artifact')
     sub.add_parser('reset')
@@ -73,8 +74,13 @@ def main():
         entry = state[Path(args.artifact).name]
         subprocess.run(['xcrun', 'notarytool', 'log', entry['id'], '--keychain-profile', PROFILE], check=True)
         return
+    if args.command == 'staple' and args.artifacts:
+        names = [Path(name).name for name in args.artifacts]
+        state_selection = {name: state[name] for name in names}
+    else:
+        state_selection = state
     incomplete = False
-    for name, entry in state.items():
+    for name, entry in state_selection.items():
         status = apple('info', entry['id'])['status']
         print(f'{name}: {status}', flush=True)
         if status != 'Accepted':

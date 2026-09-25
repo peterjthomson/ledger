@@ -90,6 +90,19 @@ class ArtifactTests(unittest.TestCase):
             self.assertEqual(runner.call_count, 1)
             self.assertEqual(runner.call_args.args[0][2], 'validate')
 
+    def test_staple_can_select_the_current_release_stage(self):
+        from types import SimpleNamespace
+        asset = self.root / 'App.dmg'
+        asset.write_bytes(b'dmg')
+        state = self.root / 'state.json'
+        state.write_text(json.dumps({
+            'app.zip': {'id': 'old-app', 'path': '/source-no-longer-used'},
+            'App.dmg': {'id': 'disk', 'path': str(asset), 'sha256': notarize.sha(asset)}}))
+        with patch.object(notarize, 'STATE', state), patch.object(notarize, 'apple', return_value={'status': 'Accepted'}) as apple, patch.object(notarize.subprocess, 'run', return_value=SimpleNamespace(returncode=0)), patch('sys.argv', ['notarize', 'staple', str(asset)]), contextlib.redirect_stdout(io.StringIO()):
+            self.assertEqual(notarize.main(), 0)
+            apple.assert_called_once_with('info', 'disk')
+            self.assertIn('app.zip', json.loads(state.read_text()))
+
     def test_changed_artifact_cannot_be_stapled(self):
         asset = self.root / 'App.dmg'
         asset.write_bytes(b'changed')
