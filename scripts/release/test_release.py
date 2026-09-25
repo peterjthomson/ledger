@@ -78,6 +78,18 @@ class ArtifactTests(unittest.TestCase):
             self.assertEqual(notarize.main(), 2)
             runner.assert_not_called()
 
+    def test_valid_ticket_is_not_stapled_again(self):
+        from types import SimpleNamespace
+        asset = self.root / 'app.zip'
+        asset.write_bytes(b'submission')
+        state = self.root / 'state.json'
+        state.write_text(json.dumps({'app.zip': {'id': 'submission', 'path': str(asset),
+            'sha256': notarize.sha(asset), 'app': str(self.root / 'App With Spaces.app')}}))
+        with patch.object(notarize, 'STATE', state), patch.object(notarize, 'apple', return_value={'status': 'Accepted'}), patch.object(notarize.subprocess, 'run', return_value=SimpleNamespace(returncode=0)) as runner, patch('sys.argv', ['notarize', 'staple']), contextlib.redirect_stdout(io.StringIO()):
+            self.assertEqual(notarize.main(), 0)
+            self.assertEqual(runner.call_count, 1)
+            self.assertEqual(runner.call_args.args[0][2], 'validate')
+
     def test_changed_artifact_cannot_be_stapled(self):
         asset = self.root / 'App.dmg'
         asset.write_bytes(b'changed')

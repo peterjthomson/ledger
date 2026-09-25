@@ -88,8 +88,12 @@ def main():
         target = entry.get('app') or str(artifact)
         if target.endswith('.zip'):
             raise ValueError(f'{name}: legacy ZIP state has no app; staple its app explicitly')
-        subprocess.run(['xcrun', 'stapler', 'staple', target], check=True)
-        subprocess.run(['xcrun', 'stapler', 'validate', target], check=True)
+        validation = subprocess.run(['xcrun', 'stapler', 'validate', target], capture_output=True)
+        if validation.returncode != 0:
+            subprocess.run(['xcrun', 'stapler', 'staple', target], check=True)
+            subprocess.run(['xcrun', 'stapler', 'validate', target], check=True)
+        else:
+            print(f'{name}: ticket already valid; preserving stapled bytes')
         entry['sha256'] = sha(artifact)
         save(state)
         for feed in artifact.parent.glob('latest*.yml'):
