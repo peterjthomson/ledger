@@ -61,6 +61,7 @@ Styling in `app/styles/app.css` uses CSS variables for theming.
 npm run dev      # Development with hot reload
 npm test         # Run E2E tests
 npm run lint     # Check for linting issues
+npm run typecheck # Check all TypeScript (also required before production builds)
 npm run build:mac:arm64  # Build for Apple Silicon
 ```
 
@@ -101,11 +102,11 @@ Uses React hooks only (no Redux/Zustand):
 
 ## Testing
 
-Playwright E2E tests in `tests/app.spec.ts`:
+Playwright tests in `tests/` cover app behavior and Git operations using temporary repositories. `tests/app.spec.ts` covers:
 - Tests welcome screen (no repo)
 - Tests main view (with repo via `--repo=` CLI arg)
 
-Run with `npm test` (builds first) or `npm run test:headed`.
+Run with `npm test` (builds first) or `npm run test:headed`. Packaged-app checks are excluded from these runs: set `LEDGER_PACKAGED_EXECUTABLE` to an absolute executable path and run `npm run test:packaged`. Missing or invalid paths fail immediately. See `CONTRIBUTING.md` for local packaging instructions.
 
 ## Chrome DevTools Protocol (CDP) Access
 

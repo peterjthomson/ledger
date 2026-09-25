@@ -216,6 +216,7 @@ export const WorkingStatusSchema = z.object({
 
 // Staging diff schemas
 export const StagingDiffLineSchema = z.object({
+  noNewline: z.boolean().optional(),
   type: z.enum(['context', 'add', 'delete']),
   content: z.string(),
   oldLineNumber: z.number().optional(),

@@ -34,7 +34,7 @@ export interface StoreOptions<T> {
  */
 export function createAppStore<T>(
   name: string,
-  initializer: StateCreator<T, [['zustand/devtools', never], ['zustand/persist', unknown]], []>,
+  initializer: StateCreator<T>,
   options?: StoreOptions<T>
 ) {
   const persistOptions: PersistOptions<T, Partial<T>> = {

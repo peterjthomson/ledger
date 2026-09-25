@@ -28,7 +28,6 @@ import {
   Sparkles,
 } from 'lucide-react'
 import { usePluginStore, selectAppPlugins } from '@/app/stores/plugin-store'
-import type { AppPlugin } from '@/lib/plugins/plugin-types'
 
 // Map of icon names to Lucide components
 const iconMap: Record<string, LucideIcon> = {

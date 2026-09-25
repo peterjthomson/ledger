@@ -71,7 +71,7 @@ export interface CanvasData {
   loadingDiff: boolean
   
   // FileGraph data
-  fileGraph: import('../../../types/electron').FileGraphData | null
+  fileGraph: import('../../types/electron').FileGraphData | null
   fileGraphLoading: boolean
 }
 

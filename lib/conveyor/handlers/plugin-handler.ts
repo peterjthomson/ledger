@@ -189,7 +189,7 @@ export const registerPluginHandlers = () => {
   // Get plugin database info
   handle('plugin-data-info', async (pluginId: string) => {
     try {
-      return { success: true, info: getPluginDatabaseInfo(pluginId) }
+      return { success: true, info: getPluginDatabaseInfo(pluginId) ?? undefined }
     } catch (error) {
       return { success: false, message: serializeError(error) }
     }

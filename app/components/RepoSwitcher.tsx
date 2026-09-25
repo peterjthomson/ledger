@@ -14,7 +14,7 @@ import './repo-switcher.css'
 interface RepoInfo {
   id: string
   name: string
-  path: string
+  path: string | null
   isActive: boolean
 }
 
@@ -51,7 +51,7 @@ export function RepoSwitcher({ currentPath, onRepoChange }: RepoSwitcherProps) {
   }, [loadRepos, currentPath])
 
   // Switch to a repo
-  const handleSwitch = useCallback(async (id: string, _path: string) => {
+  const handleSwitch = useCallback(async (id: string) => {
     if (switching) return
 
     const repo = repos.find(r => r.id === id)
@@ -88,7 +88,7 @@ export function RepoSwitcher({ currentPath, onRepoChange }: RepoSwitcherProps) {
         // If we closed the active repo, the backend picks a new active
         const newList = await window.conveyor.repo.listRepositories()
         const newActive = newList.find(r => r.isActive)
-        if (newActive) {
+        if (newActive?.path) {
           onRepoChange(newActive.path)
         }
       }
@@ -121,7 +121,7 @@ export function RepoSwitcher({ currentPath, onRepoChange }: RepoSwitcherProps) {
       case ' ':
         e.preventDefault()
         if (repo) {
-          handleSwitch(repo.id, repo.path)
+          handleSwitch(repo.id)
         } else {
           openManager()
         }
@@ -191,11 +191,11 @@ export function RepoSwitcher({ currentPath, onRepoChange }: RepoSwitcherProps) {
           key={repo.id}
           className={`repo-chip ${repo.isActive ? 'active' : ''} ${switching === repo.id ? 'switching' : ''}`}
           tabIndex={0}
-          onClick={() => handleSwitch(repo.id, repo.path)}
+          onClick={() => handleSwitch(repo.id)}
           onKeyDown={(e) => handleKeyDown(e, index, repo)}
           onMouseEnter={() => setShowClose(repo.id)}
           onMouseLeave={() => setShowClose(null)}
-          title={repo.path}
+          title={repo.path ?? repo.name}
           role="button"
           aria-pressed={repo.isActive}
         >

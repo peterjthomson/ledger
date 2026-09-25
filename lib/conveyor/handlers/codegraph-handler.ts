@@ -17,6 +17,7 @@ export const registerCodeGraphHandlers = () => {
     try {
       // Use provided path or current repo path
       const path = repoPath || getRepositoryManager().requireActive().path
+      if (!path) throw new Error('This operation requires a local repository')
       const schema = await parseCodeGraph(path, options || {})
       return { success: true, data: schema }
     } catch (error) {
@@ -33,6 +34,7 @@ export const registerCodeGraphHandlers = () => {
   handle('detect-codegraph-language', async (repoPath?: string) => {
     try {
       const path = repoPath || getRepositoryManager().requireActive().path
+      if (!path) throw new Error('This operation requires a local repository')
       const language = await detectLanguage(path)
       return { success: true, data: language }
     } catch (error) {
@@ -50,6 +52,7 @@ export const registerCodeGraphHandlers = () => {
   handle('get-codegraph-diff-status', async (repoPath?: string) => {
     try {
       const path = repoPath || getRepositoryManager().requireActive().path
+      if (!path) throw new Error('This operation requires a local repository')
       const git = simpleGit(path)
       const status = await git.status()
 

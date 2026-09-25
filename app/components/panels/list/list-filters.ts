@@ -65,12 +65,20 @@ export function filterBranches(branchList: Branch[], filter: BranchFilter): Bran
  * Sort branches. Missing values sort last; ties break on name so order is stable.
  */
 export function sortBranches(branchList: Branch[], sort: BranchSort): Branch[] {
+  // Keep the live branch first, then the primary branches, under every sort.
+  const priority = (branch: Branch) => {
+    if (branch.current) return 0
+    const name = branch.isRemote ? branch.name.replace(/^(?:remotes\/)?[^/]+\//, '') : branch.name
+    return name === 'main' || name === 'master' ? 1 : 2
+  }
+  const pinned = (a: Branch, b: Branch) => priority(a) - priority(b)
   const byName = (a: Branch, b: Branch) => a.name.localeCompare(b.name)
   const sorted = [...branchList]
 
   switch (sort) {
     case 'last-commit':
       return sorted.sort((a, b) => {
+        if (pinned(a, b)) return pinned(a, b)
         const aTime = a.lastCommitDate ? new Date(a.lastCommitDate).getTime() : Number.NaN
         const bTime = b.lastCommitDate ? new Date(b.lastCommitDate).getTime() : Number.NaN
         const aMissing = Number.isNaN(aTime)
@@ -83,6 +91,7 @@ export function sortBranches(branchList: Branch[], sort: BranchSort): Branch[] {
       })
     case 'first-commit':
       return sorted.sort((a, b) => {
+        if (pinned(a, b)) return pinned(a, b)
         const aTime = a.firstCommitDate ? new Date(a.firstCommitDate).getTime() : Number.NaN
         const bTime = b.firstCommitDate ? new Date(b.firstCommitDate).getTime() : Number.NaN
         const aMissing = Number.isNaN(aTime)
@@ -95,6 +104,7 @@ export function sortBranches(branchList: Branch[], sort: BranchSort): Branch[] {
       })
     case 'most-commits':
       return sorted.sort((a, b) => {
+        if (pinned(a, b)) return pinned(a, b)
         const aCount = a.commitCount ?? -1
         const bCount = b.commitCount ?? -1
         if (bCount !== aCount) return bCount - aCount
@@ -102,7 +112,7 @@ export function sortBranches(branchList: Branch[], sort: BranchSort): Branch[] {
       })
     case 'name':
     default:
-      return sorted.sort(byName)
+      return sorted.sort((a, b) => pinned(a, b) || byName(a, b))
   }
 }
 

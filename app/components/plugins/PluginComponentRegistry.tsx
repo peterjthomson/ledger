@@ -11,7 +11,6 @@ import type {
   PluginAppProps,
   PluginPanelProps,
   PluginWidgetProps,
-  PluginContext,
 } from '@/lib/plugins/plugin-types'
 
 // ============================================================================

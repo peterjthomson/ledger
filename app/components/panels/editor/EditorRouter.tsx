@@ -67,6 +67,7 @@ export function EditorRouter({
   branches,
   repoPath,
   prs,
+  worktrees,
   onFocusWorktree,
   onNavigateToPR,
   onOpenRepo,
@@ -85,7 +86,7 @@ export function EditorRouter({
       return (
         <BranchDetailPanel
           branch={branch}
-          repoPath={repoPath}
+          repoPath={repoPath ?? null}
           formatDate={formatDate}
           onStatusChange={onStatusChange}
           onCheckoutBranch={onCheckoutBranch}
@@ -94,6 +95,8 @@ export function EditorRouter({
           onOpenStaging={onOpenStaging}
           onNavigateToPR={onNavigateToPR}
           prs={prs}
+          worktrees={worktrees}
+          onFocusWorktree={onFocusWorktree}
           switching={switching}
           deleting={deleting}
           renaming={renaming}
@@ -161,7 +164,7 @@ export function EditorRouter({
         <WorktreeDetailPanel
           worktree={wt}
           currentBranch={currentBranch}
-          repoPath={repoPath}
+          repoPath={repoPath ?? null}
           switching={switching}
           onStatusChange={onStatusChange}
           onRefresh={onRefresh}
@@ -205,7 +208,6 @@ export function EditorRouter({
       return (
         <StashDetailPanel
           stash={stash}
-          currentBranch={currentBranch}
           formatRelativeTime={formatRelativeTime}
           onStatusChange={onStatusChange}
           onRefresh={onRefresh}

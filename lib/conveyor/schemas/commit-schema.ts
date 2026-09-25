@@ -22,7 +22,29 @@ export const commitIpcSchema = {
   },
   'get-commit-details': {
     args: z.tuple([z.string()]),
-    return: CommitSchema.nullable(),
+    return: z
+      .object({
+        hash: z.string(),
+        shortHash: z.string(),
+        message: z.string(),
+        body: z.string(),
+        author: z.string(),
+        authorEmail: z.string(),
+        date: z.string(),
+        parentHashes: z.array(z.string()),
+        files: z.array(
+          z.object({
+            path: z.string(),
+            status: z.string(),
+            additions: z.number(),
+            deletions: z.number(),
+            oldPath: z.string().optional(),
+          })
+        ),
+        totalAdditions: z.number(),
+        totalDeletions: z.number(),
+      })
+      .nullable(),
   },
   'get-working-status': {
     args: z.tuple([]),

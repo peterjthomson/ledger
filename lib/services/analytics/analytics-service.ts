@@ -815,7 +815,7 @@ export async function getFileGraph(ctx: RepositoryContext): Promise<FileGraphDat
         let parent: FileNode | undefined = root
         for (let j = 0; j < parts.length - 1; j++) {
           const dirName = parts[j]
-          parent = parent.children?.find(c => c.name === dirName && c.isDirectory)
+          parent = parent?.children?.find(c => c.name === dirName && c.isDirectory)
           if (parent) parent.lines += lines
         }
         root.lines += lines

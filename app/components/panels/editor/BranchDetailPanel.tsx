@@ -4,8 +4,9 @@
  * Displays branch metadata, allows PR creation, and shows diff against base branch.
  */
 
+import { DiffSearch } from '../../ui/DiffSearch'
 import { useState, useEffect, useMemo, useRef } from 'react'
-import type { Branch, BranchDiff, BranchDiffType, PullRequest, PreviewProviderInfo } from '../../../types/electron'
+import type { Branch, BranchDiff, BranchDiffType, PullRequest, PreviewProviderInfo, Worktree } from '../../../types/electron'
 import type { StatusMessage } from '../../../types/app-types'
 import { DiffViewer } from '../../ui/DiffViewer'
 
@@ -20,6 +21,8 @@ export interface BranchDetailPanelProps {
   onOpenStaging?: () => void
   onNavigateToPR?: (pr: PullRequest) => void
   prs?: PullRequest[]
+  worktrees?: Worktree[]
+  onFocusWorktree?: (worktree: Worktree) => void
   switching?: boolean
   deleting?: boolean
   renaming?: boolean
@@ -36,6 +39,8 @@ export function BranchDetailPanel({
   onOpenStaging,
   onNavigateToPR,
   prs,
+  worktrees = [],
+  onFocusWorktree,
   switching,
   deleting,
   renaming,
@@ -61,6 +66,8 @@ export function BranchDetailPanel({
   // Branch rename form state
   const [showRenameForm, setShowRenameForm] = useState(false)
   const [newBranchName, setNewBranchName] = useState('')
+
+  const checkedOutWorktree = worktrees.find(wt => wt.branch === branch.name)
 
   const isMainOrMaster = branch.name === 'main' || branch.name === 'master'
 
@@ -290,7 +297,7 @@ export function BranchDetailPanel({
   }, [fileContextMenu])
 
   return (
-    <div className="sidebar-detail-panel">
+    <DiffSearch className="sidebar-detail-panel">
       <div className="detail-type-badge">Local Branch</div>
       <h3 className="detail-title">{branch.name}</h3>
       <div className="detail-meta-grid">
@@ -301,7 +308,13 @@ export function BranchDetailPanel({
         <div className="detail-meta-item">
           <span className="meta-label">Status</span>
           <span className="meta-value">
-            {branch.current ? 'Current' : 'Not checked out'}
+            {branch.current ? 'Current' : checkedOutWorktree ? 'Checked out in worktree' : 'Not checked out'}
+            {checkedOutWorktree && onFocusWorktree && (
+              <button className="pr-link-badge" title={checkedOutWorktree.path}
+                onClick={() => onFocusWorktree(checkedOutWorktree)}>
+                Worktree: {checkedOutWorktree.path.split('/').pop()}
+              </button>
+            )}
             {branch.isLocalOnly && ' · Local only'}
           </span>
         </div>
@@ -630,6 +643,6 @@ export function BranchDetailPanel({
           </button>
         </div>
       )}
-    </div>
+    </DiffSearch>
   )
 }

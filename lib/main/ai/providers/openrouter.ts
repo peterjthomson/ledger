@@ -50,7 +50,6 @@ const SHOULD_MOCK_OPENROUTER =
 export class OpenRouterProvider implements AIProviderInterface {
   readonly provider = 'openrouter' as const
   private client: OpenAI | null = null
-  private apiKey: string | null = null
   private isUsingFreeTier: boolean = false
 
   /**
@@ -59,7 +58,6 @@ export class OpenRouterProvider implements AIProviderInterface {
    * - Without API key: Uses OpenCode Zen free tier (anonymous)
    */
   configure(apiKey?: string): void {
-    this.apiKey = apiKey || ''
     this.isUsingFreeTier = !apiKey || apiKey === ''
 
     if (this.isUsingFreeTier) {
@@ -96,7 +94,6 @@ export class OpenRouterProvider implements AIProviderInterface {
    */
   reset(): void {
     this.client = null
-    this.apiKey = ''
     this.isUsingFreeTier = false
   }
 
@@ -249,8 +246,8 @@ export class OpenRouterProvider implements AIProviderInterface {
 
       // Handle usage - may be undefined or have different field names
       const usage: AIUsage = {
-        inputTokens: response.usage?.prompt_tokens ?? response.usage?.input_tokens ?? 0,
-        outputTokens: response.usage?.completion_tokens ?? response.usage?.output_tokens ?? 0,
+        inputTokens: response.usage?.prompt_tokens ?? 0,
+        outputTokens: response.usage?.completion_tokens ?? 0,
         estimatedCost: 0, // Free models
       }
 

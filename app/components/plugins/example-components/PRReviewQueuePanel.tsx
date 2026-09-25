@@ -13,10 +13,9 @@ import {
   MessageSquare,
   ExternalLink,
   RefreshCw,
-  AlertCircle,
 } from 'lucide-react'
 import type { PluginPanelProps } from '@/lib/plugins/plugin-types'
-import type { PullRequest } from '@/lib/types'
+import type { PullRequest } from '@/app/types/electron'
 import './example-plugin-styles.css'
 
 interface ReviewQueueItem {
@@ -48,7 +47,7 @@ function calculateWaitingHours(createdAt: string): number {
   return Math.floor((now.getTime() - created.getTime()) / (1000 * 60 * 60))
 }
 
-export function PRReviewQueuePanel({ context, data, onClose }: PluginPanelProps) {
+export function PRReviewQueuePanel({ context }: PluginPanelProps) {
   const [pullRequests, setPullRequests] = useState<PullRequest[]>([])
   const [loading, setLoading] = useState(true)
   const [filter, setFilter] = useState<'all' | 'needs-review' | 'changes-requested' | 'approved'>('all')
@@ -135,7 +134,7 @@ export function PRReviewQueuePanel({ context, data, onClose }: PluginPanelProps)
   const handleRefresh = useCallback(async () => {
     setLoading(true)
     try {
-      const prs = await (context.api.refreshPullRequests?.() || context.api.getPullRequests())
+      const prs = await context.api.getPullRequests()
       // Ensure we always set an array (API might return null/undefined on error)
       setPullRequests(Array.isArray(prs) ? prs : [])
     } catch (error) {

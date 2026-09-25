@@ -29,6 +29,8 @@ export interface StagingDiffLine {
   newLineNumber?: number
   /** Index of this line within the hunk (0-based, for selection) */
   lineIndex: number
+  /** This line has no trailing newline on its side of the diff. */
+  noNewline?: boolean
 }
 
 /**

@@ -18,7 +18,6 @@ import {
   Globe2,
   FolderGit2,
   ChevronRight,
-  Globe,
   Download,
   Cloud,
   Link,

@@ -12,13 +12,10 @@ import {
   Check,
   RefreshCw,
   FileText,
-  Plus,
-  Minus,
-  FileCode,
   AlertCircle,
 } from 'lucide-react'
 import type { PluginWidgetProps } from '@/lib/plugins/plugin-types'
-import type { StagingStatus } from '@/lib/types'
+import type { WorkingStatus } from '@/app/types/electron'
 
 interface CommitSuggestion {
   type: 'feat' | 'fix' | 'docs' | 'style' | 'refactor' | 'test' | 'chore'
@@ -37,8 +34,8 @@ const TYPE_LABELS: Record<CommitSuggestion['type'], { label: string; color: stri
   chore: { label: 'Chore', color: 'var(--text-tertiary)' },
 }
 
-export function CommitSuggesterWidget({ context, repoPath, slot }: PluginWidgetProps) {
-  const [stagingStatus, setStagingStatus] = useState<StagingStatus | null>(null)
+export function CommitSuggesterWidget({ context }: PluginWidgetProps) {
+  const [stagingStatus, setStagingStatus] = useState<WorkingStatus | null>(null)
   const [loading, setLoading] = useState(true)
   const [copiedIndex, setCopiedIndex] = useState<number | null>(null)
 
@@ -76,11 +73,11 @@ export function CommitSuggesterWidget({ context, repoPath, slot }: PluginWidgetP
 
   // Generate commit suggestions based on staged files
   const suggestions = useMemo((): CommitSuggestion[] => {
-    if (!stagingStatus?.staged || stagingStatus.staged.length === 0) {
+    const staged = stagingStatus?.files.filter(file => file.staged) ?? []
+    if (staged.length === 0) {
       return []
     }
 
-    const staged = stagingStatus.staged
     const suggestions: CommitSuggestion[] = []
 
     // Analyze file types and patterns
@@ -202,7 +199,7 @@ export function CommitSuggesterWidget({ context, repoPath, slot }: PluginWidgetP
   const handleRefresh = useCallback(async () => {
     setLoading(true)
     try {
-      const status = await (context.api.refreshStagingStatus?.() || context.api.getStagingStatus())
+      const status = await context.api.getStagingStatus()
       setStagingStatus(status)
     } catch (error) {
       console.error('Failed to refresh:', error)
@@ -211,9 +208,7 @@ export function CommitSuggesterWidget({ context, repoPath, slot }: PluginWidgetP
     }
   }, [context.api])
 
-  const stagedCount = stagingStatus?.staged?.length || 0
-  const totalAdditions = stagingStatus?.staged?.reduce((sum, f) => sum + (f.additions || 0), 0) || 0
-  const totalDeletions = stagingStatus?.staged?.reduce((sum, f) => sum + (f.deletions || 0), 0) || 0
+  const stagedCount = stagingStatus?.stagedCount || 0
 
   if (loading && !stagingStatus) {
     return (
@@ -268,18 +263,6 @@ export function CommitSuggesterWidget({ context, repoPath, slot }: PluginWidgetP
           <FileText size={12} />
           <span>{stagedCount} staged</span>
         </div>
-        {totalAdditions > 0 && (
-          <div className="commit-suggester-stat additions">
-            <Plus size={12} />
-            <span>{totalAdditions}</span>
-          </div>
-        )}
-        {totalDeletions > 0 && (
-          <div className="commit-suggester-stat deletions">
-            <Minus size={12} />
-            <span>{totalDeletions}</span>
-          </div>
-        )}
       </div>
 
       <div className="commit-suggester-list">

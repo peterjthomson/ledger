@@ -286,6 +286,7 @@ function getContextDependencies(): PluginContextDependencies {
     ipc: {
       getBranches: async () => {
         const result = await window.conveyor.branch.getBranches()
+        if (!('branches' in result)) throw new Error(result.error)
         // Result is { current, branches } - extract the branches array
         const branches = result.branches || []
         useRepositoryStore.getState().setBranches(branches)
@@ -296,6 +297,7 @@ function getContextDependencies(): PluginContextDependencies {
       },
       getWorktrees: async () => {
         const worktrees = await window.conveyor.worktree.getWorktrees()
+        if (!Array.isArray(worktrees)) throw new Error(worktrees.error)
         useRepositoryStore.getState().setWorktrees(worktrees)
         return worktrees
       },

@@ -5,6 +5,7 @@
  * in the main Electron process.
  */
 
+import { PluginManifestSchema } from '../conveyor/schemas/plugin-schema'
 import { app } from 'electron'
 import * as fs from 'fs'
 import * as path from 'path'
@@ -30,17 +31,7 @@ export interface InstalledPlugin {
   enabled: boolean
 }
 
-export interface PluginManifest {
-  id: string
-  name: string
-  version: string
-  type: 'app' | 'panel' | 'widget' | 'service'
-  description?: string
-  author?: string
-  homepage?: string
-  main: string
-  permissions?: string[]
-}
+export type PluginManifest = import('zod').infer<typeof PluginManifestSchema>
 
 interface PluginRegistry {
   plugins: InstalledPlugin[]
@@ -112,7 +103,7 @@ export function getPluginManifest(pluginPath: string): PluginManifest | null {
     const manifestPath = path.join(pluginPath, 'plugin.json')
     if (fs.existsSync(manifestPath)) {
       const data = fs.readFileSync(manifestPath, 'utf-8')
-      return JSON.parse(data)
+      return PluginManifestSchema.parse(JSON.parse(data))
     }
 
     // Try package.json with ledger field
@@ -121,7 +112,7 @@ export function getPluginManifest(pluginPath: string): PluginManifest | null {
       const data = fs.readFileSync(packagePath, 'utf-8')
       const pkg = JSON.parse(data)
       if (pkg.ledger) {
-        return {
+        return PluginManifestSchema.parse({
           id: pkg.ledger.id || pkg.name,
           name: pkg.ledger.name || pkg.name,
           version: pkg.version,
@@ -131,7 +122,7 @@ export function getPluginManifest(pluginPath: string): PluginManifest | null {
           homepage: pkg.homepage,
           main: pkg.ledger.main || pkg.main || 'index.js',
           permissions: pkg.ledger.permissions,
-        }
+        })
       }
     }
   } catch (error) {
@@ -281,7 +272,7 @@ export async function downloadFile(
  */
 export async function installPlugin(
   source: PluginSource
-): Promise<{ success: boolean; pluginId?: string; error?: string }> {
+): Promise<{ success: boolean; pluginId?: string; message?: string }> {
   try {
     ensurePluginsDirectory()
     let pluginDir: string
@@ -442,7 +433,6 @@ export function setPluginEnabled(
 // ============================================================================
 // Helper Functions
 // ============================================================================
-
 
 function isValidUrl(url: string): boolean {
   try {

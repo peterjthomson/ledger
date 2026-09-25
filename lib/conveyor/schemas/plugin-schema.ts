@@ -23,7 +23,7 @@ const InstalledPluginSchema = z.object({
 })
 
 // Plugin manifest schema (subset for IPC)
-const PluginManifestSchema = z.object({
+export const PluginManifestSchema = z.object({
   id: z.string(),
   name: z.string(),
   version: z.string(),
@@ -32,7 +32,7 @@ const PluginManifestSchema = z.object({
   author: z.string().optional(),
   homepage: z.string().optional(),
   main: z.string(),
-  permissions: z.array(z.string()).optional(),
+  permissions: z.array(z.enum(['git:read', 'git:write', 'fs:read', 'fs:write', 'network', 'shell', 'clipboard', 'notifications'])).optional(),
 })
 
 // Plugin install result schema

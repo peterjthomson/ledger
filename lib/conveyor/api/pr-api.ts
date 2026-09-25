@@ -5,7 +5,7 @@ export class PRApi extends ConveyorApi {
   getPullRequests = () => this.invoke('get-pull-requests')
   openPullRequest = (url: string) => this.invoke('open-pull-request', url)
   createPullRequest = (options: CreatePROptions) => this.invoke('create-pull-request', options)
-  checkoutPRBranch = (branchName: string) => this.invoke('checkout-pr-branch', branchName)
+  checkoutPRBranch = (prNumber: number) => this.invoke('checkout-pr-branch', prNumber)
   getGitHubUrl = () => this.invoke('get-github-url')
   openBranchInGitHub = (branchName: string) => this.invoke('open-branch-in-github', branchName)
   getPRDetail = (prNumber: number) => this.invoke('get-pr-detail', prNumber)

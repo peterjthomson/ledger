@@ -6,11 +6,11 @@
  */
 
 import { memo } from 'react'
-import { BaseEdge, EdgeLabelRenderer, getBezierPath, type EdgeProps } from '@xyflow/react'
+import { BaseEdge, EdgeLabelRenderer, getBezierPath, type Edge, type EdgeProps } from '@xyflow/react'
 import type { ERDCardinality } from '@/lib/services/erd/erd-types'
 
 // Edge data type
-export interface RelationshipEdgeData {
+export interface RelationshipEdgeData extends Record<string, unknown> {
   label?: string
   fromCardinality?: ERDCardinality
   toCardinality?: ERDCardinality
@@ -48,7 +48,7 @@ function RelationshipEdgeComponent({
   data,
   selected,
   style,
-}: EdgeProps<RelationshipEdgeData>) {
+}: EdgeProps<Edge<RelationshipEdgeData>>) {
   const [edgePath, labelX, labelY] = getBezierPath({
     sourceX,
     sourceY,

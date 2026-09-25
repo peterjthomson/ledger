@@ -5,6 +5,8 @@
  * with syntax highlighting for additions/deletions.
  */
 
+import { DiffSearch } from '../../ui/DiffSearch'
+import { DiffViewer } from '../../ui/DiffViewer'
 import { useState, useEffect, useRef } from 'react'
 import type { CommitDiff, GraphCommit, Branch } from '../../../types/electron'
 
@@ -107,7 +109,7 @@ export function CommitDiffPanel({ diff, selectedCommit, formatRelativeTime, onBr
   }
 
   return (
-    <div className="diff-panel sidebar-detail-panel">
+    <DiffSearch className="diff-panel sidebar-detail-panel">
       {/* Meta panel header */}
       <div className="detail-type-badge">Commit</div>
       <h3 className="detail-title commit-title">{diff.message}</h3>
@@ -196,31 +198,7 @@ export function CommitDiffPanel({ diff, selectedCommit, formatRelativeTime, onBr
 
             {expandedFiles.has(fileDiff.file.path) && (
               <div className="diff-file-content">
-                {fileDiff.isBinary ? (
-                  <div className="diff-binary">Binary file</div>
-                ) : fileDiff.hunks.length === 0 ? (
-                  <div className="diff-empty">No changes</div>
-                ) : (
-                  fileDiff.hunks.map((hunk, hunkIdx) => (
-                    <div key={hunkIdx} className="diff-hunk">
-                      <div className="diff-hunk-header">
-                        @@ -{hunk.oldStart},{hunk.oldLines} +{hunk.newStart},{hunk.newLines} @@
-                      </div>
-                      <div className="diff-hunk-lines">
-                        {hunk.lines.map((line, lineIdx) => (
-                          <div key={lineIdx} className={`diff-line diff-line-${line.type}`}>
-                            <span className="diff-line-number old">{line.oldLineNumber || ''}</span>
-                            <span className="diff-line-number new">{line.newLineNumber || ''}</span>
-                            <span className="diff-line-prefix">
-                              {line.type === 'add' ? '+' : line.type === 'delete' ? '-' : ' '}
-                            </span>
-                            <span className="diff-line-content">{line.content}</span>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  ))
-                )}
+                <DiffViewer diff={fileDiff} filePath={fileDiff.file.path} syntaxHighlighting />
               </div>
             )}
           </div>
@@ -238,7 +216,7 @@ export function CommitDiffPanel({ diff, selectedCommit, formatRelativeTime, onBr
           </button>
         </div>
       )}
-    </div>
+    </DiffSearch>
   )
 }
 

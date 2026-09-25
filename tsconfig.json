@@ -1,12 +1,12 @@
 {
+  "extends": "@electron-toolkit/tsconfig/tsconfig.web.json",
   "compilerOptions": {
+    "jsx": "react-jsx",
+    "types": ["electron-vite/node"],
+    "noEmit": true,
     "paths": {
-      "@/*": ["./*"],
-      "@/app/*": ["./app/*"],
-      "@/lib/*": ["./lib/*"],
-      "@/resources/*": ["./resources/*"]
+      "@/*": ["./*"]
     }
   },
-  "files": [],
-  "references": [{ "path": "./tsconfig.node.json" }, { "path": "./tsconfig.web.json" }]
+  "include": ["app/**/*", "lib/**/*", "resources/**/*", "tests/**/*", "electron.vite.config.*", "playwright*.config.ts"]
 }

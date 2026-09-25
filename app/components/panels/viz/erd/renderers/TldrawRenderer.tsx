@@ -52,10 +52,12 @@ export function TldrawRenderer({ schema }: TldrawRendererProps) {
       const cleanup = renderERDSchema(editorRef.current, schema)
       return cleanup
     }
+    return undefined
   }, [schema, isEditorReady])
 
   // Handle editor mount
   const handleMount = useCallback((editor: Editor) => {
+    editor.user.updateUserPreferences({ colorScheme: 'system' })
     editorRef.current = editor
     setIsEditorReady(true)
   }, [])
@@ -77,7 +79,6 @@ export function TldrawRenderer({ schema }: TldrawRendererProps) {
       <Tldraw
         shapeUtils={customShapeUtils}
         onMount={handleMount}
-        inferDarkMode
         hideUi={false}
         components={{
           // Hide some default UI elements for cleaner ERD view

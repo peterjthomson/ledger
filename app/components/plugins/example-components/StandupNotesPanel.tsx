@@ -18,9 +18,9 @@ import {
   FileText,
 } from 'lucide-react'
 import type { PluginPanelProps } from '@/lib/plugins/plugin-types'
-import type { Commit, PullRequest } from '@/lib/types'
+import type { Commit, PullRequest } from '@/app/types/electron'
 
-export function StandupNotesPanel({ context, repoPath, onClose }: PluginPanelProps) {
+export function StandupNotesPanel({ context }: PluginPanelProps) {
   const [commits, setCommits] = useState<Commit[]>([])
   const [pullRequests, setPullRequests] = useState<PullRequest[]>([])
   const [selectedDate, setSelectedDate] = useState<Date>(new Date())
@@ -165,8 +165,8 @@ export function StandupNotesPanel({ context, repoPath, onClose }: PluginPanelPro
     setLoading(true)
     try {
       const [commitsData, prsData] = await Promise.all([
-        context.api.refreshCommits?.() || context.api.getCommits(),
-        context.api.refreshPullRequests?.() || context.api.getPullRequests(),
+        context.api.getCommits(),
+        context.api.getPullRequests(),
       ])
       // Ensure we always set arrays (API might return null/undefined on error)
       setCommits(Array.isArray(commitsData) ? commitsData : [])

@@ -12,7 +12,9 @@
  * additional props or wrap in a specialized component.
  */
 
-import { useCallback, useEffect, useState } from 'react'
+import { DiffLineContent } from './DiffSearch'
+import { inlineChanges } from '../../utils/inline-diff'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import type { StagingFileDiff, FileDiff } from '../../types/electron'
 import { getLanguageFromPath, highlightLines } from '../../utils/syntax-highlighter'
 import type { BundledLanguage } from 'shiki'
@@ -103,6 +105,8 @@ export function DiffViewer({
   onLineClick,
   className = '',
 }: DiffViewerProps) {
+  const changes = useMemo(() => diff?.hunks.map(hunk => inlineChanges(hunk.lines)) || [], [diff])
+
   // Syntax highlighting state
   const [highlightedLines, setHighlightedLines] = useState<Map<number, string>>(new Map())
 
@@ -123,14 +127,13 @@ export function DiffViewer({
       }
 
       // Collect all lines from all hunks with a global index
-      const allLines: Array<{ code: string; lineIndex: number; globalKey: number }> = []
+      const allLines: Array<{ code: string; globalKey: number }> = []
       let globalIndex = 0
 
       for (const hunk of diff.hunks) {
         for (const line of hunk.lines) {
           allLines.push({
             code: line.content,
-            lineIndex: line.lineIndex,
             globalKey: globalIndex++,
           })
         }
@@ -255,14 +258,7 @@ export function DiffViewer({
                   <span className="diff-line-prefix">
                     {line.type === 'add' ? '+' : line.type === 'delete' ? '-' : ' '}
                   </span>
-                  {highlightedHtml ? (
-                    <span
-                      className="diff-line-content highlighted"
-                      dangerouslySetInnerHTML={{ __html: highlightedHtml }}
-                    />
-                  ) : (
-                    <span className="diff-line-content">{line.content}</span>
-                  )}
+                  <DiffLineContent content={line.content} html={highlightedHtml} changes={changes[hunkIdx]?.get(lineArrayIdx)} />
                 </div>
               )
             })}

@@ -17,7 +17,7 @@ export const markChannelRegistered = (channel: string): void => {
  */
 export const handle = <T extends keyof typeof ipcSchemas>(
   channel: T,
-  handler: (...args: ChannelArgs<T>) => ChannelReturn<T>
+  handler: (...args: ChannelArgs<T>) => ChannelReturn<T> | Promise<ChannelReturn<T>>
 ): void => {
   if (registeredChannels.has(channel)) return
   

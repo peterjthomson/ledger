@@ -4,6 +4,7 @@
  * Shows PR details, allows commenting, merging, and viewing file diffs.
  */
 
+import { DiffSearch } from '../../ui/DiffSearch'
 import { useState, useEffect, useMemo, useCallback, useRef, useLayoutEffect } from 'react'
 import type {
   PullRequest,
@@ -129,7 +130,7 @@ export function PRReviewPanel({ pr, repoPath, formatRelativeTime, onCheckout, on
         if (statusTimeoutRef.current) clearTimeout(statusTimeoutRef.current)
         statusTimeoutRef.current = setTimeout(() => setCommentStatus(null), 3000)
       } else {
-        setCommentStatus({ type: 'error', message: result.message })
+        setCommentStatus({ type: 'error', message: result.message ?? (result.success ? 'Operation completed' : 'Operation failed') })
       }
     } catch (error) {
       setCommentStatus({ type: 'error', message: (error as Error).message })
@@ -158,7 +159,7 @@ export function PRReviewPanel({ pr, repoPath, formatRelativeTime, onCheckout, on
         if (statusTimeoutRef.current) clearTimeout(statusTimeoutRef.current)
         statusTimeoutRef.current = setTimeout(() => setCommentStatus(null), 3000)
       } else {
-        setCommentStatus({ type: 'error', message: result.message })
+        setCommentStatus({ type: 'error', message: result.message ?? (result.success ? 'Operation completed' : 'Operation failed') })
       }
     } catch (error) {
       setCommentStatus({ type: 'error', message: (error as Error).message })
@@ -183,7 +184,7 @@ export function PRReviewPanel({ pr, repoPath, formatRelativeTime, onCheckout, on
         const warningMsg = result.warnings?.length ? ` (${result.warnings.join(', ')})` : ''
         onStatusChange?.({ type: 'success', message: `Opened ${result.url}${warningMsg}` })
       } else {
-        onStatusChange?.({ type: 'error', message: result.message })
+        onStatusChange?.({ type: 'error', message: result.message ?? (result.success ? 'Operation completed' : 'Operation failed') })
       }
     } catch (error) {
       onStatusChange?.({ type: 'error', message: (error as Error).message })
@@ -306,7 +307,7 @@ export function PRReviewPanel({ pr, repoPath, formatRelativeTime, onCheckout, on
   }
 
   return (
-    <div className="pr-review-panel">
+    <DiffSearch className="pr-review-panel">
       {/* Header */}
       <div className="pr-review-header">
         <div className="detail-type-badge">Pull Request</div>
@@ -591,6 +592,6 @@ export function PRReviewPanel({ pr, repoPath, formatRelativeTime, onCheckout, on
         )}
       </div>
 
-    </div>
+    </DiffSearch>
   )
 }

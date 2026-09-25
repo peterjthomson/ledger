@@ -1,3 +1,5 @@
+import { parseDiff } from '../services/staging/diff-parser'
+import { buildPartialPatch } from '../services/staging/partial-patch'
 import { simpleGit, SimpleGit } from 'simple-git'
 import { exec } from 'child_process'
 import { promisify } from 'util'
@@ -11,9 +13,9 @@ const statAsync = promisify(fs.stat)
 let git: SimpleGit | null = null
 let repoPath: string | null = null
 
-export function setRepoPath(path: string) {
+export function setRepoPath(path: string | null) {
   repoPath = path
-  git = simpleGit(path)
+  git = path ? simpleGit(path) : null
 }
 
 export function getRepoPath(): string | null {
@@ -3747,141 +3749,6 @@ export async function discardHunk(
   }
 }
 
-/**
- * Build a partial patch from a hunk with only selected lines.
- *
- * For staging (applying to index from unstaged diff):
- * - Selected add lines: include as '+' (add to index)
- * - Non-selected add lines: OMIT entirely (they don't exist in index, can't be context)
- * - Selected delete lines: include as '-' (remove from index)
- * - Non-selected delete lines: include as context ' ' (keep in index)
- * - Context lines: include as context ' '
- */
-function buildPartialPatch(
-  filePath: string,
-  hunk: StagingDiffHunk,
-  selectedLineIndices: number[]
-): string {
-  const selectedSet = new Set(selectedLineIndices)
-
-  const patchLines: string[] = []
-  let oldCount = 0
-  let newCount = 0
-
-  for (const line of hunk.lines) {
-    const isSelected = selectedSet.has(line.lineIndex)
-
-    if (line.type === 'context') {
-      // Context lines are always included
-      patchLines.push(' ' + line.content)
-      oldCount++
-      newCount++
-    } else if (line.type === 'add') {
-      if (isSelected) {
-        // Selected add line - include as addition
-        patchLines.push('+' + line.content)
-        newCount++
-      }
-      // Non-selected add lines are OMITTED entirely.
-      // They exist in the working tree but NOT in the index,
-      // so they can't be used as context for git apply --cached.
-    } else if (line.type === 'delete') {
-      if (isSelected) {
-        // Selected delete line - include as deletion
-        patchLines.push('-' + line.content)
-        oldCount++
-      } else {
-        // Non-selected delete line - keep as context (line stays in index)
-        patchLines.push(' ' + line.content)
-        oldCount++
-        newCount++
-      }
-    }
-  }
-
-  const newHeader = `@@ -${hunk.oldStart},${oldCount} +${hunk.newStart},${newCount} @@`
-
-  return (
-    `diff --git a/${filePath} b/${filePath}\n` +
-    `--- a/${filePath}\n` +
-    `+++ b/${filePath}\n` +
-    newHeader +
-    '\n' +
-    patchLines.join('\n') +
-    '\n'
-  )
-}
-
-/**
- * Build a partial patch for reversed application (unstage/discard).
- *
- * For unstaging (applying -R to index) or discarding (applying -R to working tree):
- * - Selected add lines: include as '+' (will be removed by -R)
- * - Non-selected add lines: include as context ' ' (they exist in the target and must match)
- * - Selected delete lines: include as '-' (will be restored by -R)
- * - Non-selected delete lines: include as context ' ' (keep in target)
- * - Context lines: include as context ' '
- *
- * The key difference: when applying with -R, ALL lines (selected and non-selected)
- * must exist in the target for proper context matching.
- */
-function buildReversedPartialPatch(
-  filePath: string,
-  hunk: StagingDiffHunk,
-  selectedLineIndices: number[]
-): string {
-  const selectedSet = new Set(selectedLineIndices)
-
-  const patchLines: string[] = []
-  let oldCount = 0
-  let newCount = 0
-
-  for (const line of hunk.lines) {
-    const isSelected = selectedSet.has(line.lineIndex)
-
-    if (line.type === 'context') {
-      // Context lines are always included
-      patchLines.push(' ' + line.content)
-      oldCount++
-      newCount++
-    } else if (line.type === 'add') {
-      if (isSelected) {
-        // Selected add line - include as addition (will be removed by -R)
-        patchLines.push('+' + line.content)
-        newCount++
-      } else {
-        // Non-selected add line - include as context (exists in target, must match)
-        patchLines.push(' ' + line.content)
-        oldCount++
-        newCount++
-      }
-    } else if (line.type === 'delete') {
-      if (isSelected) {
-        // Selected delete line - include as deletion (will be restored by -R)
-        patchLines.push('-' + line.content)
-        oldCount++
-      } else {
-        // Non-selected delete line - keep as context
-        patchLines.push(' ' + line.content)
-        oldCount++
-        newCount++
-      }
-    }
-  }
-
-  const newHeader = `@@ -${hunk.oldStart},${oldCount} +${hunk.newStart},${newCount} @@`
-
-  return (
-    `diff --git a/${filePath} b/${filePath}\n` +
-    `--- a/${filePath}\n` +
-    `+++ b/${filePath}\n` +
-    newHeader +
-    '\n' +
-    patchLines.join('\n') +
-    '\n'
-  )
-}
-
 // Stage specific lines within a hunk
 export async function stageLines(
   filePath: string,
@@ -3937,7 +3804,7 @@ export async function unstageLines(
     }
 
     const hunk = diff.hunks[hunkIndex]
-    const partialPatch = buildReversedPartialPatch(filePath, hunk, lineIndices)
+    const partialPatch = buildPartialPatch(filePath, hunk, lineIndices, true)
 
     await applyPatch(repoPath, partialPatch, ['--cached', '-R'])
     return { success: true, message: `Unstaged ${lineIndices.length} line(s)` }
@@ -3969,7 +3836,7 @@ export async function discardLines(
     }
 
     const hunk = diff.hunks[hunkIndex]
-    const partialPatch = buildReversedPartialPatch(filePath, hunk, lineIndices)
+    const partialPatch = buildPartialPatch(filePath, hunk, lineIndices, true)
 
     await applyPatch(repoPath, partialPatch, ['-R'])
     return { success: true, message: `Discarded ${lineIndices.length} line(s)` }
@@ -4055,6 +3922,8 @@ export interface StagingDiffLine {
   newLineNumber?: number
   /** Index of this line within the hunk (0-based, for selection) */
   lineIndex: number
+  /** This line has no trailing newline on its side of the diff. */
+  noNewline?: boolean
 }
 
 export interface StagingFileDiff {
@@ -4142,131 +4011,6 @@ export async function getFileDiff(filePath: string, staged: boolean): Promise<St
 }
 
 // Parse unified diff format
-function parseDiff(diffOutput: string, filePath: string): StagingFileDiff {
-  const lines = diffOutput.split('\n')
-  const hunks: StagingDiffHunk[] = []
-  let currentHunk: StagingDiffHunk | null = null
-  let currentHunkRawLines: string[] = []
-  let oldLineNum = 0
-  let newLineNum = 0
-  let additions = 0
-  let deletions = 0
-  let isBinary = false
-  let status: StagingFileDiff['status'] = 'modified'
-  let oldPath: string | undefined
-
-  // Extract file header lines for building rawPatch
-  let fileHeader = ''
-  for (const line of lines) {
-    if (line.startsWith('diff --git') || line.startsWith('---') || line.startsWith('+++')) {
-      fileHeader += line + '\n'
-    }
-    if (line.startsWith('+++')) break
-  }
-
-  let lineIndex = 0
-
-  for (const line of lines) {
-    // Check for binary file
-    if (line.startsWith('Binary files')) {
-      isBinary = true
-      continue
-    }
-
-    // Check for new file
-    if (line.startsWith('new file mode')) {
-      status = 'added'
-      continue
-    }
-
-    // Check for deleted file
-    if (line.startsWith('deleted file mode')) {
-      status = 'deleted'
-      continue
-    }
-
-    // Check for rename
-    if (line.startsWith('rename from ')) {
-      oldPath = line.replace('rename from ', '')
-      status = 'renamed'
-      continue
-    }
-
-    // Parse hunk header
-    const hunkMatch = line.match(/^@@ -(\d+)(?:,(\d+))? \+(\d+)(?:,(\d+))? @@(.*)$/)
-    if (hunkMatch) {
-      // Finalize previous hunk
-      if (currentHunk) {
-        currentHunk.rawPatch = fileHeader + currentHunkRawLines.join('\n') + '\n'
-        hunks.push(currentHunk)
-      }
-
-      oldLineNum = parseInt(hunkMatch[1])
-      newLineNum = parseInt(hunkMatch[3])
-      lineIndex = 0
-      currentHunkRawLines = [line]
-
-      currentHunk = {
-        header: line,
-        oldStart: oldLineNum,
-        oldLines: parseInt(hunkMatch[2] || '1'),
-        newStart: newLineNum,
-        newLines: parseInt(hunkMatch[4] || '1'),
-        lines: [],
-        rawPatch: '', // Will be set when hunk is finalized
-      }
-      continue
-    }
-
-    // Parse diff lines
-    if (currentHunk) {
-      if (line.startsWith('+') && !line.startsWith('+++')) {
-        currentHunkRawLines.push(line)
-        additions++
-        currentHunk.lines.push({
-          type: 'add',
-          content: line.slice(1),
-          newLineNumber: newLineNum++,
-          lineIndex: lineIndex++,
-        })
-      } else if (line.startsWith('-') && !line.startsWith('---')) {
-        currentHunkRawLines.push(line)
-        deletions++
-        currentHunk.lines.push({
-          type: 'delete',
-          content: line.slice(1),
-          oldLineNumber: oldLineNum++,
-          lineIndex: lineIndex++,
-        })
-      } else if (line.startsWith(' ')) {
-        currentHunkRawLines.push(line)
-        currentHunk.lines.push({
-          type: 'context',
-          content: line.slice(1),
-          oldLineNumber: oldLineNum++,
-          newLineNumber: newLineNum++,
-          lineIndex: lineIndex++,
-        })
-      }
-    }
-  }
-
-  // Don't forget the last hunk
-  if (currentHunk) {
-    currentHunk.rawPatch = fileHeader + currentHunkRawLines.join('\n') + '\n'
-    hunks.push(currentHunk)
-  }
-
-  return {
-    filePath,
-    oldPath,
-    status,
-    hunks,
-    isBinary,
-    additions,
-    deletions,
-  }
-}
 
 // ========================================
 // Worktree-Specific Staging & Commit Functions

@@ -1,5 +1,5 @@
 import * as path from 'path'
-import { RepositoryContext, RepositoryType, createRepositoryContext } from './repository-context'
+import { RepositoryContext, LocalRepositoryContext, RepositoryType, createRepositoryContext } from './repository-context'
 
 /**
  * RepositoryManager - Singleton managing multiple repository contexts
@@ -148,11 +148,6 @@ export class RepositoryManager {
       const lruContext = sortedByLRU[0]
       console.info(`[RepositoryManager] Evicting LRU repository: ${lruContext.name} (last accessed: ${lruContext.lastAccessed.toISOString()})`)
 
-      // Clean up SimpleGit instance
-      if (lruContext.git) {
-        ;(lruContext as { git: null }).git = null
-      }
-
       // Remove from maps
       this.contexts.delete(lruContext.id)
       if (lruContext.path) {
@@ -183,7 +178,7 @@ export class RepositoryManager {
    * @param makeActive - Whether to make this the active repo (default: true)
    * @returns The repository context
    */
-  async open(repoPath: string, makeActive: boolean = true): Promise<RepositoryContext> {
+  async open(repoPath: string, makeActive: boolean = true): Promise<LocalRepositoryContext> {
     // Claim an activation slot up front so the most recently *requested* open wins,
     // regardless of which one finishes first.
     const activationId = makeActive ? ++this._activationSeq : 0
@@ -196,6 +191,7 @@ export class RepositoryManager {
     const existingId = this.pathIndex.get(normalizedPath)
     if (existingId) {
       const existing = this.contexts.get(existingId)!
+      if (existing.type !== 'local') throw new Error('Local repository index contains a remote repository')
       existing.lastAccessed = new Date()
 
       if (shouldActivate() && this.activeId !== existingId) {
@@ -221,6 +217,7 @@ export class RepositoryManager {
       const existingByActualPath = this.pathIndex.get(context.path)
       if (existingByActualPath) {
         const existing = this.contexts.get(existingByActualPath)!
+        if (existing.type !== 'local') throw new Error('Local repository index contains a remote repository')
         existing.lastAccessed = new Date()
         if (shouldActivate() && this.activeId !== existingByActualPath) {
           this._switchEpoch++
@@ -335,14 +332,7 @@ export class RepositoryManager {
 
     const wasActive = this.activeId === id
 
-    // Clean up SimpleGit instance to release resources
-    // Note: SimpleGit doesn't have explicit cleanup, but nulling prevents further operations
-    // and allows GC to collect the instance and any associated child processes
-    if (context.git) {
-      // Cast to allow nulling - the context is being removed anyway
-      ;(context as { git: null }).git = null
-    }
-
+    // Removing the manager's reference allows collection after in-flight work finishes.
     this.contexts.delete(id)
     // Remove from appropriate index
     if (context.path) {

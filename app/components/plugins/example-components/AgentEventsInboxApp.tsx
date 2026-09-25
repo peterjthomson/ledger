@@ -16,7 +16,6 @@ import {
   Clock,
   RefreshCw,
   Trash2,
-  Filter,
   Bell,
   BellOff,
   ChevronRight,
@@ -27,7 +26,6 @@ import {
   Zap,
   Eye,
   EyeOff,
-  Settings,
 } from 'lucide-react'
 import type { PluginAppProps } from '@/lib/plugins/plugin-types'
 import type { AgentEvent, AgentEventType, AgentState } from '@/lib/plugins/agent-events'
@@ -78,7 +76,7 @@ interface StoredEvent extends AgentEvent {
   read: boolean
 }
 
-export function AgentEventsInboxApp({ context, repoPath, activeNavItem, onNavigate }: PluginAppProps) {
+export function AgentEventsInboxApp({ context, repoPath, activeNavItem }: PluginAppProps) {
   const [events, setEvents] = useState<StoredEvent[]>([])
   const [agents, setAgents] = useState<AgentState[]>([])
   const [isLoading, setIsLoading] = useState(true)
@@ -112,7 +110,7 @@ export function AgentEventsInboxApp({ context, repoPath, activeNavItem, onNaviga
 
         // Load notification preference
         const notifEnabled = await context.storage.get<boolean>('notificationsEnabled')
-        if (notifEnabled !== undefined && isMountedRef.current) {
+        if (notifEnabled != null && isMountedRef.current) {
           setNotificationsEnabled(notifEnabled)
         }
       } catch (error) {

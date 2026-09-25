@@ -29,7 +29,7 @@ interface SettingValue {
   dirty: boolean
 }
 
-export function PluginConfigEditor({ plugin, onClose }: PluginConfigEditorProps) {
+export function PluginConfigEditor({ plugin }: PluginConfigEditorProps) {
   const settings = plugin.settings ?? []
 
   // Load current values

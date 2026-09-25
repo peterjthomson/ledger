@@ -59,7 +59,7 @@ export function WorktreeList({
   const [sort, setSort] = useState<WorktreeSort>('last-modified')
 
   // Get available parent filters
-  const parentFilters = useMemo(() => getWorktreeParents(worktrees, repoPath), [worktrees, repoPath])
+  const parentFilters = useMemo(() => getWorktreeParents(worktrees, repoPath ?? null), [worktrees, repoPath])
 
   // Create working folder pseudo-worktree
   const workingFolderWorktree: Worktree | null = useMemo(() => {
@@ -70,7 +70,16 @@ export function WorktreeList({
     return {
       path: repoPath,
       branch: mainWorktree?.branch || null,
-      commit: mainWorktree?.commit || '',
+      head: mainWorktree?.head || '',
+      bare: false,
+      agentIndex: 0,
+      contextHint: '',
+      lastModified: mainWorktree?.lastModified || '',
+      activityStatus: mainWorktree?.activityStatus || 'unknown',
+      lastFileModified: mainWorktree?.lastFileModified || '',
+      lastGitActivity: mainWorktree?.lastGitActivity || '',
+      activitySource: mainWorktree?.activitySource || 'git',
+      agentTaskHint: mainWorktree?.agentTaskHint ?? null,
       displayName: repoName,
       agent: 'working-folder',
       additions: mainWorktree?.additions || 0,
@@ -88,7 +97,7 @@ export function WorktreeList({
     filtered = sortWorktrees(
       filtered.filter(
         (wt) =>
-          matchesWorktreeParent(wt, parentFilter, repoPath) && matchesWorktreeSearch(wt, search)
+          matchesWorktreeParent(wt, parentFilter, repoPath ?? null) && matchesWorktreeSearch(wt, search)
       ),
       sort
     )
@@ -236,5 +245,4 @@ export function WorktreeList({
     </div>
   )
 }
-
 

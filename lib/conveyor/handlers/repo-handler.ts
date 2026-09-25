@@ -161,7 +161,7 @@ export const registerRepoHandlers = () => {
       }
 
       // Emit switch event (use fullName for remote repos)
-      const activePath = active.path || active.remote?.fullName || null
+      const activePath = active.type === 'local' ? active.path : active.remote.fullName
       emitRepoSwitched(previousPath, activePath)
 
       return { success: true, path: active.path ?? undefined }
@@ -200,7 +200,7 @@ export const registerRepoHandlers = () => {
     }
     // If there's a new active repo after close, emit switch
     if (active && closingPath && repoToClose?.isActive) {
-      const activePath = active.path || active.remote?.fullName || null
+      const activePath = active.type === 'local' ? active.path : active.remote.fullName
       emitRepoSwitched(closingPath, activePath)
     }
 

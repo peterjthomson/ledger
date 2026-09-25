@@ -25,7 +25,7 @@ export const prIpcSchema = {
     return: CreatePRResultSchema,
   },
   'checkout-pr-branch': {
-    args: z.tuple([z.string()]),
+    args: z.tuple([z.number()]),
     return: CheckoutResultSchema,
   },
   'get-github-url': {
