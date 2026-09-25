@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.6.0] - 2026-09-25
+
 ### Added
 
 - Find text in expanded diffs with Command/Ctrl-F, match navigation, and character-level change highlighting.
