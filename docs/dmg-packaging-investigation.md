@@ -13,7 +13,7 @@ Evidence collected locally:
 - No stale Ledger/Marktext disk images were mounted before the controlled retry.
 - Marktext's existing notarized app packages successfully as a DMG from the
   same Codex task. Ledger's existing notarized app fails.
-- Ledger's fresh signed app from the new detached preparation pipeline was
+- A fresh signed Ledger app prepared during the investigation was
   accepted by Apple, stapled, then failed at the same DMG copy operation.
 - The installed `dmg.js` and `dmgUtil.js` implementations are identical between
   the two apps; the builders use the same bundled native dmgbuild implementation.
@@ -25,8 +25,9 @@ inability for Codex to package DMGs. It does not establish why macOS treats the
 apps differently. No app identity, privacy permissions or security attributes
 were changed to evade the denial; no installer was assembled by hand.
 
-The next host-level remedy is a user-approved App Management permission change
-for the responsible build host, followed by the same packaging command and full
-artifact verification. Until then, a DMG candidate is blocked. ZIP-only delivery
+A possible host-level remedy is an App Management permission change for the
+responsible build host, followed by the same packaging command and full artifact
+verification. This has not been tested, so it is not an established fix. A DMG
+candidate remains blocked. ZIP-only delivery
 must be an explicit format choice. This is separate from the App Store 1.5.1
 review rejection recorded in `docs/app-store/review-1.5.1.md`.

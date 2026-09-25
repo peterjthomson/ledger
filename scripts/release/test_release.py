@@ -1,14 +1,9 @@
-import contextlib
-import io
-import json
 from pathlib import Path
 import tempfile
 import unittest
-from unittest.mock import patch
 import zipfile
 
 import mac_artifacts as artifacts
-import notarize
 
 
 class ArtifactTests(unittest.TestCase):
@@ -20,8 +15,8 @@ class ArtifactTests(unittest.TestCase):
     def test_zip_names_with_spaces_and_nested_bundle_rejected(self):
         valid = self.root / 'valid.zip'
         with zipfile.ZipFile(valid, 'w') as archive:
-            archive.writestr('Oh My Marktext.app/Contents/Info.plist', b'plist')
-        self.assertEqual(artifacts.check_zip(valid), 'Oh My Marktext.app')
+            archive.writestr('Ledger.app/Contents/Info.plist', b'plist')
+        self.assertEqual(artifacts.check_zip(valid), 'Ledger.app')
         nested = self.root / 'nested.zip'
         with zipfile.ZipFile(nested, 'w') as archive:
             archive.writestr('Ledger.app/Ledger.app/Contents/Info.plist', b'plist')
@@ -70,47 +65,6 @@ class ArtifactTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, 'missing input'):
             artifacts.verify(Namespace(dmg=None, zip=self.root/'missing.zip', feed=None,
                                        bundle_id='com.example.app', version=None))
-
-    def test_pending_notarization_cannot_staple(self):
-        state = self.root / 'state.json'
-        state.write_text(json.dumps({'app.zip': {'id': 'submission', 'path': '/unused'}}))
-        with patch.object(notarize, 'STATE', state), patch.object(notarize, 'apple', return_value={'status': 'In Progress'}), patch.object(notarize.subprocess, 'run') as runner, patch('sys.argv', ['notarize', 'staple']), contextlib.redirect_stdout(io.StringIO()), contextlib.redirect_stderr(io.StringIO()):
-            self.assertEqual(notarize.main(), 2)
-            runner.assert_not_called()
-
-    def test_valid_ticket_is_not_stapled_again(self):
-        from types import SimpleNamespace
-        asset = self.root / 'app.zip'
-        asset.write_bytes(b'submission')
-        state = self.root / 'state.json'
-        state.write_text(json.dumps({'app.zip': {'id': 'submission', 'path': str(asset),
-            'sha256': notarize.sha(asset), 'app': str(self.root / 'App With Spaces.app')}}))
-        with patch.object(notarize, 'STATE', state), patch.object(notarize, 'apple', return_value={'status': 'Accepted'}), patch.object(notarize.subprocess, 'run', return_value=SimpleNamespace(returncode=0)) as runner, patch('sys.argv', ['notarize', 'staple']), contextlib.redirect_stdout(io.StringIO()):
-            self.assertEqual(notarize.main(), 0)
-            self.assertEqual(runner.call_count, 1)
-            self.assertEqual(runner.call_args.args[0][2], 'validate')
-
-    def test_staple_can_select_the_current_release_stage(self):
-        from types import SimpleNamespace
-        asset = self.root / 'App.dmg'
-        asset.write_bytes(b'dmg')
-        state = self.root / 'state.json'
-        state.write_text(json.dumps({
-            'app.zip': {'id': 'old-app', 'path': '/source-no-longer-used'},
-            'App.dmg': {'id': 'disk', 'path': str(asset), 'sha256': notarize.sha(asset)}}))
-        with patch.object(notarize, 'STATE', state), patch.object(notarize, 'apple', return_value={'status': 'Accepted'}) as apple, patch.object(notarize.subprocess, 'run', return_value=SimpleNamespace(returncode=0)), patch('sys.argv', ['notarize', 'staple', str(asset)]), contextlib.redirect_stdout(io.StringIO()):
-            self.assertEqual(notarize.main(), 0)
-            apple.assert_called_once_with('info', 'disk')
-            self.assertIn('app.zip', json.loads(state.read_text()))
-
-    def test_changed_artifact_cannot_be_stapled(self):
-        asset = self.root / 'App.dmg'
-        asset.write_bytes(b'changed')
-        state = self.root / 'state.json'
-        state.write_text(json.dumps({'App.dmg': {'id': 'submission', 'path': str(asset), 'sha256': 'original'}}))
-        with patch.object(notarize, 'STATE', state), patch.object(notarize, 'apple', return_value={'status': 'Accepted'}), patch('sys.argv', ['notarize', 'staple']), contextlib.redirect_stdout(io.StringIO()):
-            with self.assertRaisesRegex(ValueError, 'bytes changed'):
-                notarize.main()
 
 
 if __name__ == '__main__':

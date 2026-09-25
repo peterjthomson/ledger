@@ -1,8 +1,3 @@
-> For releases, follow [RELEASE-PROTOCOL.md](../../RELEASE-PROTOCOL.md).
-> These legacy platform wrappers create local builds. They do not notarize or
-> publish releases. Use `release:prepare` and `release:package` for macOS release
-> candidates and verify the downloaded artifacts before publication.
-
 # Build Scripts for Ledger
 
 This directory contains shell scripts to build the Ledger application for macOS, Windows, and Linux. This documentation is written for beginners who may not be familiar with Electron, React, or software building in general.
@@ -805,9 +800,8 @@ chmod +x scripts/build/*.sh
 
 **Solution:**
 ```bash
-# Diagnose signing and Gatekeeper acceptance
-codesign --verify --deep --strict dist/mac-arm64/Ledger.app
-spctl --assess --type execute -v dist/mac-arm64/Ledger.app
+# Remove quarantine attribute
+xattr -cr dist/mac-arm64/Ledger.app
 
 # Or right-click > Open instead of double-clicking
 ```
@@ -881,7 +875,7 @@ scripts/build/
 │   ├── Xcode tools check
 │   ├── Signing certificate check
 │   ├── Notarization handling
-│   └── Local package verification
+│   └── Quarantine removal
 │
 ├── build-linux.sh      # Linux-specific build
 │   ├── Sources build-common.sh

@@ -13,7 +13,7 @@ macOS 26.5.2, active internet connection.
 
 These observations concern the App Store build. Developer ID notarization and
 startup checks for the GitHub ZIP do not establish that the sandboxed MAS app
-passes review. The shared direct-download release scripts do not produce MAS
+passes review. The direct-download release scripts do not produce MAS
 submissions. Keep MAS entitlements, signing and installation validation separate.
 
 No App Store metadata was edited, no reply sent and no resubmission made during
