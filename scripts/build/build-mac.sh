@@ -203,32 +203,7 @@ check_signing_certificate() {
 
 # Check for notarization credentials
 check_notarization_credentials() {
-    if [ "$SKIP_NOTARIZE" = true ] || [ "$SKIP_SIGNING" = true ]; then
-        log_info "Notarization will be skipped"
-        return 0
-    fi
-
-    log_step "Checking notarization configuration..."
-
-    # electron-builder uses these environment variables for notarization
-    if [ -z "$APPLE_ID" ] || [ -z "$APPLE_APP_SPECIFIC_PASSWORD" ]; then
-        log_warn "Notarization credentials not configured"
-        log_info ""
-        log_info "To notarize your app (required for distribution), set these environment variables:"
-        log_info "  export APPLE_ID='your-apple-id@email.com'"
-        log_info "  export APPLE_APP_SPECIFIC_PASSWORD='your-app-specific-password'"
-        log_info "  export APPLE_TEAM_ID='your-team-id' (optional)"
-        log_info ""
-        log_info "To generate an app-specific password:"
-        log_info "  1. Go to https://appleid.apple.com/account/manage"
-        log_info "  2. Sign in with your Apple ID"
-        log_info "  3. Go to 'Sign-In and Security' > 'App-Specific Passwords'"
-        log_info ""
-        log_info "Continuing without notarization..."
-        SKIP_NOTARIZE=true
-    else
-        log_success "Notarization credentials found"
-    fi
+    log_info "Notarization is a separate release stage; see RELEASE-PROTOCOL.md"
 }
 
 # Run the macOS-specific build
@@ -239,7 +214,7 @@ run_mac_build() {
     cd "$PROJECT_ROOT" || exit 1
 
     # Build the electron-builder command
-    local build_cmd="npx electron-builder --mac"
+    local build_cmd="npx electron-builder --mac --publish never"
 
     # Add architecture flag
     case $BUILD_ARCH in
@@ -274,15 +249,6 @@ run_mac_build() {
 
     # Run the build
     eval "$build_cmd"
-
-    # Post-build: Remove quarantine attribute (macOS security feature)
-    # This allows the app to run without "unidentified developer" warnings
-    local app_path="$DIST_DIR/mac-$BUILD_ARCH/Ledger.app"
-    if [ -d "$app_path" ]; then
-        log_step "Removing quarantine attribute..."
-        xattr -cr "$app_path" 2>/dev/null || true
-        log_success "Quarantine attribute removed"
-    fi
 }
 
 # Verify macOS build output

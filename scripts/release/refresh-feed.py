@@ -19,6 +19,9 @@ size = len(data)
 text = open(feed).read()
 pattern = re.compile(r"(- url: %s\s*\n\s*sha512: )\S+(\s*\n\s*size: )\d+" % re.escape(name))
 new, count = pattern.subn(lambda m: f"{m.group(1)}{sha}{m.group(2)}{size}", text)
+legacy_path = re.search(r"^path: (.+)$", text, re.M)
+if legacy_path and legacy_path.group(1).strip("\"'") == name:
+    new = re.sub(r"^sha512: .+$", f"sha512: {sha}", new, flags=re.M)
 if count and new != text:
     open(feed, "w").write(new)
     print(f"notarize: refreshed {name} checksums in {feed.split('/')[-1]}")

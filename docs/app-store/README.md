@@ -77,3 +77,8 @@ Built-in image generation was used for the shared background with this prompt:
 
 - Screenshot specification: https://developer.apple.com/help/app-store-connect/reference/app-information/screenshot-specifications/
 - App icon guidance: https://developer.apple.com/design/human-interface-guidelines/app-icons/
+
+## Current review blockers
+
+See [the 1.5.1 rejection and resubmission gates](review-1.5.1.md).
+A passing GitHub package is not evidence that the sandboxed MAS build passes.

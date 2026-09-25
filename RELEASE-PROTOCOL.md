@@ -1,111 +1,123 @@
-# Release protocol (shared across the productivity suite)
+# Release protocol
 
-Canonical copy: `peterjthomson/marktext`. Mirrored into `peterjthomson/ledger`
-and `peterjthomson/year-view` so all three release the same way.
+Shared by Marktext, Ledger and Year View. The scripts in `scripts/release/` are
+mirrored; update and test all three copies together. macOS signing stays local.
+Windows/Linux builds run on their target platforms where supported.
 
-## The rule that shapes everything
+## Release gates
 
-**Notarization is asynchronous and may take over a day.** Apple's notary
-service is usually minutes; it has taken more than 24 hours. Any pipeline that
-blocks on the result eventually strands a build, and a stranded build gets
-finished by hand.
+1. Record the source commit and version. Run typechecking, relevant tests and
+   platform builds. Keep candidate outputs in a new version/candidate directory.
+2. Build and sign the app using the repository's build tool. Do not publish yet.
+3. Submit notarization, save the submission ID, and return. Check status later;
+   pending or invalid submissions block subsequent stages. Never rebuild an app
+   to work around a slow Apple response.
+4. Staple the accepted app, then package it using the repository's packager.
+   Submit and staple the enclosing DMG if shipping one. Refresh update feeds
+   after stapling, since it changes the DMG's bytes.
+5. Verify the exact DMG/ZIP, then run the native walkthrough on the extracted
+   package. Record the artifact SHA-256, source commit, test results and observed
+   UI results. See `scripts/release/LOCAL-COMPUTER-USE.md`.
+6. Tag the approved source commit. Stage every intended asset and a complete
+   SHA-256 manifest in a **draft** release. Download the assets again, verify
+   checksums and rerun artifact verification. Only then publish the draft.
 
-That is not hypothetical. Ledger 1.5.0's DMG shipped containing
-`Ledger.app/Ledger.app` — a folder wearing the `.app` extension with the real,
-correctly-notarized bundle inside it. Finder shows a broken item and
-drag-to-Applications installs something that cannot launch. The repository's own
-`electron-builder` pipeline produces a **correct** DMG; the nesting was
-introduced by the manual step that existed to work around slow notarization. The
-workaround, not the tooling, broke the release.
+Do not overwrite published tags/assets. Check whether an existing release is
+immutable before proposing additions; a new patch release may be required.
+A release that intentionally omits a platform or installer must say so explicitly.
 
-So: never block on Apple, and never hand-assemble an artifact.
+## Electron apps: Ledger and Marktext
 
-## The five stages
-
-Each stage is idempotent and independently re-runnable. State lives on disk, so
-a stage can be resumed tomorrow without redoing the one before it.
-
-| Stage | Command | Blocks on Apple? |
-|---|---|---|
-| 1. Build | repo-native (`pnpm build:mac:arm64`, `npm run build:mac:arm64`, `xcodebuild archive`) | no |
-| 2. Submit | `scripts/release/notarize.sh submit dist/*.dmg` | no — returns after upload |
-| 3. Collect | `scripts/release/notarize.sh status` | no — poll whenever |
-| 4. Staple | `scripts/release/notarize.sh staple` | no — only staples what is Accepted |
-| 5. Verify | `scripts/release/verify-mac-artifact.sh --dmg … --bundle-id …` | no |
-| 6. Publish | `gh release upload …` | no |
-
-If Apple takes 26 hours, stages 1–2 are already done and nothing is lost: run
-`status` tomorrow, `staple` when it clears, and the ticket attaches to the
-artifact you already built. No rebuild, no re-sign, no hand-made DMG.
+Run from the repository root. `release:prepare` compiles, packages a signed app,
+creates its submission ZIP and submits it without waiting for Apple. It refuses
+to overwrite an existing candidate. It does not publish anything.
 
 ```bash
-# Day 1
-pnpm build:mac:arm64                          # or the repo's build command
-./scripts/release/notarize.sh submit dist/*.dmg
-# → "submitted as 3ac911ba-…", terminal returns
+# Ledger
+npm run typecheck
+npm test
+npm run test:release
+npm run release:prepare
 
-# Whenever — an hour later, or Thursday
-./scripts/release/notarize.sh status
-./scripts/release/notarize.sh staple
-./scripts/release/verify-mac-artifact.sh --dmg dist/App.dmg --bundle-id com.example.app
+# Marktext
+pnpm check
+pnpm test
+pnpm test:e2e
+pnpm test:release
+pnpm release:prepare
 ```
 
-`notarize.sh log <artifact>` fetches Apple's detailed report when something is
-Invalid. `notarize.sh reset` forgets recorded submissions without cancelling
-them.
-
-## Stage 5 is not optional
-
-`verify-mac-artifact.sh` is the gate that would have caught Ledger 1.5.0. It
-mounts the DMG the way a user's Mac will — quarantined — and asserts:
-
-- the DMG carries a stapled ticket, and Gatekeeper accepts it quarantined
-- **exactly one `.app` at the volume root, with `Contents/Info.plist` directly
-  inside it** (the nesting check)
-- the bundle identifier is the expected one
-- the signature is valid deep+strict, and the authority is Developer ID Application
-- the app carries its **own** stapled ticket, so it still validates offline once
-  copied out of the DMG
-- Gatekeeper accepts the app for execution
-- every `latest*.yml` entry matches the bytes on disk — stapling rewrites the
-  DMG *after* electron-builder hashes it, so the feed goes stale silently
-- the zip, if shipped, has the same single well-formed bundle at its root
-
-Exit code 0 means safe to publish. Run it again on the copy downloaded back from
-the release: that is the artifact users actually get.
-
-## Credentials
-
-One notarytool keychain profile per machine, shared by all three repos:
+The candidate directory is `dist/release-<package version>`. For a replacement
+candidate, compile first and call `scripts/release/electron-mac.sh prepare`
+with a fresh output directory; never overwrite the previous candidate.
 
 ```bash
-xcrun notarytool store-credentials AC_PASSWORD \
-  --apple-id <email> --team-id R4RRG93J68 --password <app-specific-password>
+export NOTARIZE_STATE="$PWD/dist/release-<version>/notarize-state.json"
+scripts/release/notarize.sh status
+scripts/release/notarize.sh staple
+# Only after the app is Accepted and stapled:
+npm run release:package  # Marktext: pnpm release:package
+scripts/release/notarize.sh submit dist/release-<version>/artifacts/*.dmg
+scripts/release/notarize.sh status
+scripts/release/notarize.sh staple
 ```
 
-`APPLE_KEYCHAIN_PROFILE` overrides the name (default `AC_PASSWORD`). The
-credentials live in the macOS data-protection keychain, which is why they cannot
-be read back out for CI — see `signing-and-release.md`.
+`status` and `staple` exit 2 while any submission is not accepted. Use `log
+<artifact>` to investigate an Invalid submission. Submission is idempotent for
+unchanged bytes; changed artifacts require a new candidate/state file. The
+stored `AC_PASSWORD` keychain profile is shared; `APPLE_KEYCHAIN_PROFILE`
+overrides it. Never put credentials in release manifests or logs.
 
-## Why signing stays off CI
+`build:mac*` creates local installers without notarizing or uploading them.
+A successful build alone is not a release gate. Do not remove quarantine to make
+release verification pass. The legacy `npm run release` in Ledger now prepares
+an app; it no longer uploads unchecked artifacts.
 
-CI builds what needs no secrets (Windows, Linux, unsigned smoke builds and
-tests) and stops there. macOS artifacts are built, signed, notarized and stapled
-on a Mac, then uploaded.
+## Year View
 
-This is a decision, not a gap. The Apple credential cannot be minted from a CLI,
-notarization is the one step that has never actually failed, and putting a
-Developer ID private key in CI buys nothing that the local path does not already
-do. Every historical mac CI failure across these repos was a *signing-path*
-failure while Windows and Linux went green.
+Use the archive/export commands in `release-config/README.md`. Submit its ZIP
+with `notarize.sh submit --app <exported.app> <submission.zip>`, then run
+`status` and `staple`. Recreate the final ZIP from the stapled app with
+`ditto -c -k --keepParent`. ZIP files themselves cannot be stapled.
 
-The real fragility was always the manual assembly around notarization, which
-stages 2–5 remove.
+## Artifact verification
 
-## Per-repo entry points
+Both formats are supported independently. For an Electron DMG+ZIP release:
 
-| Repo | Build | Notarizes | Publishes |
-|---|---|---|---|
-| marktext | `pnpm build:mac:arm64` | electron-builder (`notarize: true`) + `build/notarize-dmg.cjs` for the DMG | CI publishes win/linux; mac uploaded after stage 5 |
-| ledger | `npm run build:mac:arm64` | **should** use stages 2–4; `scripts/notarize.js` is currently dead code (no `afterSign` wiring) | manual upload |
-| year-view | `xcodebuild archive` + `-exportArchive` | stages 2–4 on the exported zip | manual upload |
+```bash
+scripts/release/verify-mac-artifact.sh \
+  --dmg <artifacts/App.dmg> --zip <artifacts/App.zip> \
+  --feed <artifacts/latest-mac.yml> --bundle-id <expected.id> --version <version>
+```
+
+For ZIP-only releases, omit `--dmg` and, when no updater exists, `--feed`.
+Verification checks archive layout, the extracted app's identity/version,
+Developer ID signature, stapled ticket and Gatekeeper acceptance with quarantine.
+It checks every feed entry and legacy checksum; missing requested files fail.
+DMGs are mounted read-only and verified as downloaded, including the copied app.
+Verification does not replace the native UI walkthrough.
+
+## DMG copy permissions
+
+If the packager reports `ditto: /Volumes/.../App.app: Operation not permitted`,
+retain its log and inspect `hdiutil info` plus the matching macOS `tccd` log.
+Compare the exact packager, app and parent process before diagnosing the cause.
+Do not detach unrelated volumes, change app identity, clear security attributes,
+hand-assemble an installer or change OS permissions as an automatic workaround.
+An App Management denial may need the user to grant permission to the build host
+in System Settings. ZIP-only publication is an explicit release-format decision.
+
+## Per-repository native paths
+
+- Ledger: disposable Git repo; branch/worktree navigation, search, selected
+  stage/unstage/discard and read-only historical commits. Check Git state on disk.
+- Marktext: disposable Markdown/profile; unchanged save, edit/undo, dirty prompts,
+  actual save, external reload and close. Compare file bytes. Include OS clipboard
+  and drag/drop when the change affects them.
+- Year View: all layouts, year/today navigation, day details and preferences;
+  real calendar permissions and deep links when applicable. Keep calendar data
+  read-only and redact event details from recorded evidence.
+
+Marktext's tag workflow stages Windows/Linux artifacts in a draft. Add verified
+Mac assets, regenerate the manifest for all assets, then publish. Update the
+Homebrew cask only after the referenced DMG is published.

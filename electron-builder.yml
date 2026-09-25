@@ -68,7 +68,8 @@ mac:
     - NSDocumentsFolderUsageDescription: Ledger needs access to read git repositories.
     - NSDownloadsFolderUsageDescription: Ledger needs access to read git repositories.
     - ITSAppUsesNonExemptEncryption: false
-  notarize: true
+  # Release notarization is submitted separately; see RELEASE-PROTOCOL.md.
+  notarize: false
 mas:
   identity: "Peter Thomson (R4RRG93J68)"
   hardenedRuntime: true
