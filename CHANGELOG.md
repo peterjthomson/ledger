@@ -7,6 +7,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- VS Code-style back/forward buttons in the titlebar for editor history (also ⌘[ / ⌘]).
+- Rename pull requests (edit the title) from the PR detail card.
+- Rename remote branches from the remote branch detail card. GitHub remotes use the branch-rename API, so open PRs follow the new name.
+
+### Changed
+
+- List search, filter, and sort survive switching canvases or panels, and are shared between radar columns and the Focus sidebar sections. Filter, sort, and sidebar section expansion are remembered across restarts.
+- Remote branch lists show `feature/x` instead of `remotes/origin/feature/x` (the remote is shown only when there are several) and no longer show commit hashes.
+- Branch commit counts include only commits made since the branch forked from main/master.
+
+### Fixed
+
+- Renaming a remote branch no longer fails with "branch not found".
+- Line staging works for untracked files, and untracked-file diffs no longer show a phantom empty last line.
+- Focus sidebar filter controls no longer lose focus or close their dropdowns when the list refreshes.
+- Back/forward now restores repository and mailmap views, and worktree/mailmap links are recorded in history.
+
 ## [1.6.0] - 2026-09-25
 
 ### Added

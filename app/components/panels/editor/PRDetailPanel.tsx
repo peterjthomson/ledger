@@ -21,6 +21,7 @@ export interface PRReviewPanelProps {
   formatRelativeTime: (date: string) => string
   onCheckout?: (pr: PullRequest) => void
   onPRMerged?: () => void
+  onPRUpdated?: () => void
   onStatusChange?: (status: { type: 'info' | 'success' | 'error'; message: string } | null) => void
   onNavigateToBranch?: (branchName: string) => void
   switching?: boolean
@@ -36,7 +37,7 @@ function isAIAuthor(login: string): boolean {
   return AI_AUTHORS.some((ai) => lower.includes(ai)) || lower.endsWith('[bot]') || lower.endsWith('-bot')
 }
 
-export function PRReviewPanel({ pr, repoPath, formatRelativeTime, onCheckout, onPRMerged, onStatusChange, onNavigateToBranch, switching }: PRReviewPanelProps) {
+export function PRReviewPanel({ pr, repoPath, formatRelativeTime, onCheckout, onPRMerged, onPRUpdated, onStatusChange, onNavigateToBranch, switching }: PRReviewPanelProps) {
   const [activeTab, setActiveTab] = useState<PRTab>('conversation')
   const [prDetail, setPrDetail] = useState<PRDetail | null>(null)
   const [reviewComments, setReviewComments] = useState<PRReviewComment[]>([])
@@ -49,6 +50,9 @@ export function PRReviewPanel({ pr, repoPath, formatRelativeTime, onCheckout, on
   const [submittingComment, setSubmittingComment] = useState(false)
   const [commentStatus, setCommentStatus] = useState<{ type: 'success' | 'error'; message: string } | null>(null)
   const [mergingPR, setMergingPR] = useState(false)
+  // Title rename state (null when not editing)
+  const [titleDraft, setTitleDraft] = useState<string | null>(null)
+  const [renamingTitle, setRenamingTitle] = useState(false)
   // Preview provider state
   const [previewProviders, setPreviewProviders] = useState<PreviewProviderInfo[]>([])
   const [previewLoading, setPreviewLoading] = useState(false)
@@ -87,7 +91,35 @@ export function PRReviewPanel({ pr, repoPath, formatRelativeTime, onCheckout, on
 
   useEffect(() => {
     loadPRDetail()
+    setTitleDraft(null)
   }, [loadPRDetail])
+
+  // Rename (retitle) the PR on GitHub
+  const handleSubmitTitle = async () => {
+    const title = titleDraft?.trim()
+    if (!title || renamingTitle) return
+    if (title === prDetail?.title) {
+      setTitleDraft(null)
+      return
+    }
+
+    setRenamingTitle(true)
+    try {
+      const result = await window.conveyor.pr.editPRTitle(pr.number, title)
+      if (result.success) {
+        setTitleDraft(null)
+        onStatusChange?.({ type: 'success', message: result.message ?? `Renamed PR #${pr.number}` })
+        await loadPRDetail()
+        onPRUpdated?.()
+      } else {
+        onStatusChange?.({ type: 'error', message: result.message ?? 'Could not rename PR' })
+      }
+    } catch (error) {
+      onStatusChange?.({ type: 'error', message: (error as Error).message })
+    } finally {
+      setRenamingTitle(false)
+    }
+  }
 
   const bestProvider = useMemo(
     () => previewProviders.find((provider) => provider.compatible) || null,
@@ -311,10 +343,48 @@ export function PRReviewPanel({ pr, repoPath, formatRelativeTime, onCheckout, on
       {/* Header */}
       <div className="pr-review-header">
         <div className="detail-type-badge">Pull Request</div>
-        <div className="pr-review-title-row">
-          <h3 className="pr-review-title">{prDetail.title}</h3>
-          {prDetail.reviewDecision && getReviewStateBadge(prDetail.reviewDecision)}
-        </div>
+        {titleDraft === null ? (
+          <div className="pr-review-title-row">
+            <h3 className="pr-review-title">{prDetail.title}</h3>
+            {prDetail.reviewDecision && getReviewStateBadge(prDetail.reviewDecision)}
+          </div>
+        ) : (
+          <div className="pr-create-form pr-rename-form">
+            <div className="pr-form-header">
+              <span className="pr-form-title">Rename Pull Request</span>
+              <button className="pr-form-close" onClick={() => setTitleDraft(null)} title="Cancel">
+                ×
+              </button>
+            </div>
+            <div className="pr-form-field">
+              <label className="pr-form-label">Title</label>
+              <input
+                type="text"
+                className="pr-form-input"
+                value={titleDraft}
+                onChange={(e) => setTitleDraft(e.target.value)}
+                placeholder="Pull request title"
+                autoFocus
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') handleSubmitTitle()
+                  else if (e.key === 'Escape') setTitleDraft(null)
+                }}
+              />
+            </div>
+            <div className="pr-form-actions">
+              <button className="btn btn-secondary" onClick={() => setTitleDraft(null)} disabled={renamingTitle}>
+                Cancel
+              </button>
+              <button
+                className="btn btn-primary"
+                onClick={handleSubmitTitle}
+                disabled={renamingTitle || !titleDraft.trim() || titleDraft.trim() === prDetail.title}
+              >
+                {renamingTitle ? 'Renaming...' : 'Rename'}
+              </button>
+            </div>
+          </div>
+        )}
         <div className="pr-review-meta">
           <span className="pr-review-branch">
             {onNavigateToBranch ? (
@@ -379,6 +449,15 @@ export function PRReviewPanel({ pr, repoPath, formatRelativeTime, onCheckout, on
             }
           >
             {previewLoading ? 'Opening...' : 'Preview'}
+          </button>
+        )}
+        {prDetail.state === 'OPEN' && (
+          <button
+            className="btn btn-secondary"
+            onClick={() => setTitleDraft(prDetail.title)}
+            disabled={titleDraft !== null || renamingTitle}
+          >
+            Rename
           </button>
         )}
         <button

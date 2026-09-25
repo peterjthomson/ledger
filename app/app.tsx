@@ -32,6 +32,7 @@ import {
   PRDetailPanel,
   SidebarDetailPanel,
 } from './components/panels/editor'
+import { remoteBranchDisplayName, remoteNameOf } from './components/panels/list/list-filters'
 import { SettingsPanel } from './components/SettingsPanel'
 import { initializeTheme, setThemeMode as applyThemeMode, getCurrentThemeMode, type ThemeMode } from './theme'
 import { RepoSwitcher } from './components/RepoSwitcher'
@@ -79,7 +80,7 @@ export default function App() {
   const [githubUrl, setGithubUrl] = useState<string | null>(null)
   const [themeMode, setThemeMode] = useState<ThemeMode>('light')
   const [activePluginNavItem, setActivePluginNavItem] = useState<string | undefined>(undefined)
-  const { setTitle, setTitlebarActions } = useWindowContext()
+  const { setTitle, setTitlebarActions, setTitlebarNav } = useWindowContext()
 
   // Plugin state
   const activeAppId = usePluginStore((s) => s.activeAppId)
@@ -99,7 +100,7 @@ export default function App() {
   } = useCanvas()
   
   // Initialize keyboard shortcuts for editor navigation
-  const { openStaging } = useCanvasNavigation()
+  const { openStaging, goBack, goForward, canGoBack, canGoForward } = useCanvasNavigation()
   
   // Initialize canvas persistence (auto-save custom canvases and active canvas)
   useCanvasPersistence()
@@ -279,6 +280,48 @@ export default function App() {
 
     setTitlebarActions(actions.length > 0 ? <>{actions}</> : null)
   }, [repoPath, viewMode, mainPanelView, canvasState, radarEditorVisible, toggleRadarEditor, setTitlebarActions, setActiveCanvas, isColumnVisible, toggleColumnVisibility])
+
+  // Titlebar back/forward through editor history (VS Code style, also ⌘[ / ⌘])
+  useEffect(() => {
+    if (!repoPath) {
+      setTitlebarNav(null)
+      return
+    }
+    setTitlebarNav(
+      <>
+        <button
+          className="titlebar-nav-btn"
+          data-testid="nav-back"
+          onClick={() => {
+            setMainPanelView('history')
+            goBack()
+          }}
+          disabled={!canGoBack}
+          title="Go Back (⌘[)"
+          aria-label="Go Back"
+        >
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+            <path d="M10 3L5 8l5 5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+          </svg>
+        </button>
+        <button
+          className="titlebar-nav-btn"
+          data-testid="nav-forward"
+          onClick={() => {
+            setMainPanelView('history')
+            goForward()
+          }}
+          disabled={!canGoForward}
+          title="Go Forward (⌘])"
+          aria-label="Go Forward"
+        >
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+            <path d="M6 3l5 5-5 5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+          </svg>
+        </button>
+      </>
+    )
+  }, [repoPath, goBack, goForward, canGoBack, canGoForward, setTitlebarNav])
 
   // Initialize plugin system (restores the merged POC wiring that was later removed)
   useEffect(() => {
@@ -1154,21 +1197,26 @@ export default function App() {
     async (branch: Branch, newName: string) => {
       if (renaming) return
 
-      const isMainOrMaster = branch.name === 'main' || branch.name === 'master'
+      const shortName = branch.isRemote ? remoteBranchDisplayName(branch.name) : branch.name
+      const isMainOrMaster = shortName === 'main' || shortName === 'master'
       if (isMainOrMaster) {
         setStatus({ type: 'error', message: 'Cannot rename main or master branch' })
         return
       }
 
       setRenaming(true)
-      setStatus({ type: 'info', message: `Renaming branch '${branch.name}' to '${newName}'...` })
+      setStatus({ type: 'info', message: `Renaming branch '${shortName}' to '${newName}'...` })
 
       try {
         const result = await window.electronAPI.renameBranch(branch.name, newName)
         if (result.success) {
           setStatus({ type: 'success', message: result.message })
           // Update the sidebar focus to the new branch name
-          setSidebarFocus({ type: 'branch', data: { ...branch, name: newName } })
+          setSidebarFocus(
+            branch.isRemote
+              ? { type: 'remote', data: { ...branch, name: `remotes/${remoteNameOf(branch.name)}/${newName}` } }
+              : { type: 'branch', data: { ...branch, name: newName } }
+          )
           await refresh()
         } else {
           setStatus({ type: 'error', message: result.message })
@@ -1364,6 +1412,7 @@ export default function App() {
       'create-worktree': 'create-worktree',
       'commit-detail': 'commit',
       'mailmap-detail': 'mailmap',
+      'repo-detail': 'repo',
     }
     
     const focusType = panelToSidebarType[panel]
@@ -1380,7 +1429,7 @@ export default function App() {
           .catch(() => setCommitDiff(null))
           .finally(() => setLoadingDiff(false))
       }
-    } else if (focusType && data) {
+    } else if (focusType && (data || focusType === 'mailmap')) {
       // Sidebar focus - set sidebarFocus
       const newFocus = { type: focusType, data: data as SidebarFocus['data'] }
       setSelectedCommit(null)
@@ -1459,6 +1508,7 @@ export default function App() {
           formatRelativeTime={formatRelativeTime}
           onCheckout={handlePRCheckout}
           onPRMerged={refresh}
+          onPRUpdated={refresh}
           onStatusChange={setStatus}
           onNavigateToBranch={(branchName) => {
             const branch = branches.find((b) => b.name === branchName)
@@ -1496,7 +1546,7 @@ export default function App() {
           repoPath={repoPath}
           worktrees={worktrees}
           prs={pullRequests}
-          onFocusWorktree={(wt) => setSidebarFocus({ type: 'worktree', data: wt })}
+          onFocusWorktree={(wt) => handleSidebarFocus('worktree', wt)}
           onNavigateToPR={(pr) => handleSidebarFocus('pr', pr)}
           onOpenRepo={async (repo) => {
             if (repo.isCurrent) return
@@ -1510,6 +1560,7 @@ export default function App() {
           }}
           onOpenMailmap={() => {
             setSidebarFocus({ type: 'mailmap', data: null })
+            navigateToEditor('mailmap-detail', null)
           }}
           onBranchClick={(branchName) => {
             const branch = branches.find((b) => b.name === branchName)
@@ -1555,7 +1606,7 @@ export default function App() {
     formatRelativeTime, formatDate, handlePRCheckout, handleBranchDoubleClick,
     handleRemoteBranchDoubleClick, handleWorktreeDoubleClick, handleDeleteBranch, handleRenameBranch,
     handleDeleteRemoteBranch, branches, repoPath, worktrees, pullRequests, handleSidebarFocus,
-    openRepositoryPath,
+    openRepositoryPath, navigateToEditor,
     selectedCommit, loadingDiff, commitDiff, handleCommitCheckout
   ])
 

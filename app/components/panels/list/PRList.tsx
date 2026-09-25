@@ -7,9 +7,10 @@
  * - Selection and action handlers
  */
 
-import { useState, useMemo } from 'react'
+import { useMemo } from 'react'
 import type { PullRequest, PRFilter, PRSort } from '../../../types/electron'
 import type { Column } from '../../../types/app-types'
+import { useListControl } from '../../../stores/list-controls-store'
 import { ListPanelHeader } from './ListPanelHeader'
 import { applyPRControls, PR_FILTER_OPTIONS, PR_SORT_OPTIONS } from './list-filters'
 
@@ -61,11 +62,11 @@ export function PRList({
   onDoubleClick,
   onContextMenu,
 }: PRListProps) {
-  // Local filter/sort state
-  const [controlsOpen, setControlsOpen] = useState(false)
-  const [search, setSearch] = useState('')
-  const [filter, setFilter] = useState<PRFilter>('open-not-draft')
-  const [sort, setSort] = useState<PRSort>('updated')
+  // Filter/sort state shared with the sidebar section and kept across panel switches
+  const [controlsOpen, setControlsOpen] = useListControl('prs:open', false)
+  const [search, setSearch] = useListControl('prs:search', '')
+  const [filter, setFilter] = useListControl<PRFilter>('prs:filter', 'open-not-draft')
+  const [sort, setSort] = useListControl<PRSort>('prs:sort', 'updated')
 
   // Filter and sort PRs
   const filteredPRs = useMemo(

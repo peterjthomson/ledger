@@ -32,6 +32,18 @@ export interface SelectOption<T extends string> {
 // Branches (also used for remotes)
 // ============================================================================
 
+const REMOTE_REF_PATTERN = /^(?:remotes\/)?([^/]+)\/(.+)$/
+
+/** Remote a remote-tracking branch belongs to: "remotes/origin/feature/x" -> "origin" */
+export function remoteNameOf(name: string): string {
+  return name.match(REMOTE_REF_PATTERN)?.[1] ?? ''
+}
+
+/** Branch name without the remote prefix: "remotes/origin/feature/x" -> "feature/x" */
+export function remoteBranchDisplayName(name: string): string {
+  return name.match(REMOTE_REF_PATTERN)?.[2] ?? name
+}
+
 export const BRANCH_FILTER_OPTIONS: SelectOption<BranchFilter>[] = [
   { value: 'all', label: 'All' },
   { value: 'local-only', label: 'Local Only' },
@@ -68,7 +80,7 @@ export function sortBranches(branchList: Branch[], sort: BranchSort): Branch[] {
   // Keep the live branch first, then the primary branches, under every sort.
   const priority = (branch: Branch) => {
     if (branch.current) return 0
-    const name = branch.isRemote ? branch.name.replace(/^(?:remotes\/)?[^/]+\//, '') : branch.name
+    const name = branch.isRemote ? remoteBranchDisplayName(branch.name) : branch.name
     return name === 'main' || name === 'master' ? 1 : 2
   }
   const pinned = (a: Branch, b: Branch) => priority(a) - priority(b)

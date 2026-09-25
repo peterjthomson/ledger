@@ -1,13 +1,14 @@
-import { parseDiff } from '../services/staging/diff-parser'
+import { parseDiff, buildUntrackedFileDiff } from '../services/staging/diff-parser'
 import { buildPartialPatch } from '../services/staging/partial-patch'
 import { simpleGit, SimpleGit } from 'simple-git'
-import { exec } from 'child_process'
+import { exec, execFile } from 'child_process'
 import { promisify } from 'util'
 import * as fs from 'fs'
 import * as path from 'path'
 import { getCursorAgentTaskHint, getClaudeCodeAgentTaskHint } from '@/lib/utils/agent-hints'
 
 const execAsync = promisify(exec)
+const execFileAsync = promisify(execFile)
 const statAsync = promisify(fs.stat)
 
 let git: SimpleGit | null = null
@@ -132,7 +133,27 @@ export async function getBranches() {
   }
 }
 
-export async function getBranchMetadata(branchName: string): Promise<{
+const PRIMARY_BRANCH_NAMES = new Set(['main', 'master'])
+
+/** The ref branches fork from: the first of origin/master, origin/main, master, main that exists. */
+async function resolveForkBaseRef(): Promise<string | null> {
+  if (!git) return null
+  for (const ref of ['origin/master', 'origin/main', 'master', 'main']) {
+    try {
+      if ((await git.raw(['rev-parse', '--verify', `${ref}^{commit}`])).trim()) return ref
+    } catch {
+      // Try the next candidate
+    }
+  }
+  return null
+}
+
+/** Primary branches (main/master, local or remote) count their whole history; others count from the fork. */
+function isPrimaryBranchName(branchName: string): boolean {
+  return PRIMARY_BRANCH_NAMES.has(branchName.replace(/^remotes\/[^/]+\//, ''))
+}
+
+export async function getBranchMetadata(branchName: string, forkBaseRef?: string | null): Promise<{
   lastCommitDate: string
   lastCommitMessage: string
   firstCommitDate: string
@@ -158,8 +179,10 @@ export async function getBranchMetadata(branchName: string): Promise<{
     firstCommitDate = ''
   }
 
-  // Get commit count
-  const countRaw = await git.raw(['rev-list', '--count', branchName])
+  // Commits on this branch since it forked from the base (whole history for the base itself)
+  const base = forkBaseRef === undefined ? await resolveForkBaseRef() : forkBaseRef
+  const range = base && !isPrimaryBranchName(branchName) ? `${base}..${branchName}` : branchName
+  const countRaw = await git.raw(['rev-list', '--count', range])
   const commitCount = parseInt(countRaw.trim(), 10) || 0
 
   return {
@@ -227,6 +250,7 @@ export async function getBranchesWithMetadata() {
   const { current, branches } = await getBranches()
   const unmergedBranches = await getUnmergedBranches()
   const unmergedSet = new Set(unmergedBranches)
+  const forkBaseRef = await resolveForkBaseRef()
 
   // Get metadata for all branches in parallel (batched to avoid overwhelming git)
   const batchSize = 10
@@ -236,7 +260,7 @@ export async function getBranchesWithMetadata() {
     const batch = branches.slice(i, i + batchSize)
     const metadataPromises = batch.map(async (branch) => {
       try {
-        const meta = await getBranchMetadata(branch.name)
+        const meta = await getBranchMetadata(branch.name, forkBaseRef)
         return {
           ...branch,
           lastCommitDate: meta.lastCommitDate,
@@ -953,7 +977,75 @@ export async function deleteBranch(
   }
 }
 
-// Rename a branch
+function validateBranchRename(oldName: string, newName: string): string | null {
+  if (!oldName || !newName) return 'Branch names cannot be empty'
+  // Don't allow renaming main/master
+  if (oldName === 'main' || oldName === 'master') return 'Cannot rename main or master branch'
+  // Don't allow renaming to main/master
+  if (newName === 'main' || newName === 'master') return 'Cannot rename to main or master'
+  // Validate new branch name format (no spaces, special chars at start)
+  if (!/^[a-zA-Z0-9]/.test(newName)) return 'Branch name must start with a letter or number'
+  if (/\s/.test(newName)) return 'Branch name cannot contain spaces'
+  return null
+}
+
+/**
+ * Rename a branch on a remote (`remotes/<remote>/<name>`).
+ * GitHub remotes use the branch-rename API so open PRs are retargeted rather than closed;
+ * other remotes push the new name and delete the old one.
+ */
+async function renameRemoteBranch(
+  remoteRef: string,
+  newName: string
+): Promise<{ success: boolean; message: string }> {
+  if (!git || !repoPath) throw new Error('No repository selected')
+
+  const [, remote, oldName] = remoteRef.match(/^remotes\/([^/]+)\/(.+)$/) ?? []
+  if (!remote || !oldName) {
+    return { success: false, message: `Not a remote branch: '${remoteRef}'` }
+  }
+  const invalid = validateBranchRename(oldName, newName)
+  if (invalid) return { success: false, message: invalid }
+
+  const existing = await git.raw(['ls-remote', '--heads', remote, `refs/heads/${newName}`])
+  if (existing.trim()) {
+    return { success: false, message: `Branch '${remote}/${newName}' already exists` }
+  }
+
+  const ghUrl = remote === 'origin' ? await getGitHubUrl() : null
+  const ghRepo = ghUrl?.match(/github\.com\/([^/]+)\/([^/]+)/)
+  if (ghRepo) {
+    const [, owner, repo] = ghRepo
+    try {
+      await execFileAsync(
+        'gh',
+        ['api', '-X', 'POST', `repos/${owner}/${repo}/branches/${encodeURIComponent(oldName)}/rename`, '-f', `new_name=${newName}`],
+        { cwd: repoPath }
+      )
+    } catch (error) {
+      const stderr = (error as { stderr?: string }).stderr?.trim()
+      return { success: false, message: `GitHub rename failed: ${stderr || (error as Error).message}` }
+    }
+  } else {
+    await git.raw(['push', remote, `refs/remotes/${remote}/${oldName}:refs/heads/${newName}`])
+    await git.raw(['push', remote, '--delete', oldName])
+  }
+
+  await git.fetch(remote, { '--prune': null })
+
+  // Keep local branches that tracked the old name pointed at the renamed branch
+  const tracking = await git.raw(['for-each-ref', '--format=%(refname:short)|%(upstream:short)', 'refs/heads'])
+  for (const line of tracking.split('\n')) {
+    const [local, upstream] = line.split('|')
+    if (local && upstream === `${remote}/${oldName}`) {
+      await git.raw(['branch', `--set-upstream-to=${remote}/${newName}`, local]).catch(() => undefined)
+    }
+  }
+
+  return { success: true, message: `Renamed remote branch '${remote}/${oldName}' to '${remote}/${newName}'` }
+}
+
+// Rename a branch (local, or remote when given a `remotes/<remote>/<name>` ref)
 export async function renameBranch(
   oldName: string,
   newName: string
@@ -964,28 +1056,12 @@ export async function renameBranch(
     const trimmedOldName = oldName.trim()
     const trimmedNewName = newName.trim()
 
-    if (!trimmedOldName || !trimmedNewName) {
-      return { success: false, message: 'Branch names cannot be empty' }
+    if (trimmedOldName.startsWith('remotes/')) {
+      return await renameRemoteBranch(trimmedOldName, trimmedNewName)
     }
 
-    // Don't allow renaming main/master
-    if (trimmedOldName === 'main' || trimmedOldName === 'master') {
-      return { success: false, message: 'Cannot rename main or master branch' }
-    }
-
-    // Don't allow renaming to main/master
-    if (trimmedNewName === 'main' || trimmedNewName === 'master') {
-      return { success: false, message: 'Cannot rename to main or master' }
-    }
-
-    // Validate new branch name format (no spaces, special chars at start)
-    if (!/^[a-zA-Z0-9]/.test(trimmedNewName)) {
-      return { success: false, message: 'Branch name must start with a letter or number' }
-    }
-
-    if (/\s/.test(trimmedNewName)) {
-      return { success: false, message: 'Branch name cannot contain spaces' }
-    }
+    const invalid = validateBranchRename(trimmedOldName, trimmedNewName)
+    if (invalid) return { success: false, message: invalid }
 
     // Check if new name already exists
     const branches = await git.branchLocal()
@@ -1605,6 +1681,29 @@ export async function commentOnPR(prNumber: number, body: string): Promise<{ suc
     }
 
     return { success: false, message: errorMessage }
+  }
+}
+
+// Rename (retitle) a PR
+export async function editPRTitle(prNumber: number, title: string): Promise<{ success: boolean; message: string }> {
+  if (!repoPath) {
+    return { success: false, message: 'No repository selected' }
+  }
+
+  const trimmed = title.trim()
+  if (!trimmed) {
+    return { success: false, message: 'PR title cannot be empty' }
+  }
+
+  try {
+    await execFileAsync('gh', ['pr', 'edit', String(prNumber), '--title', trimmed], { cwd: repoPath })
+    return { success: true, message: `Renamed PR #${prNumber}` }
+  } catch (error) {
+    const stderr = (error as { stderr?: string }).stderr?.trim() || (error as Error).message
+    if (stderr.includes('not logged')) {
+      return { success: false, message: 'Not logged into GitHub CLI. Run `gh auth login` in terminal.' }
+    }
+    return { success: false, message: stderr }
   }
 }
 
@@ -3772,7 +3871,7 @@ export async function stageLines(
     }
 
     const hunk = diff.hunks[hunkIndex]
-    const partialPatch = buildPartialPatch(filePath, hunk, lineIndices)
+    const partialPatch = buildPartialPatch(filePath, hunk, lineIndices, false, diff.status === 'untracked')
 
     await applyPatch(repoPath, partialPatch, ['--cached'])
     return { success: true, message: `Staged ${lineIndices.length} line(s)` }
@@ -3956,44 +4055,7 @@ export async function getFileDiff(filePath: string, staged: boolean): Promise<St
         const fullPath = path.join(repoPath!, filePath)
         try {
           const content = await fs.promises.readFile(fullPath, 'utf-8')
-          const fileLines = content.split('\n')
-
-          // Build raw patch for untracked file
-          const header = `@@ -0,0 +1,${fileLines.length} @@`
-          const patchLines = fileLines.map((l) => '+' + l)
-          const rawPatch =
-            `diff --git a/${filePath} b/${filePath}\n` +
-            `new file mode 100644\n` +
-            `--- /dev/null\n` +
-            `+++ b/${filePath}\n` +
-            header +
-            '\n' +
-            patchLines.join('\n') +
-            '\n'
-
-          return {
-            filePath,
-            status: 'untracked',
-            isBinary: false,
-            additions: fileLines.length,
-            deletions: 0,
-            hunks: [
-              {
-                header,
-                oldStart: 0,
-                oldLines: 0,
-                newStart: 1,
-                newLines: fileLines.length,
-                rawPatch,
-                lines: fileLines.map((line, idx) => ({
-                  type: 'add' as const,
-                  content: line,
-                  newLineNumber: idx + 1,
-                  lineIndex: idx,
-                })),
-              },
-            ],
-          }
+          return buildUntrackedFileDiff(filePath, content)
         } catch {
           return null
         }
@@ -4171,44 +4233,7 @@ export async function getFileDiffInWorktree(
         const fullPath = path.join(worktreePath, filePath)
         try {
           const content = await fs.promises.readFile(fullPath, 'utf-8')
-          const fileLines = content.split('\n')
-
-          // Build raw patch for untracked file
-          const header = `@@ -0,0 +1,${fileLines.length} @@`
-          const patchLines = fileLines.map((l) => '+' + l)
-          const rawPatch =
-            `diff --git a/${filePath} b/${filePath}\n` +
-            `new file mode 100644\n` +
-            `--- /dev/null\n` +
-            `+++ b/${filePath}\n` +
-            header +
-            '\n' +
-            patchLines.join('\n') +
-            '\n'
-
-          return {
-            filePath,
-            status: 'untracked',
-            isBinary: false,
-            additions: fileLines.length,
-            deletions: 0,
-            hunks: [
-              {
-                header,
-                oldStart: 0,
-                oldLines: 0,
-                newStart: 1,
-                newLines: fileLines.length,
-                rawPatch,
-                lines: fileLines.map((line, idx) => ({
-                  type: 'add' as const,
-                  content: line,
-                  newLineNumber: idx + 1,
-                  lineIndex: idx,
-                })),
-              },
-            ],
-          }
+          return buildUntrackedFileDiff(filePath, content)
         } catch {
           return null
         }

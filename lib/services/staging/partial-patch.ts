@@ -2,12 +2,15 @@ import type { StagingDiffHunk } from './staging-types'
 
 /** Build a patch against the index (forward) or changed content (reverse).
  * Pair adjacent replacement lines so retained lines keep their original order.
+ * `newFile` marks a forward patch for a file that does not exist on the old side yet
+ * (an untracked file), so git creates it instead of failing with "does not exist in index".
  */
 export function buildPartialPatch(
   filePath: string,
   hunk: StagingDiffHunk,
   selectedLineIndices: number[],
-  reverse = false
+  reverse = false,
+  newFile = false
 ): string {
   const selected = new Set(selectedLineIndices)
   const output: string[] = []
@@ -50,9 +53,11 @@ export function buildPartialPatch(
   const start = reverse ? hunk.newStart : hunk.oldStart
   const oldStart = oldCount === 0 ? Math.max(0, start - 1) : Math.max(1, start)
   const newStart = newCount === 0 ? Math.max(0, start - 1) : Math.max(1, start)
+  const creating = newFile && !reverse
   return (
     `diff --git ${JSON.stringify(`a/${filePath}`)} ${JSON.stringify(`b/${filePath}`)}\n` +
-    `--- ${JSON.stringify(`a/${filePath}`)}\n+++ ${JSON.stringify(`b/${filePath}`)}\n` +
+    (creating ? 'new file mode 100644\n--- /dev/null\n' : `--- ${JSON.stringify(`a/${filePath}`)}\n`) +
+    `+++ ${JSON.stringify(`b/${filePath}`)}\n` +
     `@@ -${oldStart},${oldCount} +${newStart},${newCount} @@\n${output.join('\n')}\n`
   )
 }

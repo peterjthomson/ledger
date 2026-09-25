@@ -7,12 +7,15 @@
  * - Selection and action handlers
  */
 
-import { useState, useMemo } from 'react'
+import { useMemo } from 'react'
 import type { Branch, BranchFilter, BranchSort } from '../../../types/electron'
 import type { Column } from '../../../types/app-types'
+import { useListControl } from '../../../stores/list-controls-store'
 import { ListPanelHeader } from './ListPanelHeader'
 import {
   applyBranchControls,
+  remoteBranchDisplayName,
+  remoteNameOf,
   BRANCH_FILTER_OPTIONS,
   BRANCH_SORT_OPTIONS,
 } from './list-filters'
@@ -52,16 +55,23 @@ export function BranchList({
   onContextMenu,
   onCreateBranch,
 }: BranchListProps) {
-  // Local filter/sort state
-  const [controlsOpen, setControlsOpen] = useState(false)
-  const [search, setSearch] = useState('')
-  const [filter, setFilter] = useState<BranchFilter>('all')
-  const [sort, setSort] = useState<BranchSort>('name')
+  // Filter/sort state shared with the matching sidebar section and kept across panel switches
+  const kind = isRemote ? 'remotes' : 'branches'
+  const [controlsOpen, setControlsOpen] = useListControl(`${kind}:open`, false)
+  const [search, setSearch] = useListControl(`${kind}:search`, '')
+  const [filter, setFilter] = useListControl<BranchFilter>(`${kind}:filter`, 'all')
+  const [sort, setSort] = useListControl<BranchSort>(`${kind}:sort`, 'name')
 
   // Filter and sort branches
   const filteredBranches = useMemo(
     () => applyBranchControls(branches, { search, filter, sort }),
     [branches, filter, sort, search]
+  )
+
+  // Only label rows with their remote when there is more than one remote to tell apart
+  const showRemoteNames = useMemo(
+    () => isRemote && new Set(branches.map((b) => remoteNameOf(b.name))).size > 1,
+    [isRemote, branches]
   )
 
   const label = column?.label || (isRemote ? 'Remotes' : 'Branches')
@@ -151,20 +161,22 @@ export function BranchList({
                 onClick={() => onSelect?.(branch)}
                 onDoubleClick={() => onDoubleClick?.(branch)}
                 onContextMenu={(e) => onContextMenu?.(e, branch)}
+                title={isRemote ? branch.name : undefined}
               >
                 <div className="item-main">
                   <span className="item-name">
                     {branch.current && <span className="arrow">→</span>}
-                    {branch.name}
+                    {isRemote ? remoteBranchDisplayName(branch.name) : branch.name}
                   </span>
                   <div className="item-badges">
+                    {isRemote && showRemoteNames && <span className="badge badge-remote">{remoteNameOf(branch.name)}</span>}
                     {branch.isLocalOnly && <span className="badge badge-local">local</span>}
                     {!branch.isMerged && <span className="badge badge-unmerged">unmerged</span>}
                     {branch.current && <span className="current-indicator">●</span>}
                   </div>
                 </div>
                 <div className="item-meta">
-                  <code className="commit-hash">{branch.commit?.slice(0, 7)}</code>
+                  {!isRemote && <code className="commit-hash">{branch.commit?.slice(0, 7)}</code>}
                   {branch.lastCommitDate && formatDate && (
                     <span className="date-info">{formatDate(branch.lastCommitDate)}</span>
                   )}

@@ -5,7 +5,7 @@
  * Each section has consistent header with filter toggle and optional add button.
  */
 
-import { useState, useMemo, useCallback, useEffect } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import type {
   PullRequest,
   Branch,
@@ -22,8 +22,11 @@ import type {
   WorktreeSort,
 } from '../../../types/electron'
 import type { Column } from '../../../types/app-types'
+import { useListControl, useListControlsStore } from '../../../stores/list-controls-store'
 import {
   applyBranchControls,
+  remoteBranchDisplayName,
+  remoteNameOf,
   applyPRControls,
   applyRepoControls,
   applyStashControls,
@@ -81,22 +84,146 @@ export interface SidebarProps {
   formatRelativeTime?: (date: string) => string
 }
 
-interface SectionState {
-  prs: boolean
-  branches: boolean
-  remotes: boolean
-  worktrees: boolean
-  stashes: boolean
-  repos: boolean
+type SectionKey = 'prs' | 'branches' | 'remotes' | 'worktrees' | 'stashes' | 'repos'
+
+const SECTION_KEYS: SectionKey[] = ['prs', 'branches', 'remotes', 'worktrees', 'stashes', 'repos']
+const DEFAULT_EXPANDED: Record<SectionKey, boolean> = {
+  prs: true,
+  branches: true,
+  remotes: false,
+  worktrees: true,
+  stashes: false,
+  repos: false,
 }
 
-interface FilterState {
-  prs: boolean
-  branches: boolean
-  remotes: boolean
-  worktrees: boolean
-  stashes: boolean
-  repos: boolean
+// Section header: expand toggle, optional add button, count, and filter toggle.
+// Defined at module scope so React keeps the same element across renders.
+function SectionHeader({
+  sectionIcon,
+  sectionLabel,
+  count,
+  expanded,
+  filterOpen,
+  hasActiveFilter,
+  onToggle,
+  onToggleFilter,
+  onAdd,
+}: {
+  sectionIcon: string
+  sectionLabel: string
+  count: number
+  expanded: boolean
+  filterOpen: boolean
+  hasActiveFilter: boolean
+  onToggle: () => void
+  onToggleFilter: () => void
+  onAdd?: () => void
+}) {
+  return (
+    <div className="sidebar-section-header-row">
+      <button className={`sidebar-section-header ${expanded ? 'open' : ''}`} onClick={onToggle}>
+        <span className="section-icon">{sectionIcon}</span>
+        <span className="section-label">{sectionLabel}</span>
+        <span className="section-chevron">{expanded ? '▾' : '▸'}</span>
+      </button>
+      {onAdd && (
+        <button
+          className="section-action-btn"
+          onClick={(e) => {
+            e.stopPropagation()
+            onAdd()
+          }}
+          title={`New ${sectionLabel.replace(/s$/, '')}`}
+        >
+          +
+        </button>
+      )}
+      <span className="section-count">{count}</span>
+      <button
+        className={`section-filter-btn ${filterOpen || hasActiveFilter ? 'active' : ''}`}
+        onClick={(e) => {
+          e.stopPropagation()
+          onToggleFilter()
+        }}
+        title="Toggle filter"
+      >
+        <svg width="10" height="10" viewBox="0 0 10 10" fill="currentColor">
+          <path d="M0 1h10L6 5v4L4 10V5L0 1z" />
+        </svg>
+      </button>
+    </div>
+  )
+}
+
+/**
+ * Section filter panel.
+ *
+ * Offers the same Search / Filter / Sort controls as the radar column header for the
+ * matching item type. Sections without a filter dimension (repos) just omit that row.
+ */
+function SectionFilter<F extends string, S extends string>({
+  placeholder,
+  search,
+  onSearchChange,
+  filterOptions,
+  filterValue,
+  onFilterChange,
+  sortOptions,
+  sortValue,
+  onSortChange,
+}: {
+  placeholder: string
+  search: string
+  onSearchChange: (value: string) => void
+  filterOptions?: SelectOption<F>[]
+  filterValue?: F
+  onFilterChange?: (value: F) => void
+  sortOptions: SelectOption<S>[]
+  sortValue: S
+  onSortChange: (value: S) => void
+}) {
+  return (
+    <div className="section-filter-panel" data-testid="section-filter-panel">
+      <input
+        type="text"
+        className="section-filter-input"
+        placeholder={placeholder}
+        value={search}
+        onChange={(e) => onSearchChange(e.target.value)}
+        autoFocus
+      />
+      {filterOptions && filterValue !== undefined && onFilterChange && (
+        <div className="section-filter-row">
+          <label>Filter</label>
+          <select
+            className="section-filter-select"
+            value={filterValue}
+            onChange={(e) => onFilterChange(e.target.value as F)}
+          >
+            {filterOptions.map((opt) => (
+              <option key={opt.value} value={opt.value}>
+                {opt.label}
+              </option>
+            ))}
+          </select>
+        </div>
+      )}
+      <div className="section-filter-row">
+        <label>Sort</label>
+        <select
+          className="section-filter-select"
+          value={sortValue}
+          onChange={(e) => onSortChange(e.target.value as S)}
+        >
+          {sortOptions.map((opt) => (
+            <option key={opt.value} value={opt.value}>
+              {opt.label}
+            </option>
+          ))}
+        </select>
+      </div>
+    </div>
+  )
 }
 
 export function Sidebar({
@@ -133,50 +260,34 @@ export function Sidebar({
   onCreateWorktree,
   formatRelativeTime,
 }: SidebarProps) {
-  // Section expanded state
-  const [sections, setSections] = useState<SectionState>({
-    prs: true,
-    branches: true,
-    remotes: false,
-    worktrees: true,
-    stashes: false,
-    repos: false,
-  })
+  // Section expanded / filter-panel state lives in the list-controls store so it
+  // survives switching canvases (this panel unmounts when its canvas isn't shown).
+  const controlValues = useListControlsStore((s) => s.values)
+  const setControlValue = useListControlsStore((s) => s.setValue)
+  const isExpanded = (key: SectionKey) =>
+    (controlValues[`sidebar:section:${key}`] as boolean | undefined) ?? DEFAULT_EXPANDED[key]
+  const isFilterOpen = (key: SectionKey) => (controlValues[`sidebar:${key}:open`] as boolean | undefined) ?? false
 
-  // Section filter panel state
-  const [filters, setFilters] = useState<FilterState>({
-    prs: false,
-    branches: false,
-    remotes: false,
-    worktrees: false,
-    stashes: false,
-    repos: false,
-  })
-
-  // Per-section search state
-  const [sectionSearch, setSectionSearch] = useState({
-    prs: '',
-    branches: '',
-    remotes: '',
-    worktrees: '',
-    stashes: '',
-    repos: '',
-  })
-
-  // Per-section filter/sort state.
-  // Same options and defaults as the matching radar column header, so a section behaves
+  // Per-section search/filter/sort state.
+  // Same keys, options, and defaults as the matching radar column, so a section behaves
   // the same whichever surface you drive it from.
-  const [prFilter, setPrFilter] = useState<PRFilter>('open-not-draft')
-  const [prSort, setPrSort] = useState<PRSort>('updated')
-  const [branchFilter, setBranchFilter] = useState<BranchFilter>('all')
-  const [branchSort, setBranchSort] = useState<BranchSort>('name')
-  const [remoteFilter, setRemoteFilter] = useState<BranchFilter>('all')
-  const [remoteSort, setRemoteSort] = useState<BranchSort>('name')
-  const [worktreeParent, setWorktreeParent] = useState<string>('all')
-  const [worktreeSort, setWorktreeSort] = useState<WorktreeSort>('last-modified')
-  const [stashFilter, setStashFilter] = useState<StashFilter>('all')
-  const [stashSort, setStashSort] = useState<StashSort>('date')
-  const [repoSort, setRepoSort] = useState<RepoSort>('current-first')
+  const [prSearch, setPrSearch] = useListControl('prs:search', '')
+  const [prFilter, setPrFilter] = useListControl<PRFilter>('prs:filter', 'open-not-draft')
+  const [prSort, setPrSort] = useListControl<PRSort>('prs:sort', 'updated')
+  const [branchSearch, setBranchSearch] = useListControl('branches:search', '')
+  const [branchFilter, setBranchFilter] = useListControl<BranchFilter>('branches:filter', 'all')
+  const [branchSort, setBranchSort] = useListControl<BranchSort>('branches:sort', 'name')
+  const [remoteSearch, setRemoteSearch] = useListControl('remotes:search', '')
+  const [remoteFilter, setRemoteFilter] = useListControl<BranchFilter>('remotes:filter', 'all')
+  const [remoteSort, setRemoteSort] = useListControl<BranchSort>('remotes:sort', 'name')
+  const [worktreeSearch, setWorktreeSearch] = useListControl('worktrees:search', '')
+  const [storedWorktreeParent, setWorktreeParent] = useListControl<string>('worktrees:filter', 'all')
+  const [worktreeSort, setWorktreeSort] = useListControl<WorktreeSort>('worktrees:sort', 'last-modified')
+  const [stashSearch, setStashSearch] = useListControl('stashes:search', '')
+  const [stashFilter, setStashFilter] = useListControl<StashFilter>('stashes:filter', 'all')
+  const [stashSort, setStashSort] = useListControl<StashSort>('stashes:sort', 'date')
+  const [repoSearch, setRepoSearch] = useListControl('repos:search', '')
+  const [repoSort, setRepoSort] = useListControl<RepoSort>('repos:sort', 'current-first')
 
   // Sibling repos state
   const [repos, setRepos] = useState<RepoInfo[]>([])
@@ -199,28 +310,24 @@ export function Sidebar({
 
   // Filter/sort items using the same logic as the radar column headers
   const filteredPRs = useMemo(
-    () => applyPRControls(prs, { search: sectionSearch.prs, filter: prFilter, sort: prSort }),
-    [prs, sectionSearch.prs, prFilter, prSort]
+    () => applyPRControls(prs, { search: prSearch, filter: prFilter, sort: prSort }),
+    [prs, prSearch, prFilter, prSort]
   )
 
   const filteredLocalBranches = useMemo(
-    () =>
-      applyBranchControls(localBranches, {
-        search: sectionSearch.branches,
-        filter: branchFilter,
-        sort: branchSort,
-      }),
-    [localBranches, sectionSearch.branches, branchFilter, branchSort]
+    () => applyBranchControls(localBranches, { search: branchSearch, filter: branchFilter, sort: branchSort }),
+    [localBranches, branchSearch, branchFilter, branchSort]
   )
 
   const filteredRemoteBranches = useMemo(
-    () =>
-      applyBranchControls(remoteBranches, {
-        search: sectionSearch.remotes,
-        filter: remoteFilter,
-        sort: remoteSort,
-      }),
-    [remoteBranches, sectionSearch.remotes, remoteFilter, remoteSort]
+    () => applyBranchControls(remoteBranches, { search: remoteSearch, filter: remoteFilter, sort: remoteSort }),
+    [remoteBranches, remoteSearch, remoteFilter, remoteSort]
+  )
+
+  // Only label remote rows with their remote when there is more than one to tell apart
+  const showRemoteNames = useMemo(
+    () => new Set(remoteBranches.map((b) => remoteNameOf(b.name))).size > 1,
+    [remoteBranches]
   )
 
   // Parent folders available as worktree filters, same as the radar column
@@ -228,6 +335,9 @@ export function Sidebar({
     () => getWorktreeParents(worktrees, repoPath ?? null),
     [worktrees, repoPath]
   )
+  // A remembered parent folder may not exist in this repo; fall back to all
+  const worktreeParent =
+    storedWorktreeParent === 'all' || worktreeParents.includes(storedWorktreeParent) ? storedWorktreeParent : 'all'
 
   const worktreeFilterOptions = useMemo<SelectOption<string>[]>(
     () => [
@@ -240,192 +350,49 @@ export function Sidebar({
   const filteredWorktrees = useMemo(
     () =>
       applyWorktreeControls(worktrees, {
-        search: sectionSearch.worktrees,
+        search: worktreeSearch,
         parentFilter: worktreeParent,
         sort: worktreeSort,
         repoPath: repoPath ?? null,
       }),
-    [worktrees, sectionSearch.worktrees, worktreeParent, worktreeSort, repoPath]
+    [worktrees, worktreeSearch, worktreeParent, worktreeSort, repoPath]
   )
 
   const filteredStashes = useMemo(
-    () =>
-      applyStashControls(stashes, {
-        search: sectionSearch.stashes,
-        filter: stashFilter,
-        sort: stashSort,
-      }),
-    [stashes, sectionSearch.stashes, stashFilter, stashSort]
+    () => applyStashControls(stashes, { search: stashSearch, filter: stashFilter, sort: stashSort }),
+    [stashes, stashSearch, stashFilter, stashSort]
   )
 
   const filteredRepos = useMemo(
-    () => applyRepoControls(repos, { search: sectionSearch.repos, sort: repoSort }),
-    [repos, sectionSearch.repos, repoSort]
+    () => applyRepoControls(repos, { search: repoSearch, sort: repoSort }),
+    [repos, repoSearch, repoSort]
   )
 
-  // Toggle section expand/collapse
-  const toggleSection = useCallback((section: keyof SectionState) => {
-    setSections((prev) => ({ ...prev, [section]: !prev[section] }))
-  }, [])
+  const toggleSection = (key: SectionKey) => setControlValue(`sidebar:section:${key}`, !isExpanded(key))
+  const toggleFilter = (key: SectionKey) => setControlValue(`sidebar:${key}:open`, !isFilterOpen(key))
 
-  // Toggle all sections expand/collapse
-  const toggleAllSections = useCallback(() => {
-    // If any section is expanded, collapse all. Otherwise expand all.
-    const anyExpanded = Object.values(sections).some(v => v)
-    const newState = !anyExpanded
-    setSections({
-      prs: newState,
-      branches: newState,
-      remotes: newState,
-      worktrees: newState,
-      stashes: newState,
-      repos: newState,
-    })
-  }, [sections])
+  // Header click: if any section is expanded, collapse all. Otherwise expand all.
+  const anyExpanded = SECTION_KEYS.some(isExpanded)
+  const allExpanded = SECTION_KEYS.every(isExpanded)
+  const toggleAllSections = () => {
+    for (const key of SECTION_KEYS) setControlValue(`sidebar:section:${key}`, !anyExpanded)
+  }
 
-  // Toggle section filter panel
-  const toggleFilter = useCallback((section: keyof FilterState) => {
-    setFilters((prev) => ({ ...prev, [section]: !prev[section] }))
-  }, [])
-
-  // Update section search
-  const updateSearch = useCallback((section: keyof typeof sectionSearch, value: string) => {
-    setSectionSearch((prev) => ({ ...prev, [section]: value }))
-  }, [])
+  // Shared header props for a section
+  const headerProps = (key: SectionKey) => ({
+    expanded: isExpanded(key),
+    filterOpen: isFilterOpen(key),
+    onToggle: () => toggleSection(key),
+    onToggleFilter: () => toggleFilter(key),
+  })
 
   const icon = column?.icon || '☰'
   const label = column?.label || 'All Items'
 
-  // Section header component for consistency
-  const SectionHeader = ({
-    sectionKey,
-    sectionIcon,
-    sectionLabel,
-    count,
-    hasActiveFilter,
-    onAdd,
-  }: {
-    sectionKey: keyof SectionState
-    sectionIcon: string
-    sectionLabel: string
-    count: number
-    hasActiveFilter: boolean
-    onAdd?: () => void
-  }) => (
-    <div className="sidebar-section-header-row">
-      <button
-        className={`sidebar-section-header ${sections[sectionKey] ? 'open' : ''}`}
-        onClick={() => toggleSection(sectionKey)}
-      >
-        <span className="section-icon">{sectionIcon}</span>
-        <span className="section-label">{sectionLabel}</span>
-        <span className="section-chevron">{sections[sectionKey] ? '▾' : '▸'}</span>
-      </button>
-      {onAdd && (
-        <button
-          className="section-action-btn"
-          onClick={(e) => {
-            e.stopPropagation()
-            onAdd()
-          }}
-          title={`New ${sectionLabel.replace(/s$/, '')}`}
-        >
-          +
-        </button>
-      )}
-      <span className="section-count">{count}</span>
-      <button
-        className={`section-filter-btn ${filters[sectionKey] || hasActiveFilter ? 'active' : ''}`}
-        onClick={(e) => {
-          e.stopPropagation()
-          toggleFilter(sectionKey)
-        }}
-        title="Toggle filter"
-      >
-        <svg width="10" height="10" viewBox="0 0 10 10" fill="currentColor">
-          <path d="M0 1h10L6 5v4L4 10V5L0 1z" />
-        </svg>
-      </button>
-    </div>
-  )
-
-  /**
-   * Section filter panel.
-   *
-   * Offers the same Search / Filter / Sort controls as the radar column header for the
-   * matching item type. Sections without a filter dimension (repos) just omit that row.
-   */
-  const SectionFilter = <F extends string, S extends string>({
-    sectionKey,
-    placeholder,
-    filterOptions,
-    filterValue,
-    onFilterChange,
-    sortOptions,
-    sortValue,
-    onSortChange,
-  }: {
-    sectionKey: keyof FilterState
-    placeholder: string
-    filterOptions?: SelectOption<F>[]
-    filterValue?: F
-    onFilterChange?: (value: F) => void
-    sortOptions: SelectOption<S>[]
-    sortValue: S
-    onSortChange: (value: S) => void
-  }) => {
-    if (!filters[sectionKey]) return null
-    return (
-      <div className="section-filter-panel">
-        <input
-          type="text"
-          className="section-filter-input"
-          placeholder={placeholder}
-          value={sectionSearch[sectionKey]}
-          onChange={(e) => updateSearch(sectionKey, e.target.value)}
-          autoFocus
-        />
-        {filterOptions && filterValue !== undefined && onFilterChange && (
-          <div className="section-filter-row">
-            <label>Filter</label>
-            <select
-              className="section-filter-select"
-              value={filterValue}
-              onChange={(e) => onFilterChange(e.target.value as F)}
-            >
-              {filterOptions.map((opt) => (
-                <option key={opt.value} value={opt.value}>
-                  {opt.label}
-                </option>
-              ))}
-            </select>
-          </div>
-        )}
-        <div className="section-filter-row">
-          <label>Sort</label>
-          <select
-            className="section-filter-select"
-            value={sortValue}
-            onChange={(e) => onSortChange(e.target.value as S)}
-          >
-            {sortOptions.map((opt) => (
-              <option key={opt.value} value={opt.value}>
-                {opt.label}
-              </option>
-            ))}
-          </select>
-        </div>
-      </div>
-    )
-  }
-
-  // Check if all sections are expanded
-  const allExpanded = Object.values(sections).every(v => v)
-
   return (
     <div className="sidebar-panel" data-testid="sidebar-panel">
       {/* Header - click to expand/collapse all */}
-      <div 
+      <div
         className="sidebar-header clickable"
         onClick={toggleAllSections}
         title={allExpanded ? 'Collapse all sections' : 'Expand all sections'}
@@ -442,23 +409,26 @@ export function Sidebar({
         {/* PRs Section */}
         <div className="sidebar-section" data-testid="sidebar-section-prs">
           <SectionHeader
-            sectionKey="prs"
+            {...headerProps('prs')}
             sectionIcon="⬡"
             sectionLabel="Pull Requests"
             count={filteredPRs.length}
-            hasActiveFilter={!!sectionSearch.prs.trim() || prFilter !== 'open-not-draft'}
+            hasActiveFilter={!!prSearch.trim() || prFilter !== 'open-not-draft'}
           />
-          <SectionFilter
-            sectionKey="prs"
-            placeholder="Filter PRs..."
-            filterOptions={PR_FILTER_OPTIONS}
-            filterValue={prFilter}
-            onFilterChange={setPrFilter}
-            sortOptions={PR_SORT_OPTIONS}
-            sortValue={prSort}
-            onSortChange={setPrSort}
-          />
-          {sections.prs && (
+          {isFilterOpen('prs') && (
+            <SectionFilter
+              placeholder="Filter PRs..."
+              search={prSearch}
+              onSearchChange={setPrSearch}
+              filterOptions={PR_FILTER_OPTIONS}
+              filterValue={prFilter}
+              onFilterChange={setPrFilter}
+              sortOptions={PR_SORT_OPTIONS}
+              sortValue={prSort}
+              onSortChange={setPrSort}
+            />
+          )}
+          {isExpanded('prs') && (
             <ul className="sidebar-items">
               {filteredPRs.map((pr) => (
                 <li
@@ -482,24 +452,27 @@ export function Sidebar({
         {/* Branches Section */}
         <div className="sidebar-section" data-testid="sidebar-section-branches">
           <SectionHeader
-            sectionKey="branches"
+            {...headerProps('branches')}
             sectionIcon="⎇"
             sectionLabel="Branches"
             count={filteredLocalBranches.length + (workingStatus?.hasChanges ? 1 : 0)}
-            hasActiveFilter={!!sectionSearch.branches.trim() || branchFilter !== 'all'}
+            hasActiveFilter={!!branchSearch.trim() || branchFilter !== 'all'}
             onAdd={onCreateBranch}
           />
-          <SectionFilter
-            sectionKey="branches"
-            placeholder="Filter branches..."
-            filterOptions={BRANCH_FILTER_OPTIONS}
-            filterValue={branchFilter}
-            onFilterChange={setBranchFilter}
-            sortOptions={BRANCH_SORT_OPTIONS}
-            sortValue={branchSort}
-            onSortChange={setBranchSort}
-          />
-          {sections.branches && (
+          {isFilterOpen('branches') && (
+            <SectionFilter
+              placeholder="Filter branches..."
+              search={branchSearch}
+              onSearchChange={setBranchSearch}
+              filterOptions={BRANCH_FILTER_OPTIONS}
+              filterValue={branchFilter}
+              onFilterChange={setBranchFilter}
+              sortOptions={BRANCH_SORT_OPTIONS}
+              sortValue={branchSort}
+              onSortChange={setBranchSort}
+            />
+          )}
+          {isExpanded('branches') && (
             <ul className="sidebar-items">
               {/* Uncommitted changes as virtual branch */}
               {workingStatus?.hasChanges && (
@@ -536,23 +509,26 @@ export function Sidebar({
         {/* Remotes Section */}
         <div className="sidebar-section" data-testid="sidebar-section-remotes">
           <SectionHeader
-            sectionKey="remotes"
+            {...headerProps('remotes')}
             sectionIcon="◈"
             sectionLabel="Remotes"
             count={filteredRemoteBranches.length}
-            hasActiveFilter={!!sectionSearch.remotes.trim() || remoteFilter !== 'all'}
+            hasActiveFilter={!!remoteSearch.trim() || remoteFilter !== 'all'}
           />
-          <SectionFilter
-            sectionKey="remotes"
-            placeholder="Filter remotes..."
-            filterOptions={BRANCH_FILTER_OPTIONS}
-            filterValue={remoteFilter}
-            onFilterChange={setRemoteFilter}
-            sortOptions={BRANCH_SORT_OPTIONS}
-            sortValue={remoteSort}
-            onSortChange={setRemoteSort}
-          />
-          {sections.remotes && (
+          {isFilterOpen('remotes') && (
+            <SectionFilter
+              placeholder="Filter remotes..."
+              search={remoteSearch}
+              onSearchChange={setRemoteSearch}
+              filterOptions={BRANCH_FILTER_OPTIONS}
+              filterValue={remoteFilter}
+              onFilterChange={setRemoteFilter}
+              sortOptions={BRANCH_SORT_OPTIONS}
+              sortValue={remoteSort}
+              onSortChange={setRemoteSort}
+            />
+          )}
+          {isExpanded('remotes') && (
             <ul className="sidebar-items">
               {filteredRemoteBranches.map((branch) => (
                 <li
@@ -561,8 +537,10 @@ export function Sidebar({
                   onClick={() => onSelectBranch?.(branch)}
                   onDoubleClick={() => onDoubleClickBranch?.(branch)}
                   onContextMenu={(e) => onContextMenuBranch?.(e, branch)}
+                  title={branch.name}
                 >
-                  <span className="item-title">{branch.name}</span>
+                  <span className="item-title">{remoteBranchDisplayName(branch.name)}</span>
+                  {showRemoteNames && <span className="item-meta">{remoteNameOf(branch.name)}</span>}
                 </li>
               ))}
               {filteredRemoteBranches.length === 0 && (
@@ -575,24 +553,27 @@ export function Sidebar({
         {/* Worktrees Section */}
         <div className="sidebar-section" data-testid="sidebar-section-worktrees">
           <SectionHeader
-            sectionKey="worktrees"
+            {...headerProps('worktrees')}
             sectionIcon="⊙"
             sectionLabel="Worktrees"
             count={filteredWorktrees.length}
-            hasActiveFilter={!!sectionSearch.worktrees.trim() || worktreeParent !== 'all'}
+            hasActiveFilter={!!worktreeSearch.trim() || worktreeParent !== 'all'}
             onAdd={onCreateWorktree}
           />
-          <SectionFilter
-            sectionKey="worktrees"
-            placeholder="Filter worktrees..."
-            filterOptions={worktreeFilterOptions}
-            filterValue={worktreeParent}
-            onFilterChange={setWorktreeParent}
-            sortOptions={WORKTREE_SORT_OPTIONS}
-            sortValue={worktreeSort}
-            onSortChange={setWorktreeSort}
-          />
-          {sections.worktrees && (
+          {isFilterOpen('worktrees') && (
+            <SectionFilter
+              placeholder="Filter worktrees..."
+              search={worktreeSearch}
+              onSearchChange={setWorktreeSearch}
+              filterOptions={worktreeFilterOptions}
+              filterValue={worktreeParent}
+              onFilterChange={setWorktreeParent}
+              sortOptions={WORKTREE_SORT_OPTIONS}
+              sortValue={worktreeSort}
+              onSortChange={setWorktreeSort}
+            />
+          )}
+          {isExpanded('worktrees') && (
             <ul className="sidebar-items">
               {filteredWorktrees.map((wt) => (
                 <li
@@ -616,23 +597,26 @@ export function Sidebar({
         {/* Stashes Section */}
         <div className="sidebar-section" data-testid="sidebar-section-stashes">
           <SectionHeader
-            sectionKey="stashes"
+            {...headerProps('stashes')}
             sectionIcon="⊡"
             sectionLabel="Stashes"
             count={filteredStashes.length}
-            hasActiveFilter={!!sectionSearch.stashes.trim() || stashFilter !== 'all'}
+            hasActiveFilter={!!stashSearch.trim() || stashFilter !== 'all'}
           />
-          <SectionFilter
-            sectionKey="stashes"
-            placeholder="Filter stashes..."
-            filterOptions={STASH_FILTER_OPTIONS}
-            filterValue={stashFilter}
-            onFilterChange={setStashFilter}
-            sortOptions={STASH_SORT_OPTIONS}
-            sortValue={stashSort}
-            onSortChange={setStashSort}
-          />
-          {sections.stashes && (
+          {isFilterOpen('stashes') && (
+            <SectionFilter
+              placeholder="Filter stashes..."
+              search={stashSearch}
+              onSearchChange={setStashSearch}
+              filterOptions={STASH_FILTER_OPTIONS}
+              filterValue={stashFilter}
+              onFilterChange={setStashFilter}
+              sortOptions={STASH_SORT_OPTIONS}
+              sortValue={stashSort}
+              onSortChange={setStashSort}
+            />
+          )}
+          {isExpanded('stashes') && (
             <ul className="sidebar-items">
               {filteredStashes.map((stash, index) => (
                 <li
@@ -658,20 +642,23 @@ export function Sidebar({
         {/* Repos Section */}
         <div className="sidebar-section" data-testid="sidebar-section-repos">
           <SectionHeader
-            sectionKey="repos"
+            {...headerProps('repos')}
             sectionIcon="⌂"
             sectionLabel="Repositories"
             count={filteredRepos.length}
-            hasActiveFilter={!!sectionSearch.repos.trim()}
+            hasActiveFilter={!!repoSearch.trim()}
           />
-          <SectionFilter
-            sectionKey="repos"
-            placeholder="Filter repos..."
-            sortOptions={REPO_SORT_OPTIONS}
-            sortValue={repoSort}
-            onSortChange={setRepoSort}
-          />
-          {sections.repos && (
+          {isFilterOpen('repos') && (
+            <SectionFilter
+              placeholder="Filter repos..."
+              search={repoSearch}
+              onSearchChange={setRepoSearch}
+              sortOptions={REPO_SORT_OPTIONS}
+              sortValue={repoSort}
+              onSortChange={setRepoSort}
+            />
+          )}
+          {isExpanded('repos') && (
             <ul className="sidebar-items">
               {filteredRepos.map((repo) => (
                 <li

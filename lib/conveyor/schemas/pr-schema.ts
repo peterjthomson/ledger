@@ -56,6 +56,10 @@ export const prIpcSchema = {
     args: z.tuple([z.number(), z.string()]),
     return: SuccessResultSchema,
   },
+  'edit-pr-title': {
+    args: z.tuple([z.number(), z.string()]),
+    return: SuccessResultSchema,
+  },
   'merge-pr': {
     args: z.tuple([z.number(), MergeMethodSchema.optional()]),
     return: SuccessResultSchema,

@@ -98,11 +98,26 @@ export async function getBranches(ctx: LocalRepositoryContext): Promise<Branches
 }
 
 /**
+ * The ref branches fork from: the first of origin/master, origin/main, master, main that exists.
+ */
+export async function resolveForkBaseRef(ctx: LocalRepositoryContext): Promise<string | null> {
+  for (const ref of ['origin/master', 'origin/main', 'master', 'main']) {
+    try {
+      if ((await ctx.git.raw(['rev-parse', '--verify', `${ref}^{commit}`])).trim()) return ref
+    } catch {
+      // Try the next candidate
+    }
+  }
+  return null
+}
+
+/**
  * Get metadata for a single branch (expensive operation)
  */
 export async function getBranchMetadata(
   ctx: LocalRepositoryContext,
-  branchName: string
+  branchName: string,
+  forkBaseRef?: string | null
 ): Promise<BranchMetadata> {
   // Do not pass custom --format to simple-git's log(): it breaks parsing of latest.date.
   const lastCommit = await ctx.git.log([branchName, '-1'])
@@ -120,8 +135,11 @@ export async function getBranchMetadata(
     firstCommitDate = ''
   }
 
-  // Get commit count
-  const countRaw = await ctx.git.raw(['rev-list', '--count', branchName])
+  // Commits on this branch since it forked from the base (whole history for main/master)
+  const base = forkBaseRef === undefined ? await resolveForkBaseRef(ctx) : forkBaseRef
+  const isPrimary = ['main', 'master'].includes(branchName.replace(/^remotes\/[^/]+\//, ''))
+  const range = base && !isPrimary ? `${base}..${branchName}` : branchName
+  const countRaw = await ctx.git.raw(['rev-list', '--count', range])
   const commitCount = parseInt(countRaw.trim(), 10) || 0
 
   return {
@@ -191,6 +209,7 @@ export async function getBranchesWithMetadata(ctx: LocalRepositoryContext): Prom
   const { current, branches } = await getBranches(ctx)
   const unmergedBranches = await getUnmergedBranches(ctx)
   const unmergedSet = new Set(unmergedBranches)
+  const forkBaseRef = await resolveForkBaseRef(ctx)
 
   // Get metadata for all branches in parallel (batched to avoid overwhelming git)
   const batchSize = 10
@@ -200,7 +219,7 @@ export async function getBranchesWithMetadata(ctx: LocalRepositoryContext): Prom
     const batch = branches.slice(i, i + batchSize)
     const metadataPromises = batch.map(async (branch) => {
       try {
-        const meta = await getBranchMetadata(ctx, branch.name)
+        const meta = await getBranchMetadata(ctx, branch.name, forkBaseRef)
         return {
           ...branch,
           lastCommitDate: meta.lastCommitDate,

@@ -8,9 +8,10 @@
  * - Selection and action handlers
  */
 
-import { useState, useMemo } from 'react'
+import { useMemo } from 'react'
 import type { Worktree, WorktreeSort } from '../../../types/electron'
 import type { Column } from '../../../types/app-types'
+import { useListControl } from '../../../stores/list-controls-store'
 import { ListPanelHeader } from './ListPanelHeader'
 import {
   getWorktreeParents,
@@ -52,14 +53,16 @@ export function WorktreeList({
   onContextMenu,
   onCreateWorktree,
 }: WorktreeListProps) {
-  // Local filter/sort state
-  const [controlsOpen, setControlsOpen] = useState(false)
-  const [search, setSearch] = useState('')
-  const [parentFilter, setParentFilter] = useState<string>('all')
-  const [sort, setSort] = useState<WorktreeSort>('last-modified')
+  // Filter/sort state shared with the sidebar section and kept across panel switches
+  const [controlsOpen, setControlsOpen] = useListControl('worktrees:open', false)
+  const [search, setSearch] = useListControl('worktrees:search', '')
+  const [storedParentFilter, setParentFilter] = useListControl<string>('worktrees:filter', 'all')
+  const [sort, setSort] = useListControl<WorktreeSort>('worktrees:sort', 'last-modified')
 
   // Get available parent filters
   const parentFilters = useMemo(() => getWorktreeParents(worktrees, repoPath ?? null), [worktrees, repoPath])
+  // A remembered parent folder may not exist in this repo; fall back to all
+  const parentFilter = storedParentFilter === 'all' || parentFilters.includes(storedParentFilter) ? storedParentFilter : 'all'
 
   // Create working folder pseudo-worktree
   const workingFolderWorktree: Worktree | null = useMemo(() => {

@@ -856,6 +856,11 @@ body,
   color: var(--accent-text);
 }
 
+.badge-remote {
+  background: var(--bg-tertiary);
+  color: var(--text-secondary);
+}
+
 .badge-unmerged {
   background: var(--warning-bg);
   color: var(--warning-text);

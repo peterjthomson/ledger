@@ -8,6 +8,7 @@
 import { useState, useMemo, useEffect } from 'react'
 import type { RepoInfo } from '../../../types/electron'
 import type { Column } from '../../../types/app-types'
+import { useListControl } from '../../../stores/list-controls-store'
 import { ListPanelHeader } from './ListPanelHeader'
 import { applyRepoControls, REPO_SORT_OPTIONS, type RepoSort } from './list-filters'
 
@@ -33,9 +34,9 @@ export function RepoList({
 }: RepoListProps) {
   const [repos, setRepos] = useState<RepoInfo[]>([])
   const [loading, setLoading] = useState(true)
-  const [controlsOpen, setControlsOpen] = useState(false)
-  const [search, setSearch] = useState('')
-  const [sort, setSort] = useState<RepoSort>('current-first')
+  const [controlsOpen, setControlsOpen] = useListControl('repos:open', false)
+  const [search, setSearch] = useListControl('repos:search', '')
+  const [sort, setSort] = useListControl<RepoSort>('repos:sort', 'current-first')
 
   // Load sibling repos when repoPath changes
   useEffect(() => {
